@@ -1,0 +1,423 @@
+# Copyright (C) 2024 cottboy
+# This file is distributed under the same license as the LibreCompress plugin.
+msgid ""
+msgstr ""
+"Project-Id-Version: LibreCompress 1.1.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-04-18 00:00:00+00:00\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+
+#: includes/class-media-library.php
+msgid "%1$s-%2$s=%3$s"
+msgstr ""
+
+#: compression/class-local-base.php
+msgid "%s 不可用"
+msgstr ""
+
+#: includes/class-settings.php
+msgid "0-100，数值越高质量越好，文件越大（仅有损压缩有效）"
+msgstr ""
+
+#: includes/class-settings.php
+msgid "JPEG 压缩"
+msgstr ""
+
+#: includes/class-settings.php
+msgid "LibreCompress"
+msgstr ""
+
+#: includes/class-settings.php
+msgid "PNG 压缩"
+msgstr ""
+
+#: includes/class-settings.php
+msgid "WEBP 压缩"
+msgstr ""
+
+#: compression/class-local-base.php
+msgid "exec() 函数不可用"
+msgstr ""
+
+#: includes/class-settings.php
+msgid "oxipng 优化级别，0-6，数值越高压缩越慢但效果越好"
+msgstr ""
+
+#: includes/class-settings.php
+msgid "pngquant 质量参数，0-100"
+msgstr ""
+
+#: includes/class-settings.php
+msgid "上传图片时自动压缩"
+msgstr ""
+
+#: includes/class-libre-compress.php
+msgid "不允许反序列化单例实例"
+msgstr ""
+
+#: includes/class-settings.php
+msgid "不可用"
+msgstr ""
+
+#: compression/class-local-base.php
+msgid "不支持的文件格式"
+msgstr ""
+
+#: includes/class-settings.php
+msgid "为缺少缩略图的图片生成缩略图，并将文章中的图片链接替换为\"大\"尺寸"
+msgstr ""
+
+#: compression/class-jpegoptim.php
+#: compression/class-oxipng.php
+msgid "从 GitHub 下载预编译的二进制文件"
+msgstr ""
+
+#: compression/class-cwebp.php
+msgid "从 Google 官网下载预编译的二进制文件"
+msgstr ""
+
+#: compression/class-pngquant.php
+msgid "从官网下载预编译的二进制文件"
+msgstr ""
+
+#: includes/class-libre-compress.php
+#: includes/class-media-library.php
+msgid "删除备份"
+msgstr ""
+
+#: includes/class-media-library.php
+msgid "删除失败"
+msgstr ""
+
+#: includes/class-settings.php
+msgid "删除已有缩略图"
+msgstr ""
+
+#: includes/class-settings.php
+msgid "删除所有原图备份"
+msgstr ""
+
+#: includes/class-settings.php
+msgid "删除所有备份文件，释放磁盘空间"
+msgstr ""
+
+#: includes/class-settings.php
+msgid "删除所有缩略图并将文章中的图片链接替换为原图"
+msgstr ""
+
+#: includes/class-media-library.php
+msgid "压缩"
+msgstr ""
+
+#: includes/class-libre-compress.php
+msgid "压缩中..."
+msgstr ""
+
+#: includes/class-settings.php
+msgid "压缩前备份原图"
+msgstr ""
+
+#: includes/class-settings.php
+msgid "压缩参数设置"
+msgstr ""
+
+#: includes/class-compressor.php
+msgid "压缩后体积更大，已跳过"
+msgstr ""
+
+#: includes/class-media-library.php
+msgid "压缩失败"
+msgstr ""
+
+#: includes/class-settings.php
+msgid "压缩媒体库中所有未压缩的图片"
+msgstr ""
+
+#: includes/class-settings.php
+msgid "压缩工具状态"
+msgstr ""
+
+#: compression/class-local-base.php
+#: includes/class-compressor.php
+msgid "压缩成功"
+msgstr ""
+
+#: includes/class-settings.php
+msgid "压缩方式"
+msgstr ""
+
+#: includes/class-settings.php
+msgid "压缩模式"
+msgstr ""
+
+#: includes/class-media-library.php
+msgid "压缩记录已清除"
+msgstr ""
+
+#: includes/class-settings.php
+msgid "压缩质量"
+msgstr ""
+
+#: includes/class-settings.php
+msgid "可用"
+msgstr ""
+
+#: includes/class-settings.php
+msgid "后续上传的图片将不再生成缩略图"
+msgstr ""
+
+#: includes/class-settings.php
+msgid "后续上传的图片将重新生成缩略图"
+msgstr ""
+
+#: includes/class-settings.php
+msgid "基本设置"
+msgstr ""
+
+#: includes/class-libre-compress.php
+msgid "处理中..."
+msgstr ""
+
+#: includes/class-settings.php
+msgid "备份原图"
+msgstr ""
+
+#: includes/class-media-library.php
+msgid "备份已删除"
+msgstr ""
+
+#: includes/class-settings.php
+msgid "安装方式：下载或自行编译二进制文件放到 /wp-content/LibreCompress-bin 目录 或 通过系统包管理器安装"
+msgstr ""
+
+#: includes/class-settings.php
+msgid "将所有已压缩的图片恢复为原图"
+msgstr ""
+
+#: includes/class-settings.php
+msgid "工具"
+msgstr ""
+
+#: includes/class-thumbnail-manager.php
+msgid "已删除 %1$d 个缩略图文件（%2$d 个附件），替换了 %3$d 个图片链接"
+msgstr ""
+
+#: includes/class-media-library.php
+msgid "已删除 %d 个备份文件"
+msgstr ""
+
+#: includes/class-media-library.php
+msgid "已压缩%s%%"
+msgstr ""
+
+#: includes/class-thumbnail-manager.php
+msgid "已启用缩略图生成"
+msgstr ""
+
+#: includes/class-settings.php
+msgid "已安装"
+msgstr ""
+
+#: includes/class-libre-compress.php
+msgid "已完成"
+msgstr ""
+
+#: includes/class-thumbnail-manager.php
+msgid "已禁止生成缩略图"
+msgstr ""
+
+#: includes/class-thumbnail-manager.php
+msgid "已重新生成 %1$d 个附件的缩略图（%2$d 个失败），替换了 %3$d 个图片链接"
+msgstr ""
+
+#: includes/class-settings.php
+msgid "当前版本仅提供本地压缩。"
+msgstr ""
+
+#: includes/class-libre-compress.php
+msgid "恢复中..."
+msgstr ""
+
+#: includes/class-media-library.php
+msgid "恢复原图"
+msgstr ""
+
+#: includes/class-media-library.php
+msgid "恢复失败"
+msgstr ""
+
+#: includes/class-media-library.php
+msgid "恢复完成，成功 %1$d 个，失败 %2$d 个"
+msgstr ""
+
+#: includes/class-media-library.php
+msgid "恢复成功"
+msgstr ""
+
+#: includes/class-settings.php
+msgid "恢复所有原图备份"
+msgstr ""
+
+#: includes/class-settings.php
+msgid "批量压缩未压缩的图片"
+msgstr ""
+
+#: includes/class-libre-compress.php
+msgid "操作失败"
+msgstr ""
+
+#: includes/class-libre-compress.php
+msgid "操作成功"
+msgstr ""
+
+#: compression/class-local-base.php
+#: includes/class-compressor.php
+#: includes/class-media-library.php
+msgid "文件不存在"
+msgstr ""
+
+#: includes/class-compressor.php
+msgid "文件大小超过限制（最大 %d MB）"
+msgstr ""
+
+#: includes/class-compressor.php
+msgid "文件路径不安全"
+msgstr ""
+
+#: includes/class-settings.php
+msgid "无损优化级别"
+msgstr ""
+
+#: includes/class-settings.php
+msgid "无损压缩"
+msgstr ""
+
+#: includes/class-thumbnail-manager.php
+msgid "无效的操作类型"
+msgstr ""
+
+#: includes/class-media-library.php
+msgid "无效的附件 ID"
+msgstr ""
+
+#: includes/class-settings.php
+msgid "有损压缩"
+msgstr ""
+
+#: includes/class-settings.php
+msgid "有损压缩质量"
+msgstr ""
+
+#: includes/class-media-library.php
+msgid "未压缩"
+msgstr ""
+
+#: includes/class-settings.php
+msgid "未安装"
+msgstr ""
+
+#: includes/class-settings.php
+msgid "本地压缩"
+msgstr ""
+
+#: includes/class-settings.php
+msgid "本地压缩并发数"
+msgstr ""
+
+#: includes/class-settings.php
+msgid "本地压缩需要 exec() 函数，请联系主机商启用"
+msgstr ""
+
+#: includes/class-media-library.php
+#: includes/class-thumbnail-manager.php
+msgid "权限不足"
+msgstr ""
+
+#: includes/class-settings.php
+msgid "格式"
+msgstr ""
+
+#: includes/class-media-library.php
+msgid "没有可用的备份"
+msgstr ""
+
+#: includes/class-compressor.php
+msgid "没有可用的本地压缩工具"
+msgstr ""
+
+#: includes/class-settings.php
+msgid "清除后可重新压缩所有图片"
+msgstr ""
+
+#: includes/class-settings.php
+msgid "清除所有压缩记录"
+msgstr ""
+
+#: includes/class-settings.php
+msgid "状态"
+msgstr ""
+
+#: includes/class-libre-compress.php
+msgid "确定要为缺少缩略图的图片重新生成缩略图吗？这可能需要一些时间。"
+msgstr ""
+
+#: includes/class-libre-compress.php
+msgid "确定要删除所有原图备份吗？删除后将无法恢复原图。"
+msgstr ""
+
+#: includes/class-libre-compress.php
+msgid "确定要删除所有缩略图吗？此操作不可撤销。"
+msgstr ""
+
+#: includes/class-libre-compress.php
+msgid "确定要删除此图片的备份吗？删除后将无法恢复原图。"
+msgstr ""
+
+#: includes/class-libre-compress.php
+msgid "确定要恢复所有原图备份吗？此操作不可撤销。"
+msgstr ""
+
+#: includes/class-libre-compress.php
+msgid "确定要清除所有压缩记录吗？此操作不可撤销。"
+msgstr ""
+
+#: includes/class-settings.php
+msgid "禁止生成缩略图"
+msgstr ""
+
+#: includes/class-settings.php
+msgid "系统状态"
+msgstr ""
+
+#: includes/class-settings.php
+msgid "自动压缩"
+msgstr ""
+
+#: includes/class-libre-compress.php
+msgid "设置"
+msgstr ""
+
+#: includes/class-settings.php
+msgid "跳转"
+msgstr ""
+
+#: includes/class-settings.php
+msgid "重新启用缩略图"
+msgstr ""
+
+#: includes/class-settings.php
+msgid "重新生成缩略图"
+msgstr ""
+
+#: includes/class-media-library.php
+msgid "重试"
+msgstr ""
+
+#: includes/class-settings.php
+msgid "链接"
+msgstr ""
