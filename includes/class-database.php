@@ -64,7 +64,6 @@ class Libre_Compress_Database {
     public function create_tables() {
         $this->create_records_table();
         $this->create_backups_table();
-        $this->migrate_obsolete_columns();
     }
 
     /**
@@ -119,36 +118,8 @@ class Libre_Compress_Database {
         require_once ABSPATH . 'wp-admin/includes/upgrade.php';
         dbDelta( $sql );
     }
-
-    /**
-     * 清理旧字段
-     */
-    private function migrate_obsolete_columns() {
-        global $wpdb;
-
-        $compression_mode_column = $wpdb->get_var( "SHOW COLUMNS FROM {$this->records_table} LIKE 'compression_mode'" );
-
-        if ( 'compression_mode' === $compression_mode_column ) {
-            $wpdb->query( "ALTER TABLE {$this->records_table} DROP COLUMN compression_mode" );
-        }
-
-        $channel_name_column = $wpdb->get_var( "SHOW COLUMNS FROM {$this->records_table} LIKE 'channel_name'" );
-        $tool_name_column    = $wpdb->get_var( "SHOW COLUMNS FROM {$this->records_table} LIKE 'tool_name'" );
-
-        if ( 'channel_name' === $channel_name_column && 'tool_name' !== $tool_name_column ) {
-            $wpdb->query( "ALTER TABLE {$this->records_table} ADD COLUMN tool_name VARCHAR(50) NOT NULL DEFAULT '' AFTER compression_ratio" );
-            $wpdb->query( "UPDATE {$this->records_table} SET tool_name = channel_name WHERE tool_name = ''" );
-            $wpdb->query( "ALTER TABLE {$this->records_table} DROP COLUMN channel_name" );
-            return;
-        }
-
-        if ( 'channel_name' === $channel_name_column && 'tool_name' === $tool_name_column ) {
-            $wpdb->query( "UPDATE {$this->records_table} SET tool_name = channel_name WHERE tool_name = ''" );
-            $wpdb->query( "ALTER TABLE {$this->records_table} DROP COLUMN channel_name" );
-        }
-    }
-
-    /**
+    
+    /* 
      * 添加压缩记录
      *
      * @param array $data 记录数据

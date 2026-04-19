@@ -26,7 +26,6 @@ $wpdb->query( "DROP TABLE IF EXISTS {$backups_table}" );
 // 删除设置项
 delete_option( 'libre_compress_general' );
 delete_option( 'libre_compress_tools' );
-delete_option( 'libre_compress_local' );
 delete_option( 'libre_compress_db_version' );
 
 // 删除备份文件目录
