@@ -16,7 +16,7 @@ msgstr ""
 msgid "%1$s-%2$s=%3$s"
 msgstr ""
 
-#: compression/class-local-base.php
+#: compression/class-tool-base.php
 msgid "%s 不可用"
 msgstr ""
 
@@ -40,7 +40,7 @@ msgstr ""
 msgid "WEBP 压缩"
 msgstr ""
 
-#: compression/class-local-base.php
+#: compression/class-tool-base.php
 msgid "exec() 函数不可用"
 msgstr ""
 
@@ -64,7 +64,7 @@ msgstr ""
 msgid "不可用"
 msgstr ""
 
-#: compression/class-local-base.php
+#: compression/class-tool-base.php
 msgid "不支持的文件格式"
 msgstr ""
 
@@ -142,13 +142,9 @@ msgstr ""
 msgid "压缩工具状态"
 msgstr ""
 
-#: compression/class-local-base.php
+#: compression/class-tool-base.php
 #: includes/class-compressor.php
 msgid "压缩成功"
-msgstr ""
-
-#: includes/class-settings.php
-msgid "压缩方式"
 msgstr ""
 
 #: includes/class-settings.php
@@ -235,10 +231,6 @@ msgstr ""
 msgid "已重新生成 %1$d 个附件的缩略图（%2$d 个失败），替换了 %3$d 个图片链接"
 msgstr ""
 
-#: includes/class-settings.php
-msgid "当前版本仅提供本地压缩。"
-msgstr ""
-
 #: includes/class-libre-compress.php
 msgid "恢复中..."
 msgstr ""
@@ -275,7 +267,7 @@ msgstr ""
 msgid "操作成功"
 msgstr ""
 
-#: compression/class-local-base.php
+#: compression/class-tool-base.php
 #: includes/class-compressor.php
 #: includes/class-media-library.php
 msgid "文件不存在"
@@ -322,15 +314,15 @@ msgid "未安装"
 msgstr ""
 
 #: includes/class-settings.php
-msgid "本地压缩"
+msgid "压缩工具"
 msgstr ""
 
 #: includes/class-settings.php
-msgid "本地压缩并发数"
+msgid "压缩并发数"
 msgstr ""
 
 #: includes/class-settings.php
-msgid "本地压缩需要 exec() 函数，请联系主机商启用"
+msgid "压缩依赖 exec() 函数，请联系主机商启用"
 msgstr ""
 
 #: includes/class-media-library.php
@@ -347,7 +339,7 @@ msgid "没有可用的备份"
 msgstr ""
 
 #: includes/class-compressor.php
-msgid "没有可用的本地压缩工具"
+msgid "没有可用的压缩工具"
 msgstr ""
 
 #: includes/class-settings.php

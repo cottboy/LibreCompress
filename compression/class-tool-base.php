@@ -1,6 +1,6 @@
 <?php
 /**
- * 本地压缩基类
+ * 压缩工具基类
  *
  * @package LibreCompress
  */
@@ -11,11 +11,11 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 /**
- * 本地压缩基类
+ * 压缩工具基类
  *
- * 提供本地命令行压缩工具的通用功能
+ * 提供命令行压缩工具的通用功能
  */
-abstract class Libre_Compress_Local_Base {
+abstract class Libre_Compress_Tool_Base {
 
     /**
      * 缓存的可执行文件路径
@@ -71,7 +71,7 @@ abstract class Libre_Compress_Local_Base {
     /**
      * 获取单张图片最大尺寸限制（KB）
      *
-     * 本地压缩默认无限制
+     * 默认无限制
      *
      * @return int 最大尺寸限制
      */
@@ -79,11 +79,6 @@ abstract class Libre_Compress_Local_Base {
         return 0;
     }
 
-    /**
-     * 获取渠道类型
-     *
-     * @return string 渠道类型，本地压缩工具都是官方开源工具
-     */
     /**
      * 检查 exec() 函数是否可用
      *

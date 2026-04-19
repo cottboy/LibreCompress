@@ -35,9 +35,9 @@ class Libre_Compress_Settings {
         );
 
         register_setting(
-            'libre_compress_local_group',
-            'libre_compress_local',
-            array( $this, 'sanitize_local_settings' )
+            'libre_compress_tools_group',
+            'libre_compress_tools',
+            array( $this, 'sanitize_tools_settings' )
         );
     }
 
@@ -46,15 +46,15 @@ class Libre_Compress_Settings {
 
         $sanitized['auto_compress']      = ! empty( $input['auto_compress'] );
         $sanitized['backup_enabled']     = ! empty( $input['backup_enabled'] );
-        $sanitized['local_concurrency']  = isset( $input['local_concurrency'] ) ? absint( $input['local_concurrency'] ) : 5;
+        $sanitized['tool_concurrency']   = isset( $input['tool_concurrency'] ) ? absint( $input['tool_concurrency'] ) : 5;
         $sanitized['disable_thumbnails'] = ! empty( $input['disable_thumbnails'] );
 
-        $sanitized['local_concurrency'] = max( 1, min( 100, $sanitized['local_concurrency'] ) );
+        $sanitized['tool_concurrency'] = max( 1, min( 100, $sanitized['tool_concurrency'] ) );
 
         return $sanitized;
     }
 
-    public function sanitize_local_settings( $input ) {
+    public function sanitize_tools_settings( $input ) {
         $sanitized = array();
 
         $sanitized['jpeg_mode']    = isset( $input['jpeg_mode'] ) && in_array( $input['jpeg_mode'], array( 'lossy', 'lossless' ), true ) ? $input['jpeg_mode'] : 'lossy';
@@ -78,7 +78,7 @@ class Libre_Compress_Settings {
     public function render_settings_page() {
         $this->current_tab = isset( $_GET['tab'] ) ? sanitize_text_field( wp_unslash( $_GET['tab'] ) ) : 'general';
 
-        $valid_tabs = array( 'general', 'local' );
+        $valid_tabs = array( 'general', 'tools' );
         if ( ! in_array( $this->current_tab, $valid_tabs, true ) ) {
             $this->current_tab = 'general';
         }
@@ -90,16 +90,16 @@ class Libre_Compress_Settings {
                 <a href="<?php echo esc_url( admin_url( 'options-general.php?page=libre-compress&tab=general' ) ); ?>" class="nav-tab <?php echo 'general' === $this->current_tab ? 'nav-tab-active' : ''; ?>">
                     <?php esc_html_e( '基本设置', 'libre-compress' ); ?>
                 </a>
-                <a href="<?php echo esc_url( admin_url( 'options-general.php?page=libre-compress&tab=local' ) ); ?>" class="nav-tab <?php echo 'local' === $this->current_tab ? 'nav-tab-active' : ''; ?>">
-                    <?php esc_html_e( '本地压缩', 'libre-compress' ); ?>
+                <a href="<?php echo esc_url( admin_url( 'options-general.php?page=libre-compress&tab=tools' ) ); ?>" class="nav-tab <?php echo 'tools' === $this->current_tab ? 'nav-tab-active' : ''; ?>">
+                    <?php esc_html_e( '压缩工具', 'libre-compress' ); ?>
                 </a>
             </nav>
 
             <div class="tab-content" style="margin-top: 20px;">
                 <?php
                 switch ( $this->current_tab ) {
-                    case 'local':
-                        $this->render_local_tab();
+                    case 'tools':
+                        $this->render_tools_tab();
                         break;
                     default:
                         $this->render_general_tab();
@@ -128,12 +128,6 @@ class Libre_Compress_Settings {
                     </td>
                 </tr>
                 <tr>
-                    <th scope="row"><?php esc_html_e( '压缩方式', 'libre-compress' ); ?></th>
-                    <td>
-                        <span class="description"><?php esc_html_e( '当前版本仅提供本地压缩。', 'libre-compress' ); ?></span>
-                    </td>
-                </tr>
-                <tr>
                     <th scope="row"><?php esc_html_e( '备份原图', 'libre-compress' ); ?></th>
                     <td>
                         <label>
@@ -143,9 +137,9 @@ class Libre_Compress_Settings {
                     </td>
                 </tr>
                 <tr>
-                    <th scope="row"><?php esc_html_e( '本地压缩并发数', 'libre-compress' ); ?></th>
+                    <th scope="row"><?php esc_html_e( '压缩并发数', 'libre-compress' ); ?></th>
                     <td>
-                        <input type="number" name="libre_compress_general[local_concurrency]" value="<?php echo esc_attr( $options['local_concurrency'] ?? 5 ); ?>" min="1" max="100" class="small-text">
+                        <input type="number" name="libre_compress_general[tool_concurrency]" value="<?php echo esc_attr( $options['tool_concurrency'] ?? 5 ); ?>" min="1" max="100" class="small-text">
                     </td>
                 </tr>
             </table>
@@ -246,11 +240,11 @@ class Libre_Compress_Settings {
         <?php
     }
 
-    private function render_local_tab() {
-        $options = get_option( 'libre_compress_local', array() );
+    private function render_tools_tab() {
+        $options = get_option( 'libre_compress_tools', array() );
 
         $compressor = libre_compress()->compressor;
-        $tools      = $compressor->get_local_tools();
+        $tools      = $compressor->get_tools();
 
         $exec_available = function_exists( 'exec' ) && ! in_array( 'exec', array_map( 'trim', explode( ',', ini_get( 'disable_functions' ) ) ), true );
         ?>
@@ -264,7 +258,7 @@ class Libre_Compress_Settings {
                         <span style="color: #00a32a;">✓ <?php esc_html_e( '可用', 'libre-compress' ); ?></span>
                     <?php else : ?>
                         <span style="color: #d63638;">✗ <?php esc_html_e( '不可用', 'libre-compress' ); ?></span>
-                        <p class="description"><?php esc_html_e( '本地压缩需要 exec() 函数，请联系主机商启用', 'libre-compress' ); ?></p>
+                        <p class="description"><?php esc_html_e( '压缩依赖 exec() 函数，请联系主机商启用', 'libre-compress' ); ?></p>
                     <?php endif; ?>
                 </td>
                 <td></td>
@@ -310,7 +304,7 @@ class Libre_Compress_Settings {
 
         <h2><?php esc_html_e( '压缩参数设置', 'libre-compress' ); ?></h2>
         <form method="post" action="options.php">
-            <?php settings_fields( 'libre_compress_local_group' ); ?>
+            <?php settings_fields( 'libre_compress_tools_group' ); ?>
 
             <h3 style="margin-top: 30px;"><?php esc_html_e( 'JPEG 压缩', 'libre-compress' ); ?></h3>
             <table class="form-table">
@@ -318,12 +312,12 @@ class Libre_Compress_Settings {
                     <th scope="row"><?php esc_html_e( '压缩模式', 'libre-compress' ); ?></th>
                     <td>
                         <label>
-                            <input type="radio" name="libre_compress_local[jpeg_mode]" value="lossy" <?php checked( ( $options['jpeg_mode'] ?? 'lossy' ), 'lossy' ); ?>>
+                            <input type="radio" name="libre_compress_tools[jpeg_mode]" value="lossy" <?php checked( ( $options['jpeg_mode'] ?? 'lossy' ), 'lossy' ); ?>>
                             <?php esc_html_e( '有损压缩', 'libre-compress' ); ?>
                         </label>
                         &nbsp;&nbsp;
                         <label>
-                            <input type="radio" name="libre_compress_local[jpeg_mode]" value="lossless" <?php checked( ( $options['jpeg_mode'] ?? 'lossy' ), 'lossless' ); ?>>
+                            <input type="radio" name="libre_compress_tools[jpeg_mode]" value="lossless" <?php checked( ( $options['jpeg_mode'] ?? 'lossy' ), 'lossless' ); ?>>
                             <?php esc_html_e( '无损压缩', 'libre-compress' ); ?>
                         </label>
                     </td>
@@ -331,7 +325,7 @@ class Libre_Compress_Settings {
                 <tr>
                     <th scope="row"><?php esc_html_e( '压缩质量', 'libre-compress' ); ?></th>
                     <td>
-                        <input type="range" name="libre_compress_local[jpeg_quality]" value="<?php echo esc_attr( $options['jpeg_quality'] ?? 80 ); ?>" min="0" max="100" oninput="this.nextElementSibling.value = this.value">
+                        <input type="range" name="libre_compress_tools[jpeg_quality]" value="<?php echo esc_attr( $options['jpeg_quality'] ?? 80 ); ?>" min="0" max="100" oninput="this.nextElementSibling.value = this.value">
                         <output><?php echo esc_html( $options['jpeg_quality'] ?? 80 ); ?></output>
                         <p class="description"><?php esc_html_e( '0-100，数值越高质量越好，文件越大（仅有损压缩有效）', 'libre-compress' ); ?></p>
                     </td>
@@ -344,12 +338,12 @@ class Libre_Compress_Settings {
                     <th scope="row"><?php esc_html_e( '压缩模式', 'libre-compress' ); ?></th>
                     <td>
                         <label>
-                            <input type="radio" name="libre_compress_local[png_mode]" value="lossy" <?php checked( ( $options['png_mode'] ?? 'lossy' ), 'lossy' ); ?>>
+                            <input type="radio" name="libre_compress_tools[png_mode]" value="lossy" <?php checked( ( $options['png_mode'] ?? 'lossy' ), 'lossy' ); ?>>
                             <?php esc_html_e( '有损压缩', 'libre-compress' ); ?>
                         </label>
                         &nbsp;&nbsp;
                         <label>
-                            <input type="radio" name="libre_compress_local[png_mode]" value="lossless" <?php checked( ( $options['png_mode'] ?? 'lossy' ), 'lossless' ); ?>>
+                            <input type="radio" name="libre_compress_tools[png_mode]" value="lossless" <?php checked( ( $options['png_mode'] ?? 'lossy' ), 'lossless' ); ?>>
                             <?php esc_html_e( '无损压缩', 'libre-compress' ); ?>
                         </label>
                     </td>
@@ -357,7 +351,7 @@ class Libre_Compress_Settings {
                 <tr>
                     <th scope="row"><?php esc_html_e( '有损压缩质量', 'libre-compress' ); ?></th>
                     <td>
-                        <input type="range" name="libre_compress_local[png_lossy_quality]" value="<?php echo esc_attr( $options['png_lossy_quality'] ?? 80 ); ?>" min="0" max="100" oninput="this.nextElementSibling.value = this.value">
+                        <input type="range" name="libre_compress_tools[png_lossy_quality]" value="<?php echo esc_attr( $options['png_lossy_quality'] ?? 80 ); ?>" min="0" max="100" oninput="this.nextElementSibling.value = this.value">
                         <output><?php echo esc_html( $options['png_lossy_quality'] ?? 80 ); ?></output>
                         <p class="description"><?php esc_html_e( 'pngquant 质量参数，0-100', 'libre-compress' ); ?></p>
                     </td>
@@ -365,7 +359,7 @@ class Libre_Compress_Settings {
                 <tr>
                     <th scope="row"><?php esc_html_e( '无损优化级别', 'libre-compress' ); ?></th>
                     <td>
-                        <input type="range" name="libre_compress_local[png_lossless_level]" value="<?php echo esc_attr( $options['png_lossless_level'] ?? 6 ); ?>" min="0" max="6" oninput="this.nextElementSibling.value = this.value">
+                        <input type="range" name="libre_compress_tools[png_lossless_level]" value="<?php echo esc_attr( $options['png_lossless_level'] ?? 6 ); ?>" min="0" max="6" oninput="this.nextElementSibling.value = this.value">
                         <output><?php echo esc_html( $options['png_lossless_level'] ?? 6 ); ?></output>
                         <p class="description"><?php esc_html_e( 'oxipng 优化级别，0-6，数值越高压缩越慢但效果越好', 'libre-compress' ); ?></p>
                     </td>
@@ -378,12 +372,12 @@ class Libre_Compress_Settings {
                     <th scope="row"><?php esc_html_e( '压缩模式', 'libre-compress' ); ?></th>
                     <td>
                         <label>
-                            <input type="radio" name="libre_compress_local[webp_mode]" value="lossy" <?php checked( ( $options['webp_mode'] ?? 'lossy' ), 'lossy' ); ?>>
+                            <input type="radio" name="libre_compress_tools[webp_mode]" value="lossy" <?php checked( ( $options['webp_mode'] ?? 'lossy' ), 'lossy' ); ?>>
                             <?php esc_html_e( '有损压缩', 'libre-compress' ); ?>
                         </label>
                         &nbsp;&nbsp;
                         <label>
-                            <input type="radio" name="libre_compress_local[webp_mode]" value="lossless" <?php checked( ( $options['webp_mode'] ?? 'lossy' ), 'lossless' ); ?>>
+                            <input type="radio" name="libre_compress_tools[webp_mode]" value="lossless" <?php checked( ( $options['webp_mode'] ?? 'lossy' ), 'lossless' ); ?>>
                             <?php esc_html_e( '无损压缩', 'libre-compress' ); ?>
                         </label>
                     </td>
@@ -391,7 +385,7 @@ class Libre_Compress_Settings {
                 <tr>
                     <th scope="row"><?php esc_html_e( '压缩质量', 'libre-compress' ); ?></th>
                     <td>
-                        <input type="range" name="libre_compress_local[webp_quality]" value="<?php echo esc_attr( $options['webp_quality'] ?? 80 ); ?>" min="0" max="100" oninput="this.nextElementSibling.value = this.value">
+                        <input type="range" name="libre_compress_tools[webp_quality]" value="<?php echo esc_attr( $options['webp_quality'] ?? 80 ); ?>" min="0" max="100" oninput="this.nextElementSibling.value = this.value">
                         <output><?php echo esc_html( $options['webp_quality'] ?? 80 ); ?></output>
                         <p class="description"><?php esc_html_e( '0-100，数值越高质量越好，文件越大（仅有损压缩有效）', 'libre-compress' ); ?></p>
                     </td>

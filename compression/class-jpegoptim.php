@@ -15,7 +15,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  *
  * 使用 jpegoptim 命令行工具压缩 JPEG 图片
  */
-class Libre_Compress_Jpegoptim extends Libre_Compress_Local_Base {
+class Libre_Compress_Jpegoptim extends Libre_Compress_Tool_Base {
 
     /**
      * 获取渠道名称
@@ -55,7 +55,7 @@ class Libre_Compress_Jpegoptim extends Libre_Compress_Local_Base {
         $executable = $this->get_executable_path();
 
         // 获取压缩设置
-        $settings = get_option( 'libre_compress_local', array() );
+        $settings = get_option( 'libre_compress_tools', array() );
         $quality  = isset( $settings['jpeg_quality'] ) ? absint( $settings['jpeg_quality'] ) : 80;
         $mode     = isset( $settings['jpeg_mode'] ) ? $settings['jpeg_mode'] : 'lossy';
         $lossless = ( 'lossless' === $mode );

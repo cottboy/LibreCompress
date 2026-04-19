@@ -25,6 +25,7 @@ $wpdb->query( "DROP TABLE IF EXISTS {$backups_table}" );
 
 // 删除设置项
 delete_option( 'libre_compress_general' );
+delete_option( 'libre_compress_tools' );
 delete_option( 'libre_compress_local' );
 delete_option( 'libre_compress_db_version' );
 
@@ -50,7 +51,7 @@ if ( is_dir( $backup_dir ) ) {
     rmdir( $backup_dir );
 }
 
-// 删除本地压缩工具二进制目录
+// 删除压缩工具二进制目录
 $bin_dir = WP_CONTENT_DIR . '/LibreCompress-bin';
 
 if ( is_dir( $bin_dir ) ) {

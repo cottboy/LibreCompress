@@ -15,7 +15,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  *
  * 使用 pngquant 命令行工具进行 PNG 有损压缩
  */
-class Libre_Compress_Pngquant extends Libre_Compress_Local_Base {
+class Libre_Compress_Pngquant extends Libre_Compress_Tool_Base {
 
     /**
      * 获取渠道名称
@@ -55,7 +55,7 @@ class Libre_Compress_Pngquant extends Libre_Compress_Local_Base {
         $executable = $this->get_executable_path();
 
         // 获取压缩设置
-        $settings = get_option( 'libre_compress_local', array() );
+        $settings = get_option( 'libre_compress_tools', array() );
         $quality  = isset( $settings['png_lossy_quality'] ) ? absint( $settings['png_lossy_quality'] ) : 80;
 
         // 允许通过选项覆盖设置

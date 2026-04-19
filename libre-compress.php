@@ -47,7 +47,7 @@ define( 'LIBRE_COMPRESS_URL', plugin_dir_url( __FILE__ ) );
 define( 'LIBRE_COMPRESS_BASENAME', plugin_basename( __FILE__ ) );
 
 /**
- * 本地压缩工具二进制文件目录路径
+ * 压缩工具二进制文件目录路径
  * 存储在 wp-content 目录下，避免插件更新时被覆盖
  */
 define( 'LIBRE_COMPRESS_BIN_PATH', WP_CONTENT_DIR . '/LibreCompress-bin/' );
@@ -73,8 +73,8 @@ add_action( 'plugins_loaded', 'libre_compress_load_textdomain' );
  * 加载依赖文件
  */
 function libre_compress_load_dependencies() {
-    // 加载本地压缩基类和实现
-    require_once LIBRE_COMPRESS_PATH . 'compression/class-local-base.php';
+    // 加载压缩工具基类和实现
+    require_once LIBRE_COMPRESS_PATH . 'compression/class-tool-base.php';
     require_once LIBRE_COMPRESS_PATH . 'compression/class-jpegoptim.php';
     require_once LIBRE_COMPRESS_PATH . 'compression/class-pngquant.php';
     require_once LIBRE_COMPRESS_PATH . 'compression/class-oxipng.php';
@@ -97,7 +97,7 @@ function libre_compress_activate() {
     // 加载依赖
     libre_compress_load_dependencies();
 
-    // 创建本地压缩工具二进制文件目录
+    // 创建压缩工具二进制文件目录
     if ( ! file_exists( LIBRE_COMPRESS_BIN_PATH ) ) {
         wp_mkdir_p( LIBRE_COMPRESS_BIN_PATH );
 
@@ -118,11 +118,11 @@ function libre_compress_activate() {
     $default_general = array(
         'auto_compress'      => false,
         'backup_enabled'     => true,
-        'local_concurrency'  => 5,
+        'tool_concurrency'   => 5,
         'disable_thumbnails' => false,
     );
 
-    $default_local = array(
+    $default_tools = array(
         'jpeg_mode'          => 'lossy',
         'jpeg_quality'       => 80,
         'png_mode'           => 'lossy',
@@ -137,8 +137,8 @@ function libre_compress_activate() {
         add_option( 'libre_compress_general', $default_general );
     }
 
-    if ( false === get_option( 'libre_compress_local' ) ) {
-        add_option( 'libre_compress_local', $default_local );
+    if ( false === get_option( 'libre_compress_tools' ) ) {
+        add_option( 'libre_compress_tools', $default_tools );
     }
 
     // 刷新重写规则

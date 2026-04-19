@@ -83,7 +83,7 @@ class Libre_Compress_Database {
             original_size BIGINT UNSIGNED NOT NULL DEFAULT 0,
             compressed_size BIGINT UNSIGNED NOT NULL DEFAULT 0,
             compression_ratio DECIMAL(5,2) NOT NULL DEFAULT 0.00,
-            channel_name VARCHAR(50) NOT NULL DEFAULT '',
+            tool_name VARCHAR(50) NOT NULL DEFAULT '',
             status VARCHAR(20) NOT NULL DEFAULT 'success',
             error_message TEXT,
             created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -121,21 +121,39 @@ class Libre_Compress_Database {
     }
 
     /**
+     * 清理旧字段
+     */
+    private function migrate_obsolete_columns() {
+        global $wpdb;
+
+        $compression_mode_column = $wpdb->get_var( "SHOW COLUMNS FROM {$this->records_table} LIKE 'compression_mode'" );
+
+        if ( 'compression_mode' === $compression_mode_column ) {
+            $wpdb->query( "ALTER TABLE {$this->records_table} DROP COLUMN compression_mode" );
+        }
+
+        $channel_name_column = $wpdb->get_var( "SHOW COLUMNS FROM {$this->records_table} LIKE 'channel_name'" );
+        $tool_name_column    = $wpdb->get_var( "SHOW COLUMNS FROM {$this->records_table} LIKE 'tool_name'" );
+
+        if ( 'channel_name' === $channel_name_column && 'tool_name' !== $tool_name_column ) {
+            $wpdb->query( "ALTER TABLE {$this->records_table} ADD COLUMN tool_name VARCHAR(50) NOT NULL DEFAULT '' AFTER compression_ratio" );
+            $wpdb->query( "UPDATE {$this->records_table} SET tool_name = channel_name WHERE tool_name = ''" );
+            $wpdb->query( "ALTER TABLE {$this->records_table} DROP COLUMN channel_name" );
+            return;
+        }
+
+        if ( 'channel_name' === $channel_name_column && 'tool_name' === $tool_name_column ) {
+            $wpdb->query( "UPDATE {$this->records_table} SET tool_name = channel_name WHERE tool_name = ''" );
+            $wpdb->query( "ALTER TABLE {$this->records_table} DROP COLUMN channel_name" );
+        }
+    }
+
+    /**
      * 添加压缩记录
      *
      * @param array $data 记录数据
      * @return int|false 插入的记录 ID 或 false
      */
-    private function migrate_obsolete_columns() {
-        global $wpdb;
-
-        $column = $wpdb->get_var( "SHOW COLUMNS FROM {$this->records_table} LIKE 'compression_mode'" );
-
-        if ( 'compression_mode' === $column ) {
-            $wpdb->query( "ALTER TABLE {$this->records_table} DROP COLUMN compression_mode" );
-        }
-    }
-
     public function add_record( $data ) {
         global $wpdb;
 
@@ -152,7 +170,7 @@ class Libre_Compress_Database {
             'original_size'     => isset( $data['original_size'] ) ? absint( $data['original_size'] ) : 0,
             'compressed_size'   => isset( $data['compressed_size'] ) ? absint( $data['compressed_size'] ) : 0,
             'compression_ratio' => isset( $data['compression_ratio'] ) ? floatval( $data['compression_ratio'] ) : 0.00,
-            'channel_name'      => isset( $data['channel_name'] ) ? sanitize_text_field( $data['channel_name'] ) : '',
+            'tool_name'         => isset( $data['tool_name'] ) ? sanitize_text_field( $data['tool_name'] ) : '',
             'status'            => isset( $data['status'] ) ? sanitize_text_field( $data['status'] ) : 'success',
             'error_message'     => isset( $data['error_message'] ) ? sanitize_textarea_field( $data['error_message'] ) : '',
         );
@@ -164,7 +182,7 @@ class Libre_Compress_Database {
             '%d', // original_size
             '%d', // compressed_size
             '%f', // compression_ratio
-            '%s', // channel_name
+            '%s', // tool_name
             '%s', // status
             '%s', // error_message
         );
@@ -222,10 +240,10 @@ class Libre_Compress_Database {
     /**
      * 根据状态获取压缩记录
      *
-     * @param string $status 状态：success, failed, skipped
-     * @param int    $limit  限制数量
+     * @param string $status 状态
+     * @param int    $limit  数量限制
      * @param int    $offset 偏移量
-     * @return array 压缩记录列表
+     * @return array
      */
     public function get_records_by_status( $status, $limit = 100, $offset = 0 ) {
         global $wpdb;
@@ -251,7 +269,7 @@ class Libre_Compress_Database {
      *
      * @param int   $record_id 记录 ID
      * @param array $data      更新数据
-     * @return bool 是否更新成功
+     * @return bool
      */
     public function update_record( $record_id, $data ) {
         global $wpdb;
@@ -262,7 +280,6 @@ class Libre_Compress_Database {
             return false;
         }
 
-        // 清理和验证数据
         $update_data = array();
         $format      = array();
 
@@ -307,10 +324,10 @@ class Libre_Compress_Database {
     }
 
     /**
-     * 删除压缩记录
+     * 删除单条压缩记录
      *
      * @param int $record_id 记录 ID
-     * @return bool 是否删除成功
+     * @return bool
      */
     public function delete_record( $record_id ) {
         global $wpdb;
@@ -321,7 +338,6 @@ class Libre_Compress_Database {
             return false;
         }
 
-        // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
         $result = $wpdb->delete(
             $this->records_table,
             array( 'id' => $record_id ),
@@ -332,10 +348,10 @@ class Libre_Compress_Database {
     }
 
     /**
-     * 根据附件 ID 删除压缩记录
+     * 根据附件删除压缩记录
      *
      * @param int $attachment_id 附件 ID
-     * @return bool 是否删除成功
+     * @return bool
      */
     public function delete_records_by_attachment( $attachment_id ) {
         global $wpdb;
@@ -346,7 +362,6 @@ class Libre_Compress_Database {
             return false;
         }
 
-        // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
         $result = $wpdb->delete(
             $this->records_table,
             array( 'attachment_id' => $attachment_id ),
@@ -357,25 +372,23 @@ class Libre_Compress_Database {
     }
 
     /**
-     * 清除所有压缩记录
+     * 清空所有压缩记录
      *
-     * @return int 删除的记录数
+     * @return int|false
      */
     public function clear_all_records() {
         global $wpdb;
 
         // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-        $count = $wpdb->query( "DELETE FROM {$this->records_table}" );
-
-        return $count;
+        return $wpdb->query( "DELETE FROM {$this->records_table}" );
     }
 
     /**
      * 获取未压缩的附件列表
      *
-     * @param int $limit  限制数量
+     * @param int $limit  数量限制
      * @param int $offset 偏移量
-     * @return array 未压缩的附件信息
+     * @return array
      */
     public function get_uncompressed_attachments( $limit = 100, $offset = 0 ) {
         global $wpdb;
@@ -383,8 +396,6 @@ class Libre_Compress_Database {
         $limit  = absint( $limit );
         $offset = absint( $offset );
 
-        // 获取所有图片附件，排除已有压缩记录的
-        // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
         $sql = $wpdb->prepare(
             "SELECT p.ID, p.guid, pm.meta_value as file_path
             FROM {$wpdb->posts} p
@@ -400,14 +411,15 @@ class Libre_Compress_Database {
             $offset
         );
 
+        // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
         return $wpdb->get_results( $sql, ARRAY_A );
     }
 
     /**
-     * 获取附件的压缩统计
+     * 获取附件压缩统计
      *
      * @param int $attachment_id 附件 ID
-     * @return array 压缩统计信息
+     * @return array|null
      */
     public function get_attachment_stats( $attachment_id ) {
         global $wpdb;
@@ -417,7 +429,7 @@ class Libre_Compress_Database {
         // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
         $result = $wpdb->get_row(
             $wpdb->prepare(
-                "SELECT 
+                "SELECT
                     COUNT(*) as total_files,
                     SUM(original_size) as total_original_size,
                     SUM(compressed_size) as total_compressed_size,
@@ -430,7 +442,6 @@ class Libre_Compress_Database {
             ARRAY_A
         );
 
-        // 计算总压缩比例
         if ( $result && $result['total_original_size'] > 0 ) {
             $result['total_ratio'] = round(
                 ( 1 - $result['total_compressed_size'] / $result['total_original_size'] ) * 100,
@@ -447,12 +458,11 @@ class Libre_Compress_Database {
      * 添加备份记录
      *
      * @param array $data 备份数据
-     * @return int|false 插入的记录 ID 或 false
+     * @return int|false
      */
     public function add_backup( $data ) {
         global $wpdb;
 
-        // 验证必需字段
         if ( empty( $data['attachment_id'] ) || empty( $data['original_path'] ) || empty( $data['backup_path'] ) ) {
             return false;
         }
@@ -471,10 +481,10 @@ class Libre_Compress_Database {
     }
 
     /**
-     * 根据附件 ID 获取备份记录
+     * 根据附件获取备份列表
      *
      * @param int $attachment_id 附件 ID
-     * @return array 备份记录列表
+     * @return array
      */
     public function get_backups_by_attachment( $attachment_id ) {
         global $wpdb;
@@ -492,10 +502,10 @@ class Libre_Compress_Database {
     }
 
     /**
-     * 根据原始路径获取备份记录
+     * 根据原始路径获取备份
      *
-     * @param string $original_path 原始文件路径
-     * @return array|null 备份记录或 null
+     * @param string $original_path 原始路径
+     * @return array|null
      */
     public function get_backup_by_path( $original_path ) {
         global $wpdb;
@@ -513,10 +523,10 @@ class Libre_Compress_Database {
     }
 
     /**
-     * 删除备份记录
+     * 删除单条备份
      *
-     * @param int $backup_id 备份记录 ID
-     * @return bool 是否删除成功
+     * @param int $backup_id 备份 ID
+     * @return bool
      */
     public function delete_backup( $backup_id ) {
         global $wpdb;
@@ -527,7 +537,6 @@ class Libre_Compress_Database {
             return false;
         }
 
-        // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
         $result = $wpdb->delete(
             $this->backups_table,
             array( 'id' => $backup_id ),
@@ -538,10 +547,10 @@ class Libre_Compress_Database {
     }
 
     /**
-     * 根据附件 ID 删除备份记录
+     * 根据附件删除备份
      *
      * @param int $attachment_id 附件 ID
-     * @return bool 是否删除成功
+     * @return bool
      */
     public function delete_backups_by_attachment( $attachment_id ) {
         global $wpdb;
@@ -552,7 +561,6 @@ class Libre_Compress_Database {
             return false;
         }
 
-        // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
         $result = $wpdb->delete(
             $this->backups_table,
             array( 'attachment_id' => $attachment_id ),
@@ -563,10 +571,10 @@ class Libre_Compress_Database {
     }
 
     /**
-     * 检查附件是否有备份
+     * 检查附件是否存在备份
      *
      * @param int $attachment_id 附件 ID
-     * @return bool 是否有备份
+     * @return bool
      */
     public function has_backup( $attachment_id ) {
         global $wpdb;
@@ -585,9 +593,9 @@ class Libre_Compress_Database {
     }
 
     /**
-     * 获取所有备份记录
+     * 获取所有备份
      *
-     * @return array 备份记录列表
+     * @return array
      */
     public function get_all_backups() {
         global $wpdb;

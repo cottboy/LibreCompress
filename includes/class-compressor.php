@@ -12,16 +12,16 @@ if ( ! defined( 'ABSPATH' ) ) {
 /**
  * 压缩调度器类
  *
- * 负责管理本地压缩工具并执行压缩流程。
+ * 负责管理压缩工具并执行压缩流程。
  */
 class Libre_Compress_Compressor {
 
     /**
-     * 本地压缩工具列表
+     * 压缩工具列表
      *
      * @var array
      */
-    private $local_tools = array();
+    private $tools = array();
 
     /**
      * 构造函数
@@ -35,12 +35,12 @@ class Libre_Compress_Compressor {
      * 注册默认压缩工具
      */
     private function register_default_tools() {
-        $this->register_local_tool( new Libre_Compress_Jpegoptim() );
-        $this->register_local_tool( new Libre_Compress_Pngquant() );
-        $this->register_local_tool( new Libre_Compress_Oxipng() );
-        $this->register_local_tool( new Libre_Compress_Cwebp() );
+        $this->register_tool( new Libre_Compress_Jpegoptim() );
+        $this->register_tool( new Libre_Compress_Pngquant() );
+        $this->register_tool( new Libre_Compress_Oxipng() );
+        $this->register_tool( new Libre_Compress_Cwebp() );
 
-        do_action( 'libre_compress_register_local_tools', $this );
+        do_action( 'libre_compress_register_tools', $this );
     }
 
     /**
@@ -51,52 +51,52 @@ class Libre_Compress_Compressor {
     }
 
     /**
-     * 注册本地压缩工具
+     * 注册压缩工具
      *
-     * @param Libre_Compress_Local_Base $tool 工具实例
+     * @param Libre_Compress_Tool_Base $tool 工具实例
      */
-    public function register_local_tool( Libre_Compress_Local_Base $tool ) {
-        $this->local_tools[ $tool->get_name() ] = $tool;
+    public function register_tool( Libre_Compress_Tool_Base $tool ) {
+        $this->tools[ $tool->get_name() ] = $tool;
     }
 
     /**
-     * 获取所有本地压缩工具
+     * 获取所有压缩工具
      *
      * @return array 工具列表
      */
-    public function get_local_tools(): array {
-        return $this->local_tools;
+    public function get_tools(): array {
+        return $this->tools;
     }
 
     /**
-     * 根据文件格式获取可用的本地压缩工具
+     * 根据文件格式获取可用的压缩工具
      *
      * @param string $extension 文件扩展名
-     * @return Libre_Compress_Local_Base|null 工具实例或 null
+     * @return Libre_Compress_Tool_Base|null 工具实例或 null
      */
-    public function get_local_tool_for_format( string $extension ): ?Libre_Compress_Local_Base {
+    public function get_tool_for_format( string $extension ): ?Libre_Compress_Tool_Base {
         $extension = strtolower( $extension );
 
         if ( 'png' === $extension ) {
-            $settings  = get_option( 'libre_compress_local', array() );
+            $settings  = get_option( 'libre_compress_tools', array() );
             $png_mode  = isset( $settings['png_mode'] ) ? $settings['png_mode'] : 'lossy';
             $use_lossy = ( 'lossy' === $png_mode );
 
             $tool_name = $use_lossy ? 'pngquant' : 'oxipng';
 
-            if ( isset( $this->local_tools[ $tool_name ] ) && $this->local_tools[ $tool_name ]->is_tool_available() ) {
-                return $this->local_tools[ $tool_name ];
+            if ( isset( $this->tools[ $tool_name ] ) && $this->tools[ $tool_name ]->is_tool_available() ) {
+                return $this->tools[ $tool_name ];
             }
 
             $fallback_tool_name = $use_lossy ? 'oxipng' : 'pngquant';
-            if ( isset( $this->local_tools[ $fallback_tool_name ] ) && $this->local_tools[ $fallback_tool_name ]->is_tool_available() ) {
-                return $this->local_tools[ $fallback_tool_name ];
+            if ( isset( $this->tools[ $fallback_tool_name ] ) && $this->tools[ $fallback_tool_name ]->is_tool_available() ) {
+                return $this->tools[ $fallback_tool_name ];
             }
 
             return null;
         }
 
-        foreach ( $this->local_tools as $tool ) {
+        foreach ( $this->tools as $tool ) {
             if ( in_array( $extension, $tool->get_supported_formats(), true ) && $tool->is_tool_available() ) {
                 return $tool;
             }
@@ -167,7 +167,7 @@ class Libre_Compress_Compressor {
      * @param int    $attachment_id 附件 ID
      * @param string $file_path     文件路径
      * @param string $size_type     尺寸类型
-     * @param array  $options       额外参数
+     * @param array  $options       压缩选项
      * @return array 压缩结果
      */
     public function compress_file( int $attachment_id, string $file_path, string $size_type = 'full', array $options = array() ): array {
@@ -192,12 +192,12 @@ class Libre_Compress_Compressor {
         $extension      = strtolower( pathinfo( $file_path, PATHINFO_EXTENSION ) );
         $settings       = get_option( 'libre_compress_general', array() );
         $backup_enabled = isset( $settings['backup_enabled'] ) ? (bool) $settings['backup_enabled'] : true;
-        $tool           = $this->get_local_tool_for_format( $extension );
+        $tool           = $this->get_tool_for_format( $extension );
 
         if ( ! $tool ) {
             return array(
                 'success' => false,
-                'message' => __( '没有可用的本地压缩工具', 'libre-compress' ),
+                'message' => __( '没有可用的压缩工具', 'libre-compress' ),
                 'status'  => 'skipped',
             );
         }
@@ -300,11 +300,11 @@ class Libre_Compress_Compressor {
     }
 
     /**
-     * 压缩整个附件及其相关尺寸
+     * 压缩附件的所有相关文件
      *
      * @param int   $attachment_id 附件 ID
-     * @param array $options       额外参数
-     * @return array 压缩结果
+     * @param array $options       压缩选项
+     * @return array 统计结果
      */
     public function compress_attachment( int $attachment_id, array $options = array() ): array {
         $files   = $this->get_attachment_files( $attachment_id );
@@ -375,7 +375,7 @@ class Libre_Compress_Compressor {
      * @param string $size_type       尺寸类型
      * @param int    $original_size   原始大小
      * @param int    $compressed_size 压缩后大小
-     * @param string $channel_name    工具名称
+     * @param string $tool_name       工具名称
      * @param string $status          状态
      * @param string $error_message   错误信息
      */
@@ -385,7 +385,7 @@ class Libre_Compress_Compressor {
         string $size_type,
         int $original_size,
         int $compressed_size,
-        string $channel_name,
+        string $tool_name,
         string $status,
         string $error_message = ''
     ) {
@@ -418,7 +418,7 @@ class Libre_Compress_Compressor {
                 'original_size'     => $original_size,
                 'compressed_size'   => $compressed_size,
                 'compression_ratio' => $ratio,
-                'channel_name'      => $channel_name,
+                'tool_name'         => $tool_name,
                 'status'            => $status,
                 'error_message'     => $error_message,
             )

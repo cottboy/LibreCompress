@@ -15,7 +15,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  *
  * 使用 cwebp 命令行工具压缩 WebP 图片
  */
-class Libre_Compress_Cwebp extends Libre_Compress_Local_Base {
+class Libre_Compress_Cwebp extends Libre_Compress_Tool_Base {
 
     /**
      * 获取渠道名称
@@ -55,7 +55,7 @@ class Libre_Compress_Cwebp extends Libre_Compress_Local_Base {
         $executable = $this->get_executable_path();
 
         // 获取压缩设置
-        $settings = get_option( 'libre_compress_local', array() );
+        $settings = get_option( 'libre_compress_tools', array() );
         $quality  = isset( $settings['webp_quality'] ) ? absint( $settings['webp_quality'] ) : 80;
         $mode     = isset( $settings['webp_mode'] ) ? $settings['webp_mode'] : 'lossy';
         $lossless = ( 'lossless' === $mode );
