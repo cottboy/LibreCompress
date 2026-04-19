@@ -250,7 +250,7 @@ class Libre_Compress_Settings {
         $options = get_option( 'libre_compress_local', array() );
 
         $compressor = libre_compress()->compressor;
-        $channels   = $compressor->get_local_channels();
+        $tools      = $compressor->get_local_tools();
 
         $exec_available = function_exists( 'exec' ) && ! in_array( 'exec', array_map( 'trim', explode( ',', ini_get( 'disable_functions' ) ) ), true );
         ?>
@@ -282,19 +282,19 @@ class Libre_Compress_Settings {
                 </tr>
             </thead>
             <tbody>
-                <?php foreach ( $channels as $channel ) : ?>
+                <?php foreach ( $tools as $tool ) : ?>
                     <tr>
-                        <td><strong><?php echo esc_html( $channel->get_name() ); ?></strong></td>
-                        <td><?php echo esc_html( strtoupper( implode( ', ', $channel->get_supported_formats() ) ) ); ?></td>
+                        <td><strong><?php echo esc_html( $tool->get_name() ); ?></strong></td>
+                        <td><?php echo esc_html( strtoupper( implode( ', ', $tool->get_supported_formats() ) ) ); ?></td>
                         <td>
-                            <?php if ( $channel->is_tool_available() ) : ?>
+                            <?php if ( $tool->is_tool_available() ) : ?>
                                 <span style="color: #00a32a;">✓ <?php esc_html_e( '已安装', 'libre-compress' ); ?></span>
                             <?php else : ?>
                                 <span style="color: #d63638;">✗ <?php esc_html_e( '未安装', 'libre-compress' ); ?></span>
                             <?php endif; ?>
                         </td>
                         <td>
-                            <a href="<?php echo esc_url( $channel->get_download_url() ); ?>" target="_blank" rel="noopener noreferrer">
+                            <a href="<?php echo esc_url( $tool->get_download_url() ); ?>" target="_blank" rel="noopener noreferrer">
                                 <?php esc_html_e( '跳转', 'libre-compress' ); ?>
                             </a>
                         </td>

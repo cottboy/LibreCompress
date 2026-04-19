@@ -21,26 +21,26 @@ class Libre_Compress_Compressor {
      *
      * @var array
      */
-    private $local_channels = array();
+    private $local_tools = array();
 
     /**
      * 构造函数
      */
     public function __construct() {
-        $this->register_default_channels();
+        $this->register_default_tools();
         $this->init_hooks();
     }
 
     /**
      * 注册默认压缩工具
      */
-    private function register_default_channels() {
-        $this->register_local_channel( new Libre_Compress_Jpegoptim() );
-        $this->register_local_channel( new Libre_Compress_Pngquant() );
-        $this->register_local_channel( new Libre_Compress_Oxipng() );
-        $this->register_local_channel( new Libre_Compress_Cwebp() );
+    private function register_default_tools() {
+        $this->register_local_tool( new Libre_Compress_Jpegoptim() );
+        $this->register_local_tool( new Libre_Compress_Pngquant() );
+        $this->register_local_tool( new Libre_Compress_Oxipng() );
+        $this->register_local_tool( new Libre_Compress_Cwebp() );
 
-        do_action( 'libre_compress_register_channels', $this );
+        do_action( 'libre_compress_register_local_tools', $this );
     }
 
     /**
@@ -53,10 +53,10 @@ class Libre_Compress_Compressor {
     /**
      * 注册本地压缩工具
      *
-     * @param Libre_Compress_Channel_Interface $channel 工具实例
+     * @param Libre_Compress_Local_Base $tool 工具实例
      */
-    public function register_local_channel( Libre_Compress_Channel_Interface $channel ) {
-        $this->local_channels[ $channel->get_name() ] = $channel;
+    public function register_local_tool( Libre_Compress_Local_Base $tool ) {
+        $this->local_tools[ $tool->get_name() ] = $tool;
     }
 
     /**
@@ -64,17 +64,17 @@ class Libre_Compress_Compressor {
      *
      * @return array 工具列表
      */
-    public function get_local_channels(): array {
-        return $this->local_channels;
+    public function get_local_tools(): array {
+        return $this->local_tools;
     }
 
     /**
      * 根据文件格式获取可用的本地压缩工具
      *
      * @param string $extension 文件扩展名
-     * @return Libre_Compress_Channel_Interface|null 工具实例或 null
+     * @return Libre_Compress_Local_Base|null 工具实例或 null
      */
-    public function get_local_channel_for_format( string $extension ): ?Libre_Compress_Channel_Interface {
+    public function get_local_tool_for_format( string $extension ): ?Libre_Compress_Local_Base {
         $extension = strtolower( $extension );
 
         if ( 'png' === $extension ) {
@@ -82,23 +82,23 @@ class Libre_Compress_Compressor {
             $png_mode  = isset( $settings['png_mode'] ) ? $settings['png_mode'] : 'lossy';
             $use_lossy = ( 'lossy' === $png_mode );
 
-            $channel_name = $use_lossy ? 'pngquant' : 'oxipng';
+            $tool_name = $use_lossy ? 'pngquant' : 'oxipng';
 
-            if ( isset( $this->local_channels[ $channel_name ] ) && $this->local_channels[ $channel_name ]->is_tool_available() ) {
-                return $this->local_channels[ $channel_name ];
+            if ( isset( $this->local_tools[ $tool_name ] ) && $this->local_tools[ $tool_name ]->is_tool_available() ) {
+                return $this->local_tools[ $tool_name ];
             }
 
-            $fallback_name = $use_lossy ? 'oxipng' : 'pngquant';
-            if ( isset( $this->local_channels[ $fallback_name ] ) && $this->local_channels[ $fallback_name ]->is_tool_available() ) {
-                return $this->local_channels[ $fallback_name ];
+            $fallback_tool_name = $use_lossy ? 'oxipng' : 'pngquant';
+            if ( isset( $this->local_tools[ $fallback_tool_name ] ) && $this->local_tools[ $fallback_tool_name ]->is_tool_available() ) {
+                return $this->local_tools[ $fallback_tool_name ];
             }
 
             return null;
         }
 
-        foreach ( $this->local_channels as $channel ) {
-            if ( in_array( $extension, $channel->get_supported_formats(), true ) && $channel->is_tool_available() ) {
-                return $channel;
+        foreach ( $this->local_tools as $tool ) {
+            if ( in_array( $extension, $tool->get_supported_formats(), true ) && $tool->is_tool_available() ) {
+                return $tool;
             }
         }
 
@@ -192,9 +192,9 @@ class Libre_Compress_Compressor {
         $extension      = strtolower( pathinfo( $file_path, PATHINFO_EXTENSION ) );
         $settings       = get_option( 'libre_compress_general', array() );
         $backup_enabled = isset( $settings['backup_enabled'] ) ? (bool) $settings['backup_enabled'] : true;
-        $channel        = $this->get_local_channel_for_format( $extension );
+        $tool           = $this->get_local_tool_for_format( $extension );
 
-        if ( ! $channel ) {
+        if ( ! $tool ) {
             return array(
                 'success' => false,
                 'message' => __( '没有可用的本地压缩工具', 'libre-compress' ),
@@ -203,7 +203,7 @@ class Libre_Compress_Compressor {
         }
 
         $file_size      = filesize( $file_path );
-        $max_size_mb    = $channel->get_max_file_size();
+        $max_size_mb    = $tool->get_max_file_size();
         $max_size_bytes = $max_size_mb * 1024 * 1024;
 
         if ( $max_size_mb > 0 && $file_size > $max_size_bytes ) {
@@ -223,7 +223,7 @@ class Libre_Compress_Compressor {
         }
 
         $original_size = filesize( $file_path );
-        $result        = $channel->compress( $file_path, $options );
+        $result        = $tool->compress( $file_path, $options );
 
         if ( ! $result['success'] ) {
             $this->save_compression_record(
@@ -232,7 +232,7 @@ class Libre_Compress_Compressor {
                 $size_type,
                 $original_size,
                 $original_size,
-                $channel->get_name(),
+                $tool->get_name(),
                 'failed',
                 $result['message']
             );
@@ -261,7 +261,7 @@ class Libre_Compress_Compressor {
                 $size_type,
                 $original_size,
                 $original_size,
-                $channel->get_name(),
+                $tool->get_name(),
                 'skipped',
                 __( '压缩后体积更大，已跳过', 'libre-compress' )
             );
@@ -283,7 +283,7 @@ class Libre_Compress_Compressor {
             $size_type,
             $original_size,
             $compressed_size,
-            $channel->get_name(),
+            $tool->get_name(),
             'success'
         );
 

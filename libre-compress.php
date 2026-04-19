@@ -73,9 +73,6 @@ add_action( 'plugins_loaded', 'libre_compress_load_textdomain' );
  * 加载依赖文件
  */
 function libre_compress_load_dependencies() {
-    // 加载压缩渠道接口
-    require_once LIBRE_COMPRESS_PATH . 'compression/interface-compression-channel.php';
-
     // 加载本地压缩基类和实现
     require_once LIBRE_COMPRESS_PATH . 'compression/class-local-base.php';
     require_once LIBRE_COMPRESS_PATH . 'compression/class-jpegoptim.php';

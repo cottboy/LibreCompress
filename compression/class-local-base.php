@@ -15,7 +15,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  *
  * 提供本地命令行压缩工具的通用功能
  */
-abstract class Libre_Compress_Local_Base implements Libre_Compress_Channel_Interface {
+abstract class Libre_Compress_Local_Base {
 
     /**
      * 缓存的可执行文件路径
@@ -23,6 +23,34 @@ abstract class Libre_Compress_Local_Base implements Libre_Compress_Channel_Inter
      * @var string|false|null
      */
     protected $executable_path = null;
+
+    /**
+     * 获取工具名称
+     *
+     * @return string 工具名称
+     */
+    abstract public function get_name(): string;
+
+    /**
+     * 获取支持的文件格式
+     *
+     * @return array 支持的扩展名列表
+     */
+    abstract public function get_supported_formats(): array;
+
+    /**
+     * 获取工具下载地址
+     *
+     * @return string 下载地址
+     */
+    abstract public function get_download_url(): string;
+
+    /**
+     * 获取安装说明
+     *
+     * @return array 安装说明
+     */
+    abstract public function get_install_instructions(): array;
 
     /**
      * 获取可执行文件名
