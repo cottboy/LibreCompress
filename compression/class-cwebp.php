@@ -95,17 +95,16 @@ class Libre_Compress_Cwebp extends Libre_Compress_Tool_Base {
         $command_parts[] = '-o';
         $command_parts[] = escapeshellarg( $temp_output );
 
-        // 添加移动命令（将临时文件替换原文件）
+        // 添加替换原文件的命令（编码成功后才执行：move /y 直接覆盖，任何一步失败都不会破坏原文件）
         if ( $this->is_windows() ) {
-            // Windows: 使用 cmd /c 确保命令正确执行，del 删除原文件后 move 移动临时文件
+            // Windows: 使用 cmd /c 确保命令正确执行，move /y 直接覆盖原文件
             $move_command = sprintf(
-                '& del /f /q "%s" & move /y "%s" "%s"',
-                str_replace( '/', '\\', $file_path ),
+                '&& move /y "%s" "%s"',
                 str_replace( '/', '\\', $temp_output ),
                 str_replace( '/', '\\', $file_path )
             );
         } else {
-            $move_command = sprintf( '&& mv %s %s', escapeshellarg( $temp_output ), escapeshellarg( $file_path ) );
+            $move_command = sprintf( '&& mv -f %s %s', escapeshellarg( $temp_output ), escapeshellarg( $file_path ) );
         }
 
         return implode( ' ', $command_parts ) . ' ' . $move_command;
