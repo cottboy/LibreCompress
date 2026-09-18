@@ -425,3 +425,7 @@ msgstr ""
 #: includes/class-settings.php
 msgid "链接"
 msgstr ""
+
+#: includes/class-compressor.php
+msgid "无法创建回滚副本，已跳过压缩"
+msgstr ""

@@ -223,10 +223,25 @@ class Libre_Compress_Compressor {
             $backup->create_backup( $attachment_id, $file_path );
         }
 
+        // 无条件创建临时回滚副本：压缩结果变大或失败时还原原文件，与备份开关无关
+        $rollback_path = $file_path . '.lc-rollback';
+
+        // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_copy
+        if ( ! copy( $file_path, $rollback_path ) ) {
+            return array(
+                'success' => false,
+                'message' => __( '无法创建回滚副本，已跳过压缩', 'libre-compress' ),
+                'status'  => 'failed',
+            );
+        }
+
         $original_size = filesize( $file_path );
         $result        = $tool->compress( $file_path, $options );
 
         if ( ! $result['success'] ) {
+            // 工具执行失败，还原原文件（即使文件未被工具改动，还原也是无害的）
+            $this->rollback_file( $rollback_path, $file_path );
+
             $this->save_compression_record(
                 $attachment_id,
                 $file_path,
@@ -251,10 +266,8 @@ class Libre_Compress_Compressor {
         $compressed_size = filesize( $file_path );
 
         if ( $compressed_size >= $original_size ) {
-            if ( $backup_enabled ) {
-                $backup = libre_compress()->backup;
-                $backup->restore_backup( $attachment_id, $file_path );
-            }
+            // 压缩后体积更大，用回滚副本还原原文件
+            $this->rollback_file( $rollback_path, $file_path );
 
             $this->save_compression_record(
                 $attachment_id,
@@ -277,6 +290,9 @@ class Libre_Compress_Compressor {
         }
 
         $ratio = round( ( 1 - $compressed_size / $original_size ) * 100, 2 );
+
+        // 压缩有效，清理回滚副本
+        $this->cleanup_rollback( $rollback_path );
 
         $this->save_compression_record(
             $attachment_id,
@@ -424,6 +440,32 @@ class Libre_Compress_Compressor {
                 'error_message'     => $error_message,
             )
         );
+    }
+
+    /**
+     * 用回滚副本还原原文件并清理副本
+     *
+     * @param string $rollback_path 回滚副本路径
+     * @param string $file_path     原文件路径
+     */
+    private function rollback_file( string $rollback_path, string $file_path ): void {
+        if ( file_exists( $rollback_path ) ) {
+            // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_copy
+            copy( $rollback_path, $file_path );
+            $this->cleanup_rollback( $rollback_path );
+        }
+    }
+
+    /**
+     * 清理回滚副本
+     *
+     * @param string $rollback_path 回滚副本路径
+     */
+    private function cleanup_rollback( string $rollback_path ): void {
+        if ( file_exists( $rollback_path ) ) {
+            // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
+            unlink( $rollback_path );
+        }
     }
 
     /**
