@@ -70,6 +70,22 @@ function libre_compress_load_textdomain() {
 add_action( 'plugins_loaded', 'libre_compress_load_textdomain' );
 
 /**
+ * 允许上传 AVIF 图片
+ *
+ * WordPress 6.5 起原生支持 AVIF，此过滤器保证旧版本也能上传
+ *
+ * @param array $mimes 允许的 MIME 类型
+ * @return array 修改后的 MIME 类型
+ */
+function libre_compress_allow_avif_upload( $mimes ) {
+    if ( ! isset( $mimes['avif'] ) ) {
+        $mimes['avif'] = 'image/avif';
+    }
+    return $mimes;
+}
+add_filter( 'upload_mimes', 'libre_compress_allow_avif_upload' );
+
+/**
  * 加载依赖文件
  */
 function libre_compress_load_dependencies() {
@@ -79,6 +95,7 @@ function libre_compress_load_dependencies() {
     require_once LIBRE_COMPRESS_PATH . 'compression/class-pngquant.php';
     require_once LIBRE_COMPRESS_PATH . 'compression/class-oxipng.php';
     require_once LIBRE_COMPRESS_PATH . 'compression/class-cwebp.php';
+    require_once LIBRE_COMPRESS_PATH . 'compression/class-avif.php';
 
     // 加载核心类
     require_once LIBRE_COMPRESS_PATH . 'includes/class-database.php';
@@ -130,6 +147,8 @@ function libre_compress_activate() {
         'png_lossless_level' => 4,
         'webp_mode'          => 'lossy',
         'webp_quality'       => 80,
+        'avif_mode'          => 'lossy',
+        'avif_quality'       => 60,
     );
 
     // 只在选项不存在时添加默认值

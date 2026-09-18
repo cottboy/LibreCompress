@@ -25,6 +25,10 @@ msgid "0-100，数值越高质量越好，文件越大（仅有损压缩有效�
 msgstr ""
 
 #: includes/class-settings.php
+msgid "AVIF 压缩"
+msgstr ""
+
+#: includes/class-settings.php
 msgid "JPEG 压缩"
 msgstr ""
 
@@ -79,6 +83,10 @@ msgstr ""
 
 #: compression/class-cwebp.php
 msgid "从 Google 官网下载预编译的二进制文件"
+msgstr ""
+
+#: compression/class-avif.php
+msgid "从 libavif GitHub Releases 下载静态编译的 avifenc.exe 和 avifdec.exe"
 msgstr ""
 
 #: compression/class-pngquant.php
@@ -295,6 +303,10 @@ msgstr ""
 
 #: includes/class-media-library.php
 msgid "无效的附件 ID"
+msgstr ""
+
+#: compression/class-avif.php
+msgid "暂无官方包，建议从 GitHub Releases 下载或自行编译"
 msgstr ""
 
 #: includes/class-settings.php

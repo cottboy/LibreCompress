@@ -39,6 +39,7 @@ class Libre_Compress_Compressor {
         $this->register_tool( new Libre_Compress_Pngquant() );
         $this->register_tool( new Libre_Compress_Oxipng() );
         $this->register_tool( new Libre_Compress_Cwebp() );
+        $this->register_tool( new Libre_Compress_Avif() );
 
         do_action( 'libre_compress_register_tools', $this );
     }
@@ -356,7 +357,7 @@ class Libre_Compress_Compressor {
         }
 
         $mime_type     = get_post_mime_type( $attachment_id );
-        $allowed_types = array( 'image/jpeg', 'image/png', 'image/webp' );
+        $allowed_types = array( 'image/jpeg', 'image/png', 'image/webp', 'image/avif' );
 
         if ( ! in_array( $mime_type, $allowed_types, true ) ) {
             return $metadata;
