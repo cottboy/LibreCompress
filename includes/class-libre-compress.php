@@ -46,6 +46,13 @@ class Libre_Compress {
     public $compressor;
 
     /**
+     * 格式转换器实例
+     *
+     * @var Libre_Compress_Converter
+     */
+    public $converter;
+
+    /**
      * 媒体库集成模块实例
      *
      * @var Libre_Compress_Media_Library
@@ -115,6 +122,10 @@ class Libre_Compress {
         // 初始化压缩调度器
         $this->compressor = new Libre_Compress_Compressor();
 
+        // 初始化格式转换器
+        $this->converter = new Libre_Compress_Converter();
+        $this->converter->init_hooks();
+
         // 初始化媒体库集成模块
         $this->media_library = new Libre_Compress_Media_Library();
 
@@ -178,6 +189,7 @@ class Libre_Compress {
                 'i18n'      => array(
                     'compressing'             => __( '压缩中...', 'libre-compress' ),
                     'restoring'               => __( '恢复中...', 'libre-compress' ),
+                    'converting'              => __( '转换中...', 'libre-compress' ),
                     'success'                 => __( '操作成功', 'libre-compress' ),
                     'error'                   => __( '操作失败', 'libre-compress' ),
                     'confirmClear'            => __( '确定要清除所有压缩记录吗？此操作不可撤销。', 'libre-compress' ),
@@ -187,6 +199,7 @@ class Libre_Compress {
                     'confirmDeleteBackup'     => __( '确定要删除此图片的备份吗？删除后将无法恢复原图。', 'libre-compress' ),
                     'confirmDeleteAllBackups' => __( '确定要删除所有原图备份吗？删除后将无法恢复原图。', 'libre-compress' ),
                     'deleteBackup'            => __( '删除备份', 'libre-compress' ),
+                    'noConvertItems'          => __( '没有需要转换的图片，请先在上方勾选要转换的格式并保存', 'libre-compress' ),
                     'processing'              => __( '处理中...', 'libre-compress' ),
                     'completed'               => __( '已完成', 'libre-compress' ),
                 ),

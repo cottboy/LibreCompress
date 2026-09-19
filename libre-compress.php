@@ -103,6 +103,7 @@ function libre_compress_load_dependencies() {
     require_once LIBRE_COMPRESS_PATH . 'includes/class-database.php';
     require_once LIBRE_COMPRESS_PATH . 'includes/class-backup.php';
     require_once LIBRE_COMPRESS_PATH . 'includes/class-compressor.php';
+    require_once LIBRE_COMPRESS_PATH . 'includes/class-converter.php';
     require_once LIBRE_COMPRESS_PATH . 'includes/class-media-library.php';
     require_once LIBRE_COMPRESS_PATH . 'includes/class-thumbnail-manager.php';
     require_once LIBRE_COMPRESS_PATH . 'includes/class-settings.php';
@@ -139,6 +140,7 @@ function libre_compress_activate() {
         'backup_enabled'     => true,
         'tool_concurrency'   => 5,
         'disable_thumbnails' => false,
+        'convert_target'     => 'webp',
     );
 
     $default_tools = array(
@@ -150,7 +152,7 @@ function libre_compress_activate() {
         'webp_mode'          => 'lossy',
         'webp_quality'       => 80,
         'avif_mode'          => 'lossy',
-        'avif_quality'       => 60,
+        'avif_quality'       => 80,
         'gif_mode'           => 'lossy',
         'gif_quality'        => 60,
         'svg_precision'      => 3,

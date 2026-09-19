@@ -453,3 +453,91 @@ msgstr ""
 #: compression/class-svgo.php
 msgid "需要 Node.js 环境，运行 npm install -g svgo"
 msgstr ""
+
+#: includes/class-settings.php
+msgid "格式转换"
+msgstr ""
+
+#: includes/class-settings.php
+msgid "PNG"
+msgstr ""
+
+#: includes/class-settings.php
+msgid "JPG"
+msgstr ""
+
+#: includes/class-settings.php
+msgid "GIF"
+msgstr ""
+
+#: includes/class-settings.php
+msgid "SVG"
+msgstr ""
+
+#: includes/class-settings.php
+msgid "勾选的格式上传时将自动转换为新格式，前端直接显示新格式（不考虑浏览器兼容性）。默认不勾选即不转换。"
+msgstr ""
+
+#: includes/class-settings.php
+msgid "转换目标格式"
+msgstr ""
+
+#: includes/class-settings.php
+msgid "选择转换的目标格式：AVIF 压缩率更高但编码更慢，WebP 兼容性更好"
+msgstr ""
+
+#: includes/class-settings.php
+msgid "批量转换未转换的图片"
+msgstr ""
+
+#: includes/class-settings.php
+msgid "为媒体库中已启用格式的图片生成新格式副本（按上方格式转换设置）"
+msgstr ""
+
+#: includes/class-libre-compress.php
+msgid "转换中..."
+msgstr ""
+
+#: includes/class-libre-compress.php
+msgid "没有需要转换的图片，请先在上方勾选要转换的格式并保存"
+msgstr ""
+
+#: includes/class-converter.php
+msgid "该格式未启用转换"
+msgstr ""
+
+#: includes/class-converter.php
+msgid "已存在转换副本"
+msgstr ""
+
+#: includes/class-converter.php
+msgid "GIF 解码失败"
+msgstr ""
+
+#: includes/class-converter.php
+msgid "SVG 栅格化失败（需要 resvg 工具）"
+msgstr ""
+
+#: includes/class-converter.php
+msgid "没有可用的编码工具"
+msgstr ""
+
+#: includes/class-converter.php
+msgid "编码失败"
+msgstr ""
+
+#: includes/class-converter.php
+msgid "转换结果更大，已放弃"
+msgstr ""
+
+#: includes/class-converter.php
+msgid "副本写入失败"
+msgstr ""
+
+#: includes/class-converter.php
+msgid "转换成功"
+msgstr ""
+
+#: includes/class-converter.php
+msgid "尚未启用任何格式的转换"
+msgstr ""

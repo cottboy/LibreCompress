@@ -39,6 +39,7 @@
             $('#libre-compress-delete-thumbnails').on('click', this.handleDeleteThumbnails.bind(this));
             $('#libre-compress-regenerate-thumbnails').on('click', this.handleRegenerateThumbnails.bind(this));
             $('#libre-compress-bulk-compress').on('click', this.handleBulkCompress.bind(this));
+            $('#libre-compress-bulk-convert').on('click', this.handleBulkConvert.bind(this));
             $('#libre-compress-delete-all-backups').on('click', this.handleDeleteAllBackups.bind(this));
         },
 
@@ -425,6 +426,46 @@
         },
 
         /**
+         * 批量转换
+         */
+        handleBulkConvert: function(e) {
+            e.preventDefault();
+
+            var self = this;
+            var $btn = $(e.currentTarget);
+            var $progress = $('#libre-compress-bulk-progress');
+            var $progressFill = $progress.find('.progress-fill');
+            var $progressText = $progress.find('.progress-text');
+
+            $btn.prop('disabled', true);
+            $progress.show();
+            $progressText.text(this.i18n.processing);
+
+            // 首先获取未转换的图片列表
+            $.ajax({
+                url: this.ajaxUrl,
+                type: 'POST',
+                data: {
+                    action: 'libre_compress_get_unconverted',
+                    nonce: this.nonce
+                },
+                success: function(response) {
+                    if (response.success && response.data.items.length > 0) {
+                        self.processBulkTasks(response.data.items, 'libre_compress_convert_single', $progressFill, $progressText, $btn);
+                    } else {
+                        $progressText.text(self.i18n.completed + ' - ' + (response.data.message || self.i18n.noConvertItems));
+                        $btn.prop('disabled', false);
+                    }
+                },
+                error: function() {
+                    alert(self.i18n.error);
+                    $btn.prop('disabled', false);
+                    $progress.hide();
+                }
+            });
+        },
+
+        /**
          * 删除所有原图备份
          */
         handleDeleteAllBackups: function(e) {
@@ -466,11 +507,21 @@
          * 处理批量压缩
          */
         processBulkCompress: function(items, $progressFill, $progressText, $btn) {
+            this.processBulkTasks(items, 'libre_compress_compress_single', $progressFill, $progressText, $btn);
+        },
+
+        /**
+         * 通用批量任务处理（压缩/转换共用）
+         *
+         * 压缩结果带 status 字段；转换为附件级统计（success/failed/skipped 计数）
+         */
+        processBulkTasks: function(items, ajaxAction, $progressFill, $progressText, $btn) {
             var self = this;
             var total = items.length;
             var completed = 0;
             var success = 0;
             var failed = 0;
+            var skipped = 0;
 
             // 获取并发数设置
             var concurrency = 5;
@@ -478,6 +529,20 @@
             // 创建任务队列
             var queue = items.slice();
             var running = 0;
+
+            function countResult(data) {
+                if (data && typeof data.status === 'string') {
+                    if (data.status === 'success') { success++; }
+                    else if (data.status === 'failed') { failed++; }
+                    else { skipped++; }
+                } else if (data && typeof data.failed === 'number') {
+                    if (data.success > 0) { success++; }
+                    else if (data.failed > 0) { failed++; }
+                    else { skipped++; }
+                } else {
+                    failed++;
+                }
+            }
 
             function processNext() {
                 while (running < concurrency && queue.length > 0) {
@@ -488,14 +553,14 @@
                         url: self.ajaxUrl,
                         type: 'POST',
                         data: {
-                            action: 'libre_compress_compress_single',
+                            action: ajaxAction,
                             nonce: self.nonce,
                             attachment_id: item.attachment_id,
                             size_type: item.size_type
                         },
                         success: function(response) {
-                            if (response.success && response.data.status === 'success') {
-                                success++;
+                            if (response.success) {
+                                countResult(response.data);
                             } else {
                                 failed++;
                             }
@@ -517,7 +582,7 @@
                                 processNext();
                             } else if (running === 0) {
                                 // 全部完成
-                                $progressText.text(self.i18n.completed + ' - 成功: ' + success + ', 失败: ' + failed);
+                                $progressText.text(self.i18n.completed + ' - 成功: ' + success + ', 跳过: ' + skipped + ', 失败: ' + failed);
                                 $btn.prop('disabled', false);
                             }
                         }

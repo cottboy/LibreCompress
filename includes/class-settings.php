@@ -51,6 +51,13 @@ class Libre_Compress_Settings {
 
         $sanitized['tool_concurrency'] = max( 1, min( 100, $sanitized['tool_concurrency'] ) );
 
+        // 格式转换：勾选启用的源格式，目标格式二选一（默认 WebP）
+        $sanitized['convert_png'] = ! empty( $input['convert_png'] );
+        $sanitized['convert_jpg'] = ! empty( $input['convert_jpg'] );
+        $sanitized['convert_gif'] = ! empty( $input['convert_gif'] );
+        $sanitized['convert_svg'] = ! empty( $input['convert_svg'] );
+        $sanitized['convert_target'] = ! empty( $input['convert_target_avif'] ) ? 'avif' : 'webp';
+
         return $sanitized;
     }
 
@@ -68,7 +75,7 @@ class Libre_Compress_Settings {
         $sanitized['webp_quality'] = isset( $input['webp_quality'] ) ? absint( $input['webp_quality'] ) : 80;
 
         $sanitized['avif_mode']    = isset( $input['avif_mode'] ) && in_array( $input['avif_mode'], array( 'lossy', 'lossless' ), true ) ? $input['avif_mode'] : 'lossy';
-        $sanitized['avif_quality'] = isset( $input['avif_quality'] ) ? absint( $input['avif_quality'] ) : 60;
+        $sanitized['avif_quality'] = isset( $input['avif_quality'] ) ? absint( $input['avif_quality'] ) : 80;
 
         $sanitized['gif_mode']    = isset( $input['gif_mode'] ) && in_array( $input['gif_mode'], array( 'lossy', 'lossless' ), true ) ? $input['gif_mode'] : 'lossy';
         $sanitized['gif_quality'] = isset( $input['gif_quality'] ) ? absint( $input['gif_quality'] ) : 60;
@@ -125,6 +132,14 @@ class Libre_Compress_Settings {
     private function render_general_tab() {
         $options = get_option( 'libre_compress_general', array() );
         ?>
+        <style>
+            .libre-compress-toggle { position: relative; display: inline-block; width: 46px; height: 24px; vertical-align: middle; }
+            .libre-compress-toggle input { opacity: 0; width: 0; height: 0; }
+            .libre-compress-toggle .slider { position: absolute; cursor: pointer; inset: 0; background: #c3c4c7; transition: .2s; border-radius: 24px; }
+            .libre-compress-toggle .slider:before { content: ""; position: absolute; height: 18px; width: 18px; left: 3px; top: 3px; background: #fff; transition: .2s; border-radius: 50%; }
+            .libre-compress-toggle input:checked + .slider { background: #2271b1; }
+            .libre-compress-toggle input:checked + .slider:before { transform: translateX(22px); }
+        </style>
         <form method="post" action="options.php">
             <?php settings_fields( 'libre_compress_general_group' ); ?>
 
@@ -153,6 +168,43 @@ class Libre_Compress_Settings {
                         <input type="number" name="libre_compress_general[tool_concurrency]" value="<?php echo esc_attr( $options['tool_concurrency'] ?? 5 ); ?>" min="1" max="100" class="small-text">
                     </td>
                 </tr>
+                <tr>
+                    <th scope="row"><?php esc_html_e( '格式转换', 'libre-compress' ); ?></th>
+                    <td>
+                        <label>
+                            <input type="checkbox" name="libre_compress_general[convert_png]" value="1" <?php checked( ! empty( $options['convert_png'] ) ); ?>>
+                            <?php esc_html_e( 'PNG', 'libre-compress' ); ?>
+                        </label>
+                        &nbsp;&nbsp;
+                        <label>
+                            <input type="checkbox" name="libre_compress_general[convert_jpg]" value="1" <?php checked( ! empty( $options['convert_jpg'] ) ); ?>>
+                            <?php esc_html_e( 'JPG', 'libre-compress' ); ?>
+                        </label>
+                        &nbsp;&nbsp;
+                        <label>
+                            <input type="checkbox" name="libre_compress_general[convert_gif]" value="1" <?php checked( ! empty( $options['convert_gif'] ) ); ?>>
+                            <?php esc_html_e( 'GIF', 'libre-compress' ); ?>
+                        </label>
+                        &nbsp;&nbsp;
+                        <label>
+                            <input type="checkbox" name="libre_compress_general[convert_svg]" value="1" <?php checked( ! empty( $options['convert_svg'] ) ); ?>>
+                            <?php esc_html_e( 'SVG', 'libre-compress' ); ?>
+                        </label>
+                        <p class="description"><?php esc_html_e( '勾选的格式上传时将自动转换为新格式，前端直接显示新格式（不考虑浏览器兼容性）。默认不勾选即不转换。', 'libre-compress' ); ?></p>
+                    </td>
+                </tr>
+                <tr>
+                    <th scope="row"><?php esc_html_e( '转换目标格式', 'libre-compress' ); ?></th>
+                    <td>
+                        <strong>WebP</strong>
+                        <label class="libre-compress-toggle">
+                            <input type="checkbox" name="libre_compress_general[convert_target_avif]" value="1" <?php checked( 'avif', $options['convert_target'] ?? 'webp' ); ?>>
+                            <span class="slider"></span>
+                        </label>
+                        <strong>AVIF</strong>
+                        <p class="description"><?php esc_html_e( '选择转换的目标格式：AVIF 压缩率更高但编码更慢，WebP 兼容性更好', 'libre-compress' ); ?></p>
+                    </td>
+                </tr>
             </table>
 
             <?php submit_button(); ?>
@@ -169,6 +221,16 @@ class Libre_Compress_Settings {
                 </td>
                 <td style="padding: 10px 0;">
                     <span class="description"><?php esc_html_e( '压缩媒体库中所有未压缩的图片', 'libre-compress' ); ?></span>
+                </td>
+            </tr>
+            <tr>
+                <td style="padding: 10px 0;">
+                    <button type="button" class="button" id="libre-compress-bulk-convert">
+                        <?php esc_html_e( '批量转换未转换的图片', 'libre-compress' ); ?>
+                    </button>
+                </td>
+                <td style="padding: 10px 0;">
+                    <span class="description"><?php esc_html_e( '为媒体库中已启用格式的图片生成新格式副本（按上方格式转换设置）', 'libre-compress' ); ?></span>
                 </td>
             </tr>
             <tr>
@@ -422,8 +484,8 @@ class Libre_Compress_Settings {
                 <tr>
                     <th scope="row"><?php esc_html_e( '压缩质量', 'libre-compress' ); ?></th>
                     <td>
-                        <input type="range" name="libre_compress_tools[avif_quality]" value="<?php echo esc_attr( $options['avif_quality'] ?? 60 ); ?>" min="0" max="100" oninput="this.nextElementSibling.value = this.value">
-                        <output><?php echo esc_html( $options['avif_quality'] ?? 60 ); ?></output>
+                        <input type="range" name="libre_compress_tools[avif_quality]" value="<?php echo esc_attr( $options['avif_quality'] ?? 80 ); ?>" min="0" max="100" oninput="this.nextElementSibling.value = this.value">
+                        <output><?php echo esc_html( $options['avif_quality'] ?? 80 ); ?></output>
                         <p class="description"><?php esc_html_e( '0-100，数值越高质量越好，文件越大（仅有损压缩有效）', 'libre-compress' ); ?></p>
                     </td>
                 </tr>

@@ -108,8 +108,7 @@ abstract class Libre_Compress_Tool_Base {
      *
      * @return string|false 可执行文件路径或 false
      */
-    protected function get_executable_path() {
-        // 使用缓存
+    protected function get_executable_path() {        // 使用缓存
         if ( null !== $this->executable_path ) {
             return $this->executable_path;
         }
@@ -195,6 +194,15 @@ abstract class Libre_Compress_Tool_Base {
         }
 
         return false !== $this->get_executable_path();
+    }
+
+    /**
+     * 获取工具二进制路径（供转换等其他子系统复用工具查找逻辑）
+     *
+     * @return string|false 可执行文件路径或 false
+     */
+    public function get_tool_binary_path() {
+        return $this->get_executable_path();
     }
 
     /**

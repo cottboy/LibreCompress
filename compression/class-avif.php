@@ -110,7 +110,7 @@ class Libre_Compress_Avif extends Libre_Compress_Tool_Base {
 
         // 获取压缩设置
         $settings = get_option( 'libre_compress_tools', array() );
-        $quality  = isset( $settings['avif_quality'] ) ? absint( $settings['avif_quality'] ) : 60;
+        $quality  = isset( $settings['avif_quality'] ) ? absint( $settings['avif_quality'] ) : 80;
         $mode     = isset( $settings['avif_mode'] ) ? $settings['avif_mode'] : 'lossy';
         $lossless = ( 'lossless' === $mode );
 
