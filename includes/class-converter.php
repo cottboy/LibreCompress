@@ -750,15 +750,25 @@ class Libre_Compress_Converter {
     /**
      * 查找本地辅助工具（resvg、gif2webp、ffmpeg 等）
      *
-     * 优先 wp-content/LibreCompress-bin 目录，其次系统 PATH
+     * 优先 wp-content/LibreCompress-bin 目录，其次系统 PATH。
+     * 设置页复用此方法展示辅助工具的安装状态与路径。
      *
      * @param string $name 可执行文件名
      * @return string|false 路径或 false
      */
-    private function find_local_tool( string $name ) {
+    public function find_local_tool( string $name ) {
         static $cache = array();
 
         if ( isset( $cache[ $name ] ) ) {
+            return $cache[ $name ];
+        }
+
+        // exec() 不可用时跳过系统 PATH 查找（bin 目录查找无需 exec）
+        if ( ! function_exists( 'exec' ) || in_array( 'exec', array_map( 'trim', explode( ',', (string) ini_get( 'disable_functions' ) ) ), true ) ) {
+            $is_windows_early = 'WIN' === strtoupper( substr( PHP_OS, 0, 3 ) );
+            $bin_path_early   = LIBRE_COMPRESS_BIN_PATH . $name . ( $is_windows_early ? '.exe' : '' );
+
+            $cache[ $name ] = file_exists( $bin_path_early ) ? $bin_path_early : false;
             return $cache[ $name ];
         }
 

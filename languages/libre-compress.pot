@@ -196,7 +196,11 @@ msgid "备份已删除"
 msgstr ""
 
 #: includes/class-settings.php
-msgid "安装方式：下载或自行编译二进制文件放到 /wp-content/LibreCompress-bin 目录 或 通过系统包管理器安装"
+msgid "安装方式（二选一）：① 推荐：把工具的可执行文件直接放进 /wp-content/LibreCompress-bin/ 目录，无需其他配置，随站点一起备份迁移；② 或将工具安装到电脑任意位置后，把它所在的文件夹加入系统的 Path 环境变量。"
+msgstr ""
+
+#: includes/class-settings.php
+msgid "Path 环境变量的添加方法（Windows）：右键「此电脑」→ 属性 → 高级系统设置 → 环境变量，在「用户变量」或「系统变量」中选中 Path 点「编辑」→「新建」，粘贴工具所在文件夹的完整路径后一路确定，改完重启 PHP 站点生效。Linux/macOS 可用包管理器安装（如 apt install、brew install）。两处同时存在同一种工具时，优先使用 LibreCompress-bin 目录中的版本。"
 msgstr ""
 
 #: includes/class-settings.php
@@ -503,7 +507,91 @@ msgid "批量转换未转换的图片"
 msgstr ""
 
 #: includes/class-settings.php
-msgid "为媒体库中已启用格式的图片执行格式转换（按上方格式转换设置）"
+msgid "为媒体库中已启用格式的图片执行格式转换"
+msgstr ""
+
+#: includes/class-settings.php
+msgid "转换辅助工具"
+msgstr ""
+
+#: includes/class-settings.php
+msgid "用途"
+msgstr ""
+
+#: includes/class-settings.php
+msgid "安装路径"
+msgstr ""
+
+#: includes/class-settings.php
+msgid "AVIF 解码（压缩 AVIF 时先解码为 PNG 再重新编码）"
+msgstr ""
+
+#: includes/class-settings.php
+msgid "动画 GIF 转 WebP"
+msgstr ""
+
+#: includes/class-settings.php
+msgid "动画 GIF 转 AVIF（解码 GIF 帧序列）"
+msgstr ""
+
+#: includes/class-settings.php
+msgid "SVG 栅格化为 PNG（SVG 转换依赖）"
+msgstr ""
+
+#: includes/class-settings.php
+msgid "路径支持状态"
+msgstr ""
+
+#: includes/class-settings.php
+msgid "路径"
+msgstr ""
+
+#: includes/class-settings.php
+msgid "依赖"
+msgstr ""
+
+#: includes/class-settings.php
+msgid "支持"
+msgstr ""
+
+#: includes/class-settings.php
+msgid "不支持"
+msgstr ""
+
+#: includes/class-settings.php
+msgid "缺少：%s"
+msgstr ""
+
+#: includes/class-settings.php
+msgid "GD 扩展"
+msgstr ""
+
+#: includes/class-settings.php
+msgid "PNG/JPG 转 WebP"
+msgstr ""
+
+#: includes/class-settings.php
+msgid "PNG/JPG 转 AVIF"
+msgstr ""
+
+#: includes/class-settings.php
+msgid "静态 GIF 转 WebP"
+msgstr ""
+
+#: includes/class-settings.php
+msgid "静态 GIF 转 AVIF"
+msgstr ""
+
+#: includes/class-settings.php
+msgid "SVG 转 WebP"
+msgstr ""
+
+#: includes/class-settings.php
+msgid "SVG 转 AVIF"
+msgstr ""
+
+#: includes/class-settings.php
+msgid "或"
 msgstr ""
 
 #: includes/class-libre-compress.php

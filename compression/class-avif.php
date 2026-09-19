@@ -56,11 +56,12 @@ class Libre_Compress_Avif extends Libre_Compress_Tool_Base {
     /**
      * 获取解码器（avifdec）路径
      *
-     * 查找逻辑与 get_executable_path() 一致：优先 wp-content/LibreCompress-bin 目录，其次系统 PATH
+     * 查找逻辑与 get_executable_path() 一致：优先 wp-content/LibreCompress-bin 目录，其次系统 PATH。
+     * public 供设置页展示解码器的安装状态与路径。
      *
      * @return string|false 解码器路径或 false
      */
-    protected function get_decoder_path() {
+    public function get_decoder_path() {
         // 使用缓存
         if ( null !== $this->decoder_path ) {
             return $this->decoder_path;
