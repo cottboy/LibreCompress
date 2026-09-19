@@ -96,6 +96,8 @@ function libre_compress_load_dependencies() {
     require_once LIBRE_COMPRESS_PATH . 'compression/class-oxipng.php';
     require_once LIBRE_COMPRESS_PATH . 'compression/class-cwebp.php';
     require_once LIBRE_COMPRESS_PATH . 'compression/class-avif.php';
+    require_once LIBRE_COMPRESS_PATH . 'compression/class-gifsicle.php';
+    require_once LIBRE_COMPRESS_PATH . 'compression/class-svgo.php';
 
     // 加载核心类
     require_once LIBRE_COMPRESS_PATH . 'includes/class-database.php';
@@ -149,6 +151,9 @@ function libre_compress_activate() {
         'webp_quality'       => 80,
         'avif_mode'          => 'lossy',
         'avif_quality'       => 60,
+        'gif_mode'           => 'lossy',
+        'gif_quality'        => 60,
+        'svg_precision'      => 3,
     );
 
     // 只在选项不存在时添加默认值

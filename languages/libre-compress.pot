@@ -429,3 +429,27 @@ msgstr ""
 #: includes/class-compressor.php
 msgid "无法创建回滚副本，已跳过压缩"
 msgstr ""
+
+#: includes/class-settings.php
+msgid "GIF 压缩"
+msgstr ""
+
+#: includes/class-settings.php
+msgid "SVG 优化"
+msgstr ""
+
+#: includes/class-settings.php
+msgid "优化精度"
+msgstr ""
+
+#: includes/class-settings.php
+msgid "坐标小数有效位数 0-8，数值越高越保真，文件越大"
+msgstr ""
+
+#: compression/class-gifsicle.php
+msgid "从 eternallybored.org 下载预编译的 gifsicle.exe"
+msgstr ""
+
+#: compression/class-svgo.php
+msgid "需要 Node.js 环境，运行 npm install -g svgo"
+msgstr ""

@@ -80,7 +80,7 @@ class Libre_Compress_Media_Library {
 
         // 检查是否为图片
         $mime_type     = get_post_mime_type( $attachment_id );
-        $allowed_types = array( 'image/jpeg', 'image/png', 'image/webp', 'image/avif' );
+        $allowed_types = array( 'image/jpeg', 'image/png', 'image/webp', 'image/avif', 'image/gif', 'image/svg+xml' );
 
         if ( ! in_array( $mime_type, $allowed_types, true ) ) {
             echo '<span class="libre-compress-na">—</span>';

@@ -136,7 +136,7 @@ class Libre_Compress_Thumbnail_Manager {
         $attachments = $wpdb->get_col(
             "SELECT ID FROM {$wpdb->posts} 
             WHERE post_type = 'attachment' 
-            AND post_mime_type IN ('image/jpeg', 'image/png', 'image/webp', 'image/avif', 'image/gif')"
+            AND post_mime_type IN ('image/jpeg', 'image/png', 'image/webp', 'image/avif', 'image/gif', 'image/svg+xml')"
         );
 
         $total_deleted = 0;
@@ -188,7 +188,7 @@ class Libre_Compress_Thumbnail_Manager {
 
             foreach ( $matches[1] as $img_url ) {
                 // 检查是否为缩略图 URL（包含尺寸后缀如 -300x200）
-                if ( preg_match( '/-\d+x\d+\.(jpg|jpeg|png|gif|webp|avif)$/i', $img_url ) ) {
+                if ( preg_match( '/-\d+x\d+\.(jpg|jpeg|png|gif|webp|avif|svg)$/i', $img_url ) ) {
                     // 获取原图 URL
                     $original_url = preg_replace( '/-\d+x\d+\./', '.', $img_url );
 
@@ -252,7 +252,7 @@ class Libre_Compress_Thumbnail_Manager {
         $attachments = $wpdb->get_col(
             "SELECT ID FROM {$wpdb->posts} 
             WHERE post_type = 'attachment' 
-            AND post_mime_type IN ('image/jpeg', 'image/png', 'image/webp', 'image/avif', 'image/gif')"
+            AND post_mime_type IN ('image/jpeg', 'image/png', 'image/webp', 'image/avif', 'image/gif', 'image/svg+xml')"
         );
 
         $success = 0;
@@ -310,7 +310,7 @@ class Libre_Compress_Thumbnail_Manager {
 
             foreach ( $matches[1] as $img_url ) {
                 // 检查是否为原图 URL（不包含尺寸后缀）
-                if ( ! preg_match( '/-\d+x\d+\.(jpg|jpeg|png|gif|webp|avif)$/i', $img_url ) ) {
+                if ( ! preg_match( '/-\d+x\d+\.(jpg|jpeg|png|gif|webp|avif|svg)$/i', $img_url ) ) {
                     // 尝试获取对应的附件 ID
                     $attachment_id = attachment_url_to_postid( $img_url );
 

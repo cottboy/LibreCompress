@@ -218,8 +218,9 @@ abstract class Libre_Compress_Tool_Base {
         $output      = array();
         $return_code = 0;
 
+        // 用分组括号包住整条命令再做 2>&1，否则命令链中 2>&1 只作用于末段，前面命令的错误会漏到 stderr
         // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.system_calls_exec
-        exec( $command . ' 2>&1', $output, $return_code );
+        exec( '(' . $command . ') 2>&1', $output, $return_code );
 
         return array(
             'success'     => 0 === $return_code,

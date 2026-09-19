@@ -70,11 +70,18 @@ class Libre_Compress_Settings {
         $sanitized['avif_mode']    = isset( $input['avif_mode'] ) && in_array( $input['avif_mode'], array( 'lossy', 'lossless' ), true ) ? $input['avif_mode'] : 'lossy';
         $sanitized['avif_quality'] = isset( $input['avif_quality'] ) ? absint( $input['avif_quality'] ) : 60;
 
+        $sanitized['gif_mode']    = isset( $input['gif_mode'] ) && in_array( $input['gif_mode'], array( 'lossy', 'lossless' ), true ) ? $input['gif_mode'] : 'lossy';
+        $sanitized['gif_quality'] = isset( $input['gif_quality'] ) ? absint( $input['gif_quality'] ) : 60;
+
+        $sanitized['svg_precision'] = isset( $input['svg_precision'] ) ? absint( $input['svg_precision'] ) : 3;
+
         $sanitized['jpeg_quality']       = max( 0, min( 100, $sanitized['jpeg_quality'] ) );
         $sanitized['png_lossy_quality']  = max( 0, min( 100, $sanitized['png_lossy_quality'] ) );
         $sanitized['png_lossless_level'] = max( 0, min( 6, $sanitized['png_lossless_level'] ) );
         $sanitized['webp_quality']       = max( 0, min( 100, $sanitized['webp_quality'] ) );
         $sanitized['avif_quality']       = max( 0, min( 100, $sanitized['avif_quality'] ) );
+        $sanitized['gif_quality']        = max( 0, min( 100, $sanitized['gif_quality'] ) );
+        $sanitized['svg_precision']      = max( 0, min( 8, $sanitized['svg_precision'] ) );
 
         return $sanitized;
     }
@@ -418,6 +425,44 @@ class Libre_Compress_Settings {
                         <input type="range" name="libre_compress_tools[avif_quality]" value="<?php echo esc_attr( $options['avif_quality'] ?? 60 ); ?>" min="0" max="100" oninput="this.nextElementSibling.value = this.value">
                         <output><?php echo esc_html( $options['avif_quality'] ?? 60 ); ?></output>
                         <p class="description"><?php esc_html_e( '0-100，数值越高质量越好，文件越大（仅有损压缩有效）', 'libre-compress' ); ?></p>
+                    </td>
+                </tr>
+            </table>
+
+            <h3><?php esc_html_e( 'GIF 压缩', 'libre-compress' ); ?></h3>
+            <table class="form-table">
+                <tr>
+                    <th scope="row"><?php esc_html_e( '压缩模式', 'libre-compress' ); ?></th>
+                    <td>
+                        <label>
+                            <input type="radio" name="libre_compress_tools[gif_mode]" value="lossy" <?php checked( ( $options['gif_mode'] ?? 'lossy' ), 'lossy' ); ?>>
+                            <?php esc_html_e( '有损压缩', 'libre-compress' ); ?>
+                        </label>
+                        &nbsp;&nbsp;
+                        <label>
+                            <input type="radio" name="libre_compress_tools[gif_mode]" value="lossless" <?php checked( ( $options['gif_mode'] ?? 'lossy' ), 'lossless' ); ?>>
+                            <?php esc_html_e( '无损压缩', 'libre-compress' ); ?>
+                        </label>
+                    </td>
+                </tr>
+                <tr>
+                    <th scope="row"><?php esc_html_e( '压缩质量', 'libre-compress' ); ?></th>
+                    <td>
+                        <input type="range" name="libre_compress_tools[gif_quality]" value="<?php echo esc_attr( $options['gif_quality'] ?? 60 ); ?>" min="0" max="100" oninput="this.nextElementSibling.value = this.value">
+                        <output><?php echo esc_html( $options['gif_quality'] ?? 60 ); ?></output>
+                        <p class="description"><?php esc_html_e( '0-100，数值越高质量越好，文件越大（仅有损压缩有效）', 'libre-compress' ); ?></p>
+                    </td>
+                </tr>
+            </table>
+
+            <h3><?php esc_html_e( 'SVG 优化', 'libre-compress' ); ?></h3>
+            <table class="form-table">
+                <tr>
+                    <th scope="row"><?php esc_html_e( '优化精度', 'libre-compress' ); ?></th>
+                    <td>
+                        <input type="range" name="libre_compress_tools[svg_precision]" value="<?php echo esc_attr( $options['svg_precision'] ?? 3 ); ?>" min="0" max="8" oninput="this.nextElementSibling.value = this.value">
+                        <output><?php echo esc_html( $options['svg_precision'] ?? 3 ); ?></output>
+                        <p class="description"><?php esc_html_e( '坐标小数有效位数 0-8，数值越高越保真，文件越大', 'libre-compress' ); ?></p>
                     </td>
                 </tr>
             </table>
