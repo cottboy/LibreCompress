@@ -507,31 +507,7 @@ msgid "为媒体库中已启用格式的图片执行格式转换"
 msgstr ""
 
 #: includes/class-settings.php
-msgid "用途"
-msgstr ""
-
-#: includes/class-settings.php
 msgid "安装路径"
-msgstr ""
-
-#: includes/class-settings.php
-msgid "PNG 压缩（有损）"
-msgstr ""
-
-#: includes/class-settings.php
-msgid "PNG 压缩（无损）"
-msgstr ""
-
-#: includes/class-settings.php
-msgid "WEBP 压缩 / 转换编码"
-msgstr ""
-
-#: includes/class-settings.php
-msgid "AVIF 压缩 / 转换编码"
-msgstr ""
-
-#: includes/class-settings.php
-msgid "AVIF 解码（压缩依赖）"
 msgstr ""
 
 #: includes/class-settings.php
@@ -540,10 +516,6 @@ msgstr ""
 
 #: includes/class-settings.php
 msgid "动画 GIF 转 AVIF"
-msgstr ""
-
-#: includes/class-settings.php
-msgid "SVG 栅格化（转换依赖）"
 msgstr ""
 
 #: includes/class-settings.php

@@ -339,17 +339,17 @@ class Libre_Compress_Settings {
 
         // 全部工具（压缩渠道 + 转换辅助），按格式相邻排序
         $all_tools = array(
-            array( 'name' => 'jpegoptim', 'usage' => __( 'JPEG 压缩', 'libre-compress' ), 'tool' => $tools['jpegoptim'] ),
-            array( 'name' => 'pngquant', 'usage' => __( 'PNG 压缩（有损）', 'libre-compress' ), 'tool' => $tools['pngquant'] ),
-            array( 'name' => 'oxipng', 'usage' => __( 'PNG 压缩（无损）', 'libre-compress' ), 'tool' => $tools['oxipng'] ),
-            array( 'name' => 'gifsicle', 'usage' => __( 'GIF 压缩', 'libre-compress' ), 'tool' => $tools['gifsicle'] ),
-            array( 'name' => 'gif2webp', 'usage' => __( '动画 GIF 转 WebP', 'libre-compress' ), 'tool' => null, 'path' => $converter->find_local_tool( 'gif2webp' ), 'url' => 'https://developers.google.com/speed/webp/download' ),
-            array( 'name' => 'ffmpeg', 'usage' => __( '动画 GIF 转 AVIF', 'libre-compress' ), 'tool' => null, 'path' => $converter->find_local_tool( 'ffmpeg' ), 'url' => 'https://ffmpeg.org/download.html' ),
-            array( 'name' => 'cwebp', 'usage' => __( 'WEBP 压缩 / 转换编码', 'libre-compress' ), 'tool' => $tools['cwebp'] ),
-            array( 'name' => 'avifenc', 'usage' => __( 'AVIF 压缩 / 转换编码', 'libre-compress' ), 'tool' => null, 'path' => $converter->find_local_tool( 'avifenc' ), 'url' => 'https://github.com/AOMediaCodec/libavif/releases' ),
-            array( 'name' => 'avifdec', 'usage' => __( 'AVIF 解码（压缩依赖）', 'libre-compress' ), 'tool' => null, 'path' => $converter->find_local_tool( 'avifdec' ), 'url' => 'https://github.com/AOMediaCodec/libavif/releases' ),
-            array( 'name' => 'svgo', 'usage' => __( 'SVG 优化', 'libre-compress' ), 'tool' => $tools['svgo'] ),
-            array( 'name' => 'resvg', 'usage' => __( 'SVG 栅格化（转换依赖）', 'libre-compress' ), 'tool' => null, 'path' => $converter->find_local_tool( 'resvg' ), 'url' => 'https://github.com/linebender/resvg/releases' ),
+            array( 'name' => 'jpegoptim', 'tool' => $tools['jpegoptim'] ),
+            array( 'name' => 'pngquant', 'tool' => $tools['pngquant'] ),
+            array( 'name' => 'oxipng', 'tool' => $tools['oxipng'] ),
+            array( 'name' => 'gifsicle', 'tool' => $tools['gifsicle'] ),
+            array( 'name' => 'gif2webp', 'tool' => null, 'path' => $converter->find_local_tool( 'gif2webp' ), 'url' => 'https://developers.google.com/speed/webp/download' ),
+            array( 'name' => 'ffmpeg', 'tool' => null, 'path' => $converter->find_local_tool( 'ffmpeg' ), 'url' => 'https://ffmpeg.org/download.html' ),
+            array( 'name' => 'cwebp', 'tool' => $tools['cwebp'] ),
+            array( 'name' => 'avifenc', 'tool' => null, 'path' => $converter->find_local_tool( 'avifenc' ), 'url' => 'https://github.com/AOMediaCodec/libavif/releases' ),
+            array( 'name' => 'avifdec', 'tool' => null, 'path' => $converter->find_local_tool( 'avifdec' ), 'url' => 'https://github.com/AOMediaCodec/libavif/releases' ),
+            array( 'name' => 'svgo', 'tool' => $tools['svgo'] ),
+            array( 'name' => 'resvg', 'tool' => null, 'path' => $converter->find_local_tool( 'resvg' ), 'url' => 'https://github.com/linebender/resvg/releases' ),
         );
 
         // 统一为渲染字段：available(bool)、path、url
@@ -385,7 +385,6 @@ class Libre_Compress_Settings {
             <thead>
                 <tr>
                     <th style="width: 170px;"><?php esc_html_e( '工具', 'libre-compress' ); ?></th>
-                    <th style="width: 180px;"><?php esc_html_e( '用途', 'libre-compress' ); ?></th>
                     <th style="width: 90px;"><?php esc_html_e( '状态', 'libre-compress' ); ?></th>
                     <th><?php esc_html_e( '安装路径', 'libre-compress' ); ?></th>
                     <th style="width: 50px;"><?php esc_html_e( '链接', 'libre-compress' ); ?></th>
@@ -395,7 +394,6 @@ class Libre_Compress_Settings {
                 <?php foreach ( $all_tools as $row ) : ?>
                     <tr>
                         <td><strong><?php echo esc_html( $row['name'] ); ?></strong></td>
-                        <td><?php echo esc_html( $row['usage'] ); ?></td>
                         <td>
                             <?php if ( $row['available'] ) : ?>
                                 <span style="color: #00a32a;">✓ <?php esc_html_e( '已安装', 'libre-compress' ); ?></span>
