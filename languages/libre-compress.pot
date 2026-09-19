@@ -531,6 +531,10 @@ msgid "AVIF 压缩 / 转换编码"
 msgstr ""
 
 #: includes/class-settings.php
+msgid "AVIF 解码（压缩依赖）"
+msgstr ""
+
+#: includes/class-settings.php
 msgid "动画 GIF 转 WebP"
 msgstr ""
 

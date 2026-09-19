@@ -346,22 +346,20 @@ class Libre_Compress_Settings {
             array( 'name' => 'gif2webp', 'usage' => __( '动画 GIF 转 WebP', 'libre-compress' ), 'tool' => null, 'path' => $converter->find_local_tool( 'gif2webp' ), 'url' => 'https://developers.google.com/speed/webp/download' ),
             array( 'name' => 'ffmpeg', 'usage' => __( '动画 GIF 转 AVIF', 'libre-compress' ), 'tool' => null, 'path' => $converter->find_local_tool( 'ffmpeg' ), 'url' => 'https://ffmpeg.org/download.html' ),
             array( 'name' => 'cwebp', 'usage' => __( 'WEBP 压缩 / 转换编码', 'libre-compress' ), 'tool' => $tools['cwebp'] ),
-            array( 'name' => 'avifenc + avifdec', 'usage' => __( 'AVIF 压缩 / 转换编码', 'libre-compress' ), 'tool' => $tools['avifenc'], 'dual' => true ),
+            array( 'name' => 'avifenc', 'usage' => __( 'AVIF 压缩 / 转换编码', 'libre-compress' ), 'tool' => null, 'path' => $converter->find_local_tool( 'avifenc' ), 'url' => 'https://github.com/AOMediaCodec/libavif/releases' ),
+            array( 'name' => 'avifdec', 'usage' => __( 'AVIF 解码（压缩依赖）', 'libre-compress' ), 'tool' => null, 'path' => $converter->find_local_tool( 'avifdec' ), 'url' => 'https://github.com/AOMediaCodec/libavif/releases' ),
             array( 'name' => 'svgo', 'usage' => __( 'SVG 优化', 'libre-compress' ), 'tool' => $tools['svgo'] ),
             array( 'name' => 'resvg', 'usage' => __( 'SVG 栅格化（转换依赖）', 'libre-compress' ), 'tool' => null, 'path' => $converter->find_local_tool( 'resvg' ), 'url' => 'https://github.com/linebender/resvg/releases' ),
         );
 
-        // 统一为渲染字段：available(bool)、paths(array)、url
+        // 统一为渲染字段：available(bool)、path、url
         foreach ( $all_tools as $index => $row ) {
             if ( null !== $row['tool'] ) {
                 $all_tools[ $index ]['available'] = $row['tool']->is_tool_available();
+                $all_tools[ $index ]['path']      = $row['tool']->get_tool_binary_path();
                 $all_tools[ $index ]['url']       = $row['tool']->get_download_url();
-                $all_tools[ $index ]['paths']     = ! empty( $row['dual'] )
-                    ? array( $converter->find_local_tool( 'avifenc' ), $converter->find_local_tool( 'avifdec' ) )
-                    : array( $row['tool']->get_tool_binary_path() );
             } else {
                 $all_tools[ $index ]['available'] = false !== $row['path'];
-                $all_tools[ $index ]['paths']     = array( $row['path'] );
             }
         }
         ?>
@@ -406,14 +404,11 @@ class Libre_Compress_Settings {
                             <?php endif; ?>
                         </td>
                         <td>
-                            <?php foreach ( $row['paths'] as $path_index => $path ) : ?>
-                                <?php if ( $path_index > 0 ) : ?><br><?php endif; ?>
-                                <?php if ( false !== $path ) : ?>
-                                    <code style="word-break: break-all; font-size: 11px;"><?php echo esc_html( $path ); ?></code>
-                                <?php else : ?>
-                                    —
-                                <?php endif; ?>
-                            <?php endforeach; ?>
+                            <?php if ( false !== $row['path'] ) : ?>
+                                <code style="word-break: break-all; font-size: 11px;"><?php echo esc_html( $row['path'] ); ?></code>
+                            <?php else : ?>
+                                —
+                            <?php endif; ?>
                         </td>
                         <td>
                             <a href="<?php echo esc_url( $row['url'] ); ?>" target="_blank" rel="noopener noreferrer">
