@@ -56,7 +56,7 @@ class Libre_Compress_Settings {
         $sanitized['convert_jpg'] = ! empty( $input['convert_jpg'] );
         $sanitized['convert_gif'] = ! empty( $input['convert_gif'] );
         $sanitized['convert_svg'] = ! empty( $input['convert_svg'] );
-        $sanitized['convert_target'] = ! empty( $input['convert_target_avif'] ) ? 'avif' : 'webp';
+        $sanitized['convert_target'] = ( isset( $input['convert_target'] ) && in_array( $input['convert_target'], array( 'webp', 'avif' ), true ) ) ? $input['convert_target'] : 'webp';
 
         // SVG 上传开关
         $sanitized['allow_svg_upload'] = ! empty( $input['allow_svg_upload'] );
@@ -136,12 +136,13 @@ class Libre_Compress_Settings {
         $options = get_option( 'libre_compress_general', array() );
         ?>
         <style>
-            .libre-compress-toggle { position: relative; display: inline-block; width: 56px; height: 22px; vertical-align: middle; }
-            .libre-compress-toggle input { opacity: 0; width: 0; height: 0; }
-            .libre-compress-toggle .slider { position: absolute; cursor: pointer; inset: 0; background: #c3c4c7; transition: .2s; border-radius: 4px; }
-            .libre-compress-toggle .slider:before { content: ""; position: absolute; height: 14px; width: 22px; left: 4px; top: 4px; background: #fff; transition: .2s; border-radius: 3px; box-shadow: 0 1px 2px rgba(0, 0, 0, .2); }
-            .libre-compress-toggle input:checked + .slider { background: #2271b1; }
-            .libre-compress-toggle input:checked + .slider:before { transform: translateX(26px); }
+            .libre-compress-seg { position: relative; display: inline-flex; background: #dcdcde; border-radius: 8px; padding: 3px; vertical-align: middle; }
+            .libre-compress-seg input { position: absolute; opacity: 0; width: 0; height: 0; pointer-events: none; }
+            .libre-compress-seg label { position: relative; z-index: 2; flex: 1; min-width: 64px; padding: 5px 16px; text-align: center; color: #50575e; font-weight: 500; cursor: pointer; border-radius: 6px; transition: color .15s; }
+            .libre-compress-seg .seg-thumb { position: absolute; z-index: 1; top: 3px; bottom: 3px; left: 3px; width: calc(50% - 3px); background: #fff; border-radius: 6px; box-shadow: 0 1px 3px rgba(0, 0, 0, .15); transition: transform .2s ease; }
+            #libre-compress-seg-avif:checked ~ .seg-thumb { transform: translateX(100%); }
+            #libre-compress-seg-webp:checked ~ label[for="libre-compress-seg-webp"],
+            #libre-compress-seg-avif:checked ~ label[for="libre-compress-seg-avif"] { color: #1d2327; font-weight: 600; }
         </style>
         <form method="post" action="options.php">
             <?php settings_fields( 'libre_compress_general_group' ); ?>
@@ -209,12 +210,13 @@ class Libre_Compress_Settings {
                 <tr>
                     <th scope="row"><?php esc_html_e( '转换目标格式', 'libre-compress' ); ?></th>
                     <td>
-                        <strong>WebP</strong>
-                        <label class="libre-compress-toggle">
-                            <input type="checkbox" name="libre_compress_general[convert_target_avif]" value="1" <?php checked( 'avif', $options['convert_target'] ?? 'webp' ); ?>>
-                            <span class="slider"></span>
-                        </label>
-                        <strong>AVIF</strong>
+                        <span class="libre-compress-seg">
+                            <input type="radio" name="libre_compress_general[convert_target]" value="webp" id="libre-compress-seg-webp" <?php checked( ( $options['convert_target'] ?? 'webp' ), 'webp' ); ?>>
+                            <label for="libre-compress-seg-webp">WebP</label>
+                            <input type="radio" name="libre_compress_general[convert_target]" value="avif" id="libre-compress-seg-avif" <?php checked( ( $options['convert_target'] ?? 'webp' ), 'avif' ); ?>>
+                            <label for="libre-compress-seg-avif">AVIF</label>
+                            <span class="seg-thumb"></span>
+                        </span>
                         <p class="description"><?php esc_html_e( '选择转换的目标格式：AVIF 压缩率更高但编码更慢，WebP 兼容性更好', 'libre-compress' ); ?></p>
                     </td>
                 </tr>
