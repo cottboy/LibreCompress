@@ -268,10 +268,10 @@ class Libre_Compress_Converter {
 
         $target_path = $this->get_target_path( $file_path, $target );
 
-        // 同名目标文件已存在时不覆盖（避免不同源格式转换后互相冲突）
+        // 同名目标文件已存在时不覆盖（避免不同源格式转换后互相冲突）——轮到了但没办成，记为失败
         if ( file_exists( $target_path ) ) {
             $result_template['to']       = $target_path;
-            $result_template['status']   = 'skipped';
+            $result_template['status']   = 'failed';
             $result_template['message']  = __( '同名目标文件已存在', 'libre-compress' );
             $result_template['original_size']  = (int) filesize( $file_path );
             $result_template['converted_size'] = (int) filesize( $target_path );
@@ -298,6 +298,8 @@ class Libre_Compress_Converter {
                 $animated = $this->build_animated_gif_command( $file_path, $temp_output, $target );
 
                 if ( false === $animated ) {
+                    // 缺工具：环境未配齐，记为跳过
+                    $result_template['status']  = 'skipped';
                     $result_template['message'] = ( 'webp' === $target )
                         ? __( '动画 GIF 转 WebP 需要 gif2webp 工具（libwebp 套件）', 'libre-compress' )
                         : __( '动画 GIF 转 AVIF 需要 ffmpeg', 'libre-compress' );
@@ -308,6 +310,12 @@ class Libre_Compress_Converter {
                 $temp_source = $animated['temp'];
             } else {
                 $temp_source = $file_path . '.tmp-src.png';
+                if ( ! function_exists( 'imagecreatefromgif' ) || ! function_exists( 'imagepng' ) ) {
+                    // 缺 GD 扩展：环境未配齐，记为跳过
+                    $result_template['status']  = 'skipped';
+                    $result_template['message'] = __( '静态 GIF 转换需要 GD 扩展', 'libre-compress' );
+                    return $result_template;
+                }
                 if ( ! $this->decode_gif_to_png( $file_path, $temp_source ) ) {
                     $result_template['message'] = __( 'GIF 解码失败', 'libre-compress' );
                     return $result_template;
@@ -317,8 +325,14 @@ class Libre_Compress_Converter {
         } elseif ( 'svg' === $extension ) {
             // SVG 需先栅格化为 PNG 中间文件
             $temp_source = $file_path . '.tmp-src.png';
+            if ( false === $this->get_resvg_path() ) {
+                // 缺 resvg：环境未配齐，记为跳过
+                $result_template['status']  = 'skipped';
+                $result_template['message'] = __( 'SVG 转换需要 resvg 工具', 'libre-compress' );
+                return $result_template;
+            }
             if ( ! $this->rasterize_svg_to_png( $file_path, $temp_source ) ) {
-                $result_template['message'] = __( 'SVG 栅格化失败（需要 resvg 工具）', 'libre-compress' );
+                $result_template['message'] = __( 'SVG 栅格化失败', 'libre-compress' );
                 return $result_template;
             }
             $command = $this->build_encode_command( $temp_source, $temp_output, $target );
@@ -328,7 +342,9 @@ class Libre_Compress_Converter {
         }
 
         if ( false === $command ) {
-            $error_msg = __( '没有可用的编码工具', 'libre-compress' );
+            // 缺编码工具（cwebp/avifenc）：环境未配齐，记为跳过
+            $error_msg                 = __( '没有可用的编码工具', 'libre-compress' );
+            $result_template['status'] = 'skipped';
         } else {
             $output  = array();
             $exec_rc = 0;
@@ -367,7 +383,7 @@ class Libre_Compress_Converter {
             // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
             unlink( $temp_output );
 
-            $result_template['status']         = 'skipped';
+            $result_template['status']         = 'failed';
             $result_template['message']        = __( '转换结果更大，已放弃', 'libre-compress' );
             $result_template['original_size']  = $original_size;
             $result_template['converted_size'] = $converted_size;

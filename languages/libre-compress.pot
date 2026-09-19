@@ -587,15 +587,19 @@ msgid "该格式未启用转换"
 msgstr ""
 
 #: includes/class-converter.php
-msgid "已存在转换副本"
-msgstr ""
-
-#: includes/class-converter.php
 msgid "GIF 解码失败"
 msgstr ""
 
 #: includes/class-converter.php
-msgid "SVG 栅格化失败（需要 resvg 工具）"
+msgid "SVG 转换需要 resvg 工具"
+msgstr ""
+
+#: includes/class-converter.php
+msgid "SVG 栅格化失败"
+msgstr ""
+
+#: includes/class-converter.php
+msgid "静态 GIF 转换需要 GD 扩展"
 msgstr ""
 
 #: includes/class-converter.php
