@@ -383,7 +383,7 @@ class Libre_Compress_Converter {
             // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
             unlink( $temp_output );
 
-            $result_template['status']         = 'failed';
+            $result_template['status']         = 'skipped';
             $result_template['message']        = __( '转换结果更大，已放弃', 'libre-compress' );
             $result_template['original_size']  = $original_size;
             $result_template['converted_size'] = $converted_size;
