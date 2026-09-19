@@ -58,6 +58,9 @@ class Libre_Compress_Settings {
         $sanitized['convert_svg'] = ! empty( $input['convert_svg'] );
         $sanitized['convert_target'] = ! empty( $input['convert_target_avif'] ) ? 'avif' : 'webp';
 
+        // SVG 上传开关
+        $sanitized['allow_svg_upload'] = ! empty( $input['allow_svg_upload'] );
+
         return $sanitized;
     }
 
@@ -133,12 +136,12 @@ class Libre_Compress_Settings {
         $options = get_option( 'libre_compress_general', array() );
         ?>
         <style>
-            .libre-compress-toggle { position: relative; display: inline-block; width: 46px; height: 24px; vertical-align: middle; }
+            .libre-compress-toggle { position: relative; display: inline-block; width: 56px; height: 22px; vertical-align: middle; }
             .libre-compress-toggle input { opacity: 0; width: 0; height: 0; }
-            .libre-compress-toggle .slider { position: absolute; cursor: pointer; inset: 0; background: #c3c4c7; transition: .2s; border-radius: 24px; }
-            .libre-compress-toggle .slider:before { content: ""; position: absolute; height: 18px; width: 18px; left: 3px; top: 3px; background: #fff; transition: .2s; border-radius: 50%; }
+            .libre-compress-toggle .slider { position: absolute; cursor: pointer; inset: 0; background: #c3c4c7; transition: .2s; border-radius: 4px; }
+            .libre-compress-toggle .slider:before { content: ""; position: absolute; height: 14px; width: 22px; left: 4px; top: 4px; background: #fff; transition: .2s; border-radius: 3px; box-shadow: 0 1px 2px rgba(0, 0, 0, .2); }
             .libre-compress-toggle input:checked + .slider { background: #2271b1; }
-            .libre-compress-toggle input:checked + .slider:before { transform: translateX(22px); }
+            .libre-compress-toggle input:checked + .slider:before { transform: translateX(26px); }
         </style>
         <form method="post" action="options.php">
             <?php settings_fields( 'libre_compress_general_group' ); ?>
@@ -166,6 +169,16 @@ class Libre_Compress_Settings {
                     <th scope="row"><?php esc_html_e( '压缩并发数', 'libre-compress' ); ?></th>
                     <td>
                         <input type="number" name="libre_compress_general[tool_concurrency]" value="<?php echo esc_attr( $options['tool_concurrency'] ?? 5 ); ?>" min="1" max="100" class="small-text">
+                    </td>
+                </tr>
+                <tr>
+                    <th scope="row"><?php esc_html_e( 'SVG 上传', 'libre-compress' ); ?></th>
+                    <td>
+                        <label>
+                            <input type="checkbox" name="libre_compress_general[allow_svg_upload]" value="1" <?php checked( ! empty( $options['allow_svg_upload'] ) ); ?>>
+                            <?php esc_html_e( '允许上传 SVG 文件', 'libre-compress' ); ?>
+                        </label>
+                        <p class="description"><?php esc_html_e( '上传时自动清理脚本等危险内容；SVG 可能被用于 XSS 攻击，仅在信任上传者时开启。', 'libre-compress' ); ?></p>
                     </td>
                 </tr>
                 <tr>

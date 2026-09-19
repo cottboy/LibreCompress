@@ -69,13 +69,6 @@ class Libre_Compress_Converter {
     );
 
     /**
-     * 缓存的 resvg 路径
-     *
-     * @var string|false|null
-     */
-    private $resvg_path = null;
-
-    /**
      * 恢复原图处理中标记（防止恢复后重新生成元数据时再次触发转换）
      *
      * @var bool
@@ -293,32 +286,47 @@ class Libre_Compress_Converter {
 
         $original_size = (int) filesize( $file_path );
 
-        // 准备编码输入源：GIF/SVG 需要先解码为 PNG 中间文件
-        $source      = $file_path;
+        // 编码为目标格式的临时文件
+        $temp_output = $file_path . '.tmp-conv.' . $target;
+        $encode_ok   = false;
+        $error_msg   = '';
         $temp_source = '';
 
         if ( 'gif' === $extension ) {
-            $temp_source = $file_path . '.tmp-src.png';
-            if ( ! $this->decode_gif_to_png( $file_path, $temp_source ) ) {
-                $result_template['message'] = __( 'GIF 解码失败', 'libre-compress' );
-                return $result_template;
+            // 动画 GIF 用专用工具整段转换，静态 GIF 先 GD 解码为 PNG
+            if ( $this->is_animated_gif( $file_path ) ) {
+                $animated = $this->build_animated_gif_command( $file_path, $temp_output, $target );
+
+                if ( false === $animated ) {
+                    $result_template['message'] = ( 'webp' === $target )
+                        ? __( '动画 GIF 转 WebP 需要 gif2webp 工具（libwebp 套件）', 'libre-compress' )
+                        : __( '动画 GIF 转 AVIF 需要 ffmpeg', 'libre-compress' );
+                    return $result_template;
+                }
+
+                $command     = $animated['command'];
+                $temp_source = $animated['temp'];
+            } else {
+                $temp_source = $file_path . '.tmp-src.png';
+                if ( ! $this->decode_gif_to_png( $file_path, $temp_source ) ) {
+                    $result_template['message'] = __( 'GIF 解码失败', 'libre-compress' );
+                    return $result_template;
+                }
+                $command = $this->build_encode_command( $temp_source, $temp_output, $target );
             }
-            $source = $temp_source;
         } elseif ( 'svg' === $extension ) {
+            // SVG 需先栅格化为 PNG 中间文件
             $temp_source = $file_path . '.tmp-src.png';
             if ( ! $this->rasterize_svg_to_png( $file_path, $temp_source ) ) {
                 $result_template['message'] = __( 'SVG 栅格化失败（需要 resvg 工具）', 'libre-compress' );
                 return $result_template;
             }
-            $source = $temp_source;
+            $command = $this->build_encode_command( $temp_source, $temp_output, $target );
+        } else {
+            // PNG/JPG 由编码工具直接支持
+            $command = $this->build_encode_command( $file_path, $temp_output, $target );
         }
 
-        // 编码为目标格式的临时文件
-        $temp_output = $file_path . '.tmp-conv.' . $target;
-        $encode_ok   = false;
-        $error_msg   = '';
-
-        $command = $this->build_encode_command( $source, $temp_output, $target );
         if ( false === $command ) {
             $error_msg = __( '没有可用的编码工具', 'libre-compress' );
         } else {
@@ -536,7 +544,7 @@ class Libre_Compress_Converter {
     }
 
     /**
-     * 用 GD 将 GIF 解码为 PNG（动画 GIF 仅取第一帧）
+     * 用 GD 将 GIF 解码为 PNG（仅用于静态 GIF，动画 GIF 走专用工具）
      *
      * @param string $gif_path GIF 源路径
      * @param string $png_path PNG 输出路径
@@ -587,32 +595,188 @@ class Libre_Compress_Converter {
     }
 
     /**
-     * 查找 resvg 可执行文件
+     * 检测 GIF 是否为动画（解析 GIF 块结构统计图像帧数）
+     *
+     * @param string $gif_path GIF 文件路径
+     * @return bool 是否为动画
+     */
+    private function is_animated_gif( string $gif_path ): bool {
+        $size = filesize( $gif_path );
+
+        if ( false === $size ) {
+            return false;
+        }
+
+        // 超大 GIF 基本都是动画，跳过解析
+        if ( $size > 30 * 1024 * 1024 ) {
+            return true;
+        }
+
+        // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_get_contents
+        $data = file_get_contents( $gif_path );
+
+        if ( false === $data || strlen( $data ) < 14 || 'GIF' !== substr( $data, 0, 3 ) ) {
+            return false;
+        }
+
+        // 跳过文件头（签名 6 字节 + 逻辑屏幕描述符 7 字节）与全局调色板
+        $pos   = 13;
+        $flags = ord( $data[10] );
+
+        if ( $flags & 0x80 ) {
+            $pos += 3 * ( 2 << ( $flags & 0x07 ) );
+        }
+
+        $length = strlen( $data );
+        $frames = 0;
+
+        while ( $pos < $length ) {
+            $block = ord( $data[ $pos ] );
+
+            if ( 0x21 === $block ) {
+                // 扩展块：跳过子块序列（长度前缀，0 结束）
+                $pos += 2;
+                while ( $pos < $length ) {
+                    $chunk = ord( $data[ $pos ] );
+                    $pos++;
+                    if ( 0 === $chunk ) {
+                        break;
+                    }
+                    $pos += $chunk;
+                }
+            } elseif ( 0x2C === $block ) {
+                // 图像描述符：一帧
+                $frames++;
+                if ( $frames > 1 ) {
+                    return true;
+                }
+                $pos += 9;
+                $local_flags = ord( $data[ $pos ] );
+                $pos++;
+                if ( $local_flags & 0x80 ) {
+                    $pos += 3 * ( 2 << ( $local_flags & 0x07 ) );
+                }
+                // LZW 最小码长字节，其后才是数据子块序列
+                $pos++;
+                while ( $pos < $length ) {
+                    $chunk = ord( $data[ $pos ] );
+                    $pos++;
+                    if ( 0 === $chunk ) {
+                        break;
+                    }
+                    $pos += $chunk;
+                }
+            } else {
+                // 块结束符或未知结构，停止解析
+                break;
+            }
+        }
+
+        return $frames > 1;
+    }
+
+    /**
+     * 构建动画 GIF 的转换命令
+     *
+     * WebP 用 gif2webp（libwebp 套件）直接转换；
+     * AVIF 无 GIF 输入能力，先由 ffmpeg 无损解码为 Y4M 序列，再由 avifenc 编码为动画 AVIF
+     *
+     * @param string $gif_path GIF 源路径
+     * @param string $output   输出文件路径
+     * @param string $target   目标格式 webp|avif
+     * @return array|false array( command, temp )，工具不可用时返回 false
+     */
+    private function build_animated_gif_command( string $gif_path, string $output, string $target ) {
+        $settings = get_option( 'libre_compress_tools', array() );
+        $gif_esc  = escapeshellarg( $gif_path );
+        $out_esc  = escapeshellarg( $output );
+
+        if ( 'webp' === $target ) {
+            $binary = $this->find_local_tool( 'gif2webp' );
+
+            if ( false === $binary ) {
+                return false;
+            }
+
+            $mode = isset( $settings['webp_mode'] ) ? $settings['webp_mode'] : 'lossy';
+
+            // gif2webp 默认即无损编码，有损模式需显式开启并指定质量
+            if ( 'lossy' !== $mode ) {
+                $command = escapeshellarg( $binary ) . ' ' . $gif_esc . ' -o ' . $out_esc;
+            } else {
+                $quality = isset( $settings['webp_quality'] ) ? absint( $settings['webp_quality'] ) : 80;
+                $quality = max( 0, min( 100, $quality ) );
+
+                $command = escapeshellarg( $binary ) . ' -lossy ' . sprintf( '-q %d', $quality ) . ' ' . $gif_esc . ' -o ' . $out_esc;
+            }
+
+            return array(
+                'command' => $command,
+                'temp'    => '',
+            );
+        }
+
+        $ffmpeg = $this->find_local_tool( 'ffmpeg' );
+        $avifenc = $this->find_local_tool( 'avifenc' );
+
+        if ( false === $ffmpeg || false === $avifenc ) {
+            return false;
+        }
+
+        // Y4M 中间文件保留 GIF 的完整帧序列，由 avifenc 读取全部帧
+        $temp_y4m = $gif_path . '.tmp-anim.y4m';
+
+        $mode    = isset( $settings['avif_mode'] ) ? $settings['avif_mode'] : 'lossy';
+        $quality = isset( $settings['avif_quality'] ) ? absint( $settings['avif_quality'] ) : 80;
+        $quality = max( 0, min( 100, $quality ) );
+
+        if ( 'lossless' === $mode ) {
+            $encode_args = '--lossless';
+        } else {
+            $encode_args = sprintf( '-q %d', $quality );
+        }
+
+        $command = escapeshellarg( $ffmpeg ) . ' -y -loglevel error -i ' . $gif_esc
+            . ' -pix_fmt yuv420p -f yuv4mpegpipe ' . escapeshellarg( $temp_y4m )
+            . ' && ' . escapeshellarg( $avifenc ) . ' -j 4 ' . $encode_args . ' '
+            . escapeshellarg( $temp_y4m ) . ' ' . $out_esc;
+
+        return array(
+            'command' => $command,
+            'temp'    => $temp_y4m,
+        );
+    }
+
+    /**
+     * 查找本地辅助工具（resvg、gif2webp、ffmpeg 等）
      *
      * 优先 wp-content/LibreCompress-bin 目录，其次系统 PATH
      *
+     * @param string $name 可执行文件名
      * @return string|false 路径或 false
      */
-    private function get_resvg_path() {
-        if ( null !== $this->resvg_path ) {
-            return $this->resvg_path;
+    private function find_local_tool( string $name ) {
+        static $cache = array();
+
+        if ( isset( $cache[ $name ] ) ) {
+            return $cache[ $name ];
         }
 
-        $executable = 'resvg';
-        $bin_path   = LIBRE_COMPRESS_BIN_PATH . $executable;
+        $is_windows = 'WIN' === strtoupper( substr( PHP_OS, 0, 3 ) );
+        $bin_path   = LIBRE_COMPRESS_BIN_PATH . $name;
 
-        if ( 'WIN' === strtoupper( substr( PHP_OS, 0, 3 ) ) ) {
+        if ( $is_windows ) {
             $bin_path .= '.exe';
         }
 
         if ( file_exists( $bin_path ) ) {
-            $this->resvg_path = $bin_path;
-            return $this->resvg_path;
+            $cache[ $name ] = $bin_path;
+            return $bin_path;
         }
 
-        $command = ( 'WIN' === strtoupper( substr( PHP_OS, 0, 3 ) ) )
-            ? 'where ' . escapeshellarg( $executable ) . ' 2>nul'
-            : 'which ' . escapeshellarg( $executable ) . ' 2>/dev/null';
+        $command = $is_windows
+            ? 'where ' . escapeshellarg( $name ) . ' 2>nul'
+            : 'which ' . escapeshellarg( $name ) . ' 2>/dev/null';
 
         $output = array();
         $rc     = 0;
@@ -622,13 +786,24 @@ class Libre_Compress_Converter {
         if ( 0 === $rc && ! empty( $output[0] ) ) {
             $path = trim( $output[0] );
             if ( file_exists( $path ) ) {
-                $this->resvg_path = $path;
-                return $this->resvg_path;
+                $cache[ $name ] = $path;
+                return $path;
             }
         }
 
-        $this->resvg_path = false;
-        return $this->resvg_path;
+        $cache[ $name ] = false;
+        return false;
+    }
+
+    /**
+     * 查找 resvg 可执行文件
+     *
+     * 优先 wp-content/LibreCompress-bin 目录，其次系统 PATH
+     *
+     * @return string|false 路径或 false
+     */
+    private function get_resvg_path() {
+        return $this->find_local_tool( 'resvg' );
     }
 
     /**

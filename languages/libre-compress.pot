@@ -459,6 +459,18 @@ msgid "格式转换"
 msgstr ""
 
 #: includes/class-settings.php
+msgid "SVG 上传"
+msgstr ""
+
+#: includes/class-settings.php
+msgid "允许上传 SVG 文件"
+msgstr ""
+
+#: includes/class-settings.php
+msgid "上传时自动清理脚本等危险内容；SVG 可能被用于 XSS 攻击，仅在信任上传者时开启。"
+msgstr ""
+
+#: includes/class-settings.php
 msgid "PNG"
 msgstr ""
 
@@ -548,4 +560,20 @@ msgstr ""
 
 #: includes/class-converter.php
 msgid "尚未启用任何格式的转换"
+msgstr ""
+
+#: includes/class-converter.php
+msgid "动画 GIF 转 WebP 需要 gif2webp 工具（libwebp 套件）"
+msgstr ""
+
+#: includes/class-converter.php
+msgid "动画 GIF 转 AVIF 需要 ffmpeg"
+msgstr ""
+
+#: libre-compress.php
+msgid "无法读取上传的 SVG 文件"
+msgstr ""
+
+#: libre-compress.php
+msgid "SVG 内容不合法或包含危险代码"
 msgstr ""
