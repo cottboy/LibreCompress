@@ -475,7 +475,7 @@ msgid "SVG"
 msgstr ""
 
 #: includes/class-settings.php
-msgid "勾选的格式上传时将自动转换为新格式，前端直接显示新格式（不考虑浏览器兼容性）。默认不勾选即不转换。"
+msgid "勾选的格式上传后将直接转换为目标新格式（原文件按备份设置处理），前端直接显示新格式。默认不勾选即不转换。"
 msgstr ""
 
 #: includes/class-settings.php
@@ -491,7 +491,7 @@ msgid "批量转换未转换的图片"
 msgstr ""
 
 #: includes/class-settings.php
-msgid "为媒体库中已启用格式的图片生成新格式副本（按上方格式转换设置）"
+msgid "为媒体库中已启用格式的图片执行格式转换（按上方格式转换设置）"
 msgstr ""
 
 #: includes/class-libre-compress.php
@@ -531,7 +531,15 @@ msgid "转换结果更大，已放弃"
 msgstr ""
 
 #: includes/class-converter.php
-msgid "副本写入失败"
+msgid "新格式文件写入失败"
+msgstr ""
+
+#: includes/class-converter.php
+msgid "同名目标文件已存在"
+msgstr ""
+
+#: includes/class-converter.php
+msgid "原文件清理失败，已撤销转换"
 msgstr ""
 
 #: includes/class-converter.php

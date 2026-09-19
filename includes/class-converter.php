@@ -13,13 +13,21 @@ if ( ! defined( 'ABSPATH' ) ) {
 /**
  * 图片格式转换器
  *
- * 将勾选格式的图片（PNG/JPG/GIF/SVG）转换为 WebP 或 AVIF 副本，
- * 并在前端直接以新格式 URL 显示（不考虑浏览器兼容性）。
+ * 将勾选格式的图片（PNG/JPG/GIF/SVG）直接转换为 WebP 或 AVIF：
+ * 原文件从原位置移除（开启了备份原图时先备份到备份文件夹），新格式
+ * 文件以原文件名仅替换扩展名的形式落在原位置，并同步更新附件的
+ * MIME 与元数据，保证 WordPress 原生输出的 URL 即为新格式。
  *
- * 副本为双扩展名 sidecar 文件（如 photo.png.webp），转换产物不小于
- * 源文件时放弃副本（回退），源文件永远不会被改动。
+ * 转换产物不小于源文件时放弃转换（原文件保留，即回退）。
  */
 class Libre_Compress_Converter {
+
+    /**
+     * 转换记录 post meta 键（供恢复原图时反向处理）
+     *
+     * @var string
+     */
+    const CONVERTED_META_KEY = '_libre_compress_converted';
 
     /**
      * 目标格式对应的编码工具注册名
@@ -29,6 +37,16 @@ class Libre_Compress_Converter {
     private $target_tools = array(
         'webp' => 'cwebp',
         'avif' => 'libavif',
+    );
+
+    /**
+     * 目标格式对应的 MIME 类型
+     *
+     * @var array
+     */
+    private $target_mimes = array(
+        'webp' => 'image/webp',
+        'avif' => 'image/avif',
     );
 
     /**
@@ -58,17 +76,24 @@ class Libre_Compress_Converter {
     private $resvg_path = null;
 
     /**
+     * 恢复原图处理中标记（防止恢复后重新生成元数据时再次触发转换）
+     *
+     * @var bool
+     */
+    private $restoring = false;
+
+    /**
      * 初始化钩子
      */
     public function init_hooks() {
         // 上传后自动转换（优先级 20，晚于压缩钩子的 10，转换基准为压缩后的文件）
         add_filter( 'wp_generate_attachment_metadata', array( $this, 'auto_convert_on_upload' ), 20, 2 );
 
-        // 前端 URL 硬替换：直接输出新格式 URL，不检测浏览器支持
-        add_filter( 'wp_get_attachment_url', array( $this, 'filter_attachment_url' ), 10, 2 );
-        add_filter( 'wp_get_attachment_image_src', array( $this, 'filter_image_src' ), 10 );
-        add_filter( 'wp_calculate_image_srcset', array( $this, 'filter_image_srcset' ), 10 );
+        // 文章内容中已固化的旧格式 URL，在同名新格式文件存在时替换
         add_filter( 'the_content', array( $this, 'filter_content' ), 20 );
+
+        // 恢复原图后反向处理：移除新格式文件并还原 MIME/元数据
+        add_action( 'libre_compress_after_restore', array( $this, 'handle_after_restore' ) );
 
         // AJAX 接口
         add_action( 'wp_ajax_libre_compress_get_unconverted', array( $this, 'ajax_get_unconverted' ) );
@@ -109,14 +134,31 @@ class Libre_Compress_Converter {
     }
 
     /**
-     * 获取 sidecar 副本路径
+     * 获取目标格式文件路径（同目录同名，仅替换扩展名）
      *
      * @param string $file_path 源文件路径
      * @param string $target    目标格式
-     * @return string 副本路径
+     * @return string 目标路径
      */
-    private function get_sidecar_path( string $file_path, string $target ): string {
-        return $file_path . '.' . $target;
+    private function get_target_path( string $file_path, string $target ): string {
+        return $this->replace_extension( $file_path, $target );
+    }
+
+    /**
+     * 替换路径的扩展名
+     *
+     * @param string $path   文件路径
+     * @param string $target 目标扩展名
+     * @return string 替换后的路径
+     */
+    private function replace_extension( string $path, string $target ): string {
+        $extension = pathinfo( $path, PATHINFO_EXTENSION );
+
+        if ( '' === $extension ) {
+            return $path . '.' . $target;
+        }
+
+        return substr( $path, 0, -strlen( $extension ) ) . $target;
     }
 
     /**
@@ -141,8 +183,27 @@ class Libre_Compress_Converter {
 
         $files = libre_compress()->compressor->get_attachment_files( $attachment_id );
 
+        // SVG 等非 WP 原生格式可能没有元数据，回退到 _wp_attached_file
+        if ( empty( $files ) ) {
+            $attached_file = get_post_meta( $attachment_id, '_wp_attached_file', true );
+
+            if ( is_string( $attached_file ) && '' !== $attached_file ) {
+                $file_path = wp_get_upload_dir()['basedir'] . '/' . $attached_file;
+
+                if ( file_exists( $file_path ) ) {
+                    $files[] = array(
+                        'size_type' => 'full',
+                        'file_path' => $file_path,
+                    );
+                }
+            }
+        }
+
+        // 记录成功转换的源文件 basename，用于元数据同步
+        $converted_map = array();
+
         foreach ( $files as $file ) {
-            $result           = $this->convert_file( $file['file_path'] );
+            $result              = $this->convert_file( $attachment_id, $file['file_path'] );
             $result['size_type'] = $file['size_type'];
 
             $results['details'][] = $result;
@@ -151,6 +212,7 @@ class Libre_Compress_Converter {
             if ( 'success' === $result['status'] ) {
                 $results['success']++;
                 $results['saved_bytes'] += (int) $result['original_size'] - (int) $result['converted_size'];
+                $converted_map[ basename( $result['from'] ) ] = true;
             } elseif ( 'failed' === $result['status'] ) {
                 $results['failed']++;
             } else {
@@ -158,20 +220,29 @@ class Libre_Compress_Converter {
             }
         }
 
+        // 有文件成功转换后同步附件的 MIME 与元数据
+        if ( ! empty( $converted_map ) ) {
+            $this->sync_attachment_format( $attachment_id, $converted_map );
+        }
+
         return $results;
     }
 
     /**
-     * 转换单个文件
+     * 转换单个文件（原地替换格式）
      *
-     * 生成 {name}.{ext}.{target} 副本；转换产物不小于源文件时放弃副本
+     * 开启备份时先把源文件备份到备份文件夹；转换产物不小于源文件时放弃（回退）。
+     * 成功后源文件从原位置删除，新格式文件落位。
      *
-     * @param string $file_path 源文件绝对路径
+     * @param int    $attachment_id 附件 ID
+     * @param string $file_path     源文件绝对路径
      * @return array 转换结果
      */
-    public function convert_file( string $file_path ): array {
+    public function convert_file( int $attachment_id, string $file_path ): array {
         $result_template = array(
             'file_path'      => $file_path,
+            'from'           => $file_path,
+            'to'             => '',
             'status'         => 'failed',
             'message'        => '',
             'original_size'  => 0,
@@ -202,39 +273,47 @@ class Libre_Compress_Converter {
             return $result_template;
         }
 
-        $sidecar_path = $this->get_sidecar_path( $file_path, $target );
-        if ( file_exists( $sidecar_path ) ) {
-            $result_template['status']  = 'skipped';
-            $result_template['message'] = __( '已存在转换副本', 'libre-compress' );
+        $target_path = $this->get_target_path( $file_path, $target );
+
+        // 同名目标文件已存在时不覆盖（避免不同源格式转换后互相冲突）
+        if ( file_exists( $target_path ) ) {
+            $result_template['to']       = $target_path;
+            $result_template['status']   = 'skipped';
+            $result_template['message']  = __( '同名目标文件已存在', 'libre-compress' );
+            $result_template['original_size']  = (int) filesize( $file_path );
+            $result_template['converted_size'] = (int) filesize( $target_path );
             return $result_template;
+        }
+
+        // 开启备份时先把源文件备份到备份文件夹
+        $settings_general = get_option( 'libre_compress_general', array() );
+        if ( ! empty( $settings_general['backup_enabled'] ) ) {
+            libre_compress()->backup->create_backup( $attachment_id, $file_path );
         }
 
         $original_size = (int) filesize( $file_path );
 
         // 准备编码输入源：GIF/SVG 需要先解码为 PNG 中间文件
-        $source         = $file_path;
-        $temp_source    = '';
-        $temp_source_ok = true;
+        $source      = $file_path;
+        $temp_source = '';
 
         if ( 'gif' === $extension ) {
-            $temp_source    = $file_path . '.tmp-src.png';
-            $temp_source_ok = $this->decode_gif_to_png( $file_path, $temp_source );
-            if ( ! $temp_source_ok ) {
+            $temp_source = $file_path . '.tmp-src.png';
+            if ( ! $this->decode_gif_to_png( $file_path, $temp_source ) ) {
                 $result_template['message'] = __( 'GIF 解码失败', 'libre-compress' );
                 return $result_template;
             }
             $source = $temp_source;
         } elseif ( 'svg' === $extension ) {
-            $temp_source    = $file_path . '.tmp-src.png';
-            $temp_source_ok = $this->rasterize_svg_to_png( $file_path, $temp_source );
-            if ( ! $temp_source_ok ) {
+            $temp_source = $file_path . '.tmp-src.png';
+            if ( ! $this->rasterize_svg_to_png( $file_path, $temp_source ) ) {
                 $result_template['message'] = __( 'SVG 栅格化失败（需要 resvg 工具）', 'libre-compress' );
                 return $result_template;
             }
             $source = $temp_source;
         }
 
-        // 编码为目标格式
+        // 编码为目标格式的临时文件
         $temp_output = $file_path . '.tmp-conv.' . $target;
         $encode_ok   = false;
         $error_msg   = '';
@@ -243,8 +322,8 @@ class Libre_Compress_Converter {
         if ( false === $command ) {
             $error_msg = __( '没有可用的编码工具', 'libre-compress' );
         } else {
-            $output   = array();
-            $exec_rc  = 0;
+            $output  = array();
+            $exec_rc = 0;
             // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.system_calls_exec
             exec( '(' . $command . ') 2>&1', $output, $exec_rc );
             clearstatcache( true, $temp_output );
@@ -273,7 +352,7 @@ class Libre_Compress_Converter {
             return $result_template;
         }
 
-        // 大小对比回退：转换产物不小于源文件时放弃副本（源文件从未被改动）
+        // 大小对比回退：转换产物不小于源文件时放弃，源文件原样保留
         $converted_size = (int) filesize( $temp_output );
 
         if ( $converted_size >= $original_size ) {
@@ -287,26 +366,124 @@ class Libre_Compress_Converter {
             return $result_template;
         }
 
-        // 原子化落地副本
+        // 落位新格式文件
         // phpcs:ignore WordPress.WP.AlternativeFunctions.rename_rename
-        $renamed = @rename( $temp_output, $sidecar_path );
+        $renamed = @rename( $temp_output, $target_path );
 
         if ( ! $renamed ) {
             if ( file_exists( $temp_output ) ) {
                 // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
                 unlink( $temp_output );
             }
-            $result_template['message'] = __( '副本写入失败', 'libre-compress' );
+            $result_template['message'] = __( '新格式文件写入失败', 'libre-compress' );
             return $result_template;
         }
 
+        // 删除原位置源文件；删除失败则撤销转换，保证状态一致
+        if ( ! unlink( $file_path ) ) {
+            // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
+            unlink( $target_path );
+
+            clearstatcache( true, $file_path );
+            $result_template['message'] = __( '原文件清理失败，已撤销转换', 'libre-compress' );
+            return $result_template;
+        }
+
+        // 记录转换映射，供恢复原图时反向处理
+        $this->add_converted_record( $attachment_id, $file_path, $target_path );
+
         return array(
             'file_path'      => $file_path,
-            'sidecar_path'   => $sidecar_path,
+            'from'           => $file_path,
+            'to'             => $target_path,
             'status'         => 'success',
             'message'        => __( '转换成功', 'libre-compress' ),
             'original_size'  => $original_size,
             'converted_size' => $converted_size,
+        );
+    }
+
+    /**
+     * 追加转换记录到附件 post meta
+     *
+     * @param int    $attachment_id 附件 ID
+     * @param string $from_path     原文件路径
+     * @param string $to_path       新格式文件路径
+     */
+    private function add_converted_record( int $attachment_id, string $from_path, string $to_path ): void {
+        $records = get_post_meta( $attachment_id, self::CONVERTED_META_KEY, true );
+
+        if ( ! is_array( $records ) ) {
+            $records = array();
+        }
+
+        $records[] = array(
+            'from' => $from_path,
+            'to'   => $to_path,
+        );
+
+        update_post_meta( $attachment_id, self::CONVERTED_META_KEY, $records );
+    }
+
+    /**
+     * 同步附件的 MIME 与元数据到目标格式
+     *
+     * 仅更新成功转换的文件对应的记录，未转换成功（回退）的保持不变
+     *
+     * @param int   $attachment_id 附件 ID
+     * @param array $converted_map 成功转换的源文件 basename 列表
+     */
+    private function sync_attachment_format( int $attachment_id, array $converted_map ): void {
+        $settings = $this->get_convert_settings();
+        $target   = $settings['target'];
+        $mime     = isset( $this->target_mimes[ $target ] ) ? $this->target_mimes[ $target ] : 'image/webp';
+
+        // _wp_attached_file（相对路径）
+        $attached_file = get_post_meta( $attachment_id, '_wp_attached_file', true );
+
+        if ( is_string( $attached_file ) && '' !== $attached_file && isset( $converted_map[ basename( $attached_file ) ] ) ) {
+            update_post_meta( $attachment_id, '_wp_attached_file', $this->replace_extension( $attached_file, $target ) );
+        }
+
+        // 附件元数据：主文件、original_image、各尺寸
+        $metadata = wp_get_attachment_metadata( $attachment_id );
+
+        if ( is_array( $metadata ) ) {
+            $changed = false;
+
+            if ( ! empty( $metadata['file'] ) && isset( $converted_map[ basename( $metadata['file'] ) ] ) ) {
+                $metadata['file'] = $this->replace_extension( $metadata['file'], $target );
+                $changed          = true;
+            }
+
+            if ( ! empty( $metadata['original_image'] ) && isset( $converted_map[ basename( $metadata['original_image'] ) ] ) ) {
+                $metadata['original_image'] = $this->replace_extension( $metadata['original_image'], $target );
+                $changed                    = true;
+            }
+
+            if ( ! empty( $metadata['sizes'] ) && is_array( $metadata['sizes'] ) ) {
+                foreach ( $metadata['sizes'] as $size_name => $size_data ) {
+                    if ( empty( $size_data['file'] ) || ! isset( $converted_map[ basename( $size_data['file'] ) ] ) ) {
+                        continue;
+                    }
+
+                    $metadata['sizes'][ $size_name ]['file']      = $this->replace_extension( $size_data['file'], $target );
+                    $metadata['sizes'][ $size_name ]['mime-type'] = $mime;
+                    $changed                                      = true;
+                }
+            }
+
+            if ( $changed ) {
+                wp_update_attachment_metadata( $attachment_id, $metadata );
+            }
+        }
+
+        // MIME 类型（转换后原格式文件已不存在）
+        wp_update_post(
+            array(
+                'ID'             => $attachment_id,
+                'post_mime_type' => $mime,
+            )
         );
     }
 
@@ -328,9 +505,8 @@ class Libre_Compress_Converter {
             return false;
         }
 
-        $binary   = escapeshellarg( $tools[ $tool_name ]->get_tool_binary_path() );
-        $settings = get_option( 'libre_compress_tools', array() );
-
+        $binary     = escapeshellarg( $tools[ $tool_name ]->get_tool_binary_path() );
+        $settings   = get_option( 'libre_compress_tools', array() );
         $source_esc = escapeshellarg( $source );
         $output_esc = escapeshellarg( $output );
 
@@ -463,7 +639,8 @@ class Libre_Compress_Converter {
      * @return array
      */
     public function auto_convert_on_upload( $metadata, $attachment_id ) {
-        if ( ! $this->is_conversion_enabled() ) {
+        // 恢复原图流程中重新生成元数据时不再触发转换，避免循环
+        if ( $this->restoring || ! $this->is_conversion_enabled() ) {
             return $metadata;
         }
 
@@ -475,11 +652,83 @@ class Libre_Compress_Converter {
 
         $this->convert_attachment( $attachment_id );
 
-        return $metadata;
+        // 转换可能已替换文件并同步元数据，返回最新元数据
+        return wp_get_attachment_metadata( $attachment_id );
     }
 
     /**
-     * 将 URL 映射到 uploads 目录内的本地文件
+     * 恢复原图后的反向处理
+     *
+     * 备份系统已把原格式文件复制回原位置，这里移除新格式文件、
+     * 还原 MIME 并重新生成元数据，最后清除转换记录
+     *
+     * @param int $attachment_id 附件 ID
+     */
+    public function handle_after_restore( int $attachment_id ): void {
+        $records = get_post_meta( $attachment_id, self::CONVERTED_META_KEY, true );
+
+        if ( ! is_array( $records ) || empty( $records ) ) {
+            return;
+        }
+
+        $this->restoring = true;
+
+        $first_from = '';
+
+        foreach ( $records as $record ) {
+            if ( empty( $record['to'] ) ) {
+                continue;
+            }
+
+            // 移除转换产生的新格式文件
+            if ( file_exists( $record['to'] ) ) {
+                // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
+                unlink( $record['to'] );
+            }
+
+            if ( '' === $first_from && ! empty( $record['from'] ) ) {
+                $first_from = $record['from'];
+            }
+        }
+
+        // 按备份的原文件扩展名还原 MIME
+        if ( '' !== $first_from ) {
+            $extension = strtolower( pathinfo( $first_from, PATHINFO_EXTENSION ) );
+            if ( 'jpeg' === $extension ) {
+                $extension = 'jpg';
+            }
+
+            if ( isset( $this->format_mimes[ $extension ] ) ) {
+                wp_update_post(
+                    array(
+                        'ID'             => $attachment_id,
+                        'post_mime_type' => $this->format_mimes[ $extension ],
+                    )
+                );
+            }
+
+            // 原图已恢复，重新生成元数据（含缩略图）
+            if ( file_exists( $first_from ) ) {
+                if ( ! function_exists( 'wp_generate_attachment_metadata' ) ) {
+                    require_once ABSPATH . 'wp-admin/includes/image.php';
+                }
+
+                if ( function_exists( 'wp_generate_attachment_metadata' ) ) {
+                    $metadata = wp_generate_attachment_metadata( $attachment_id, $first_from );
+                    wp_update_attachment_metadata( $attachment_id, $metadata );
+                }
+            }
+        }
+
+        delete_post_meta( $attachment_id, self::CONVERTED_META_KEY );
+
+        $this->restoring = false;
+    }
+
+    /**
+     * 将 URL 映射到 uploads 目录内的本地路径
+     *
+     * 不要求原格式文件仍然存在（转换后已被移除）
      *
      * @param string $url 图片 URL
      * @return array|null array( local_path, url_path ) 或 null
@@ -493,7 +742,7 @@ class Libre_Compress_Converter {
             return null;
         }
 
-        $url_path = wp_parse_url( $url, PHP_URL_PATH );
+        $url_path  = wp_parse_url( $url, PHP_URL_PATH );
         $base_path = wp_parse_url( $base_url, PHP_URL_PATH );
 
         if ( ! is_string( $url_path ) || '' === $url_path || ! is_string( $base_path ) || '' === $base_path ) {
@@ -511,25 +760,41 @@ class Libre_Compress_Converter {
             return null;
         }
 
-        $local_path = $base_dir . str_replace( '/', DIRECTORY_SEPARATOR, $relative );
-
-        if ( ! file_exists( $local_path ) ) {
-            return null;
-        }
-
         return array(
-            'local_path' => $local_path,
+            'local_path' => $base_dir . str_replace( '/', DIRECTORY_SEPARATOR, $relative ),
             'url_path'   => $url_path,
         );
     }
 
     /**
-     * 重写单个 URL 为新格式副本 URL（副本存在时）
+     * 文章内容中的旧格式 URL 替换
      *
-     * @param string $url 图片 URL
-     * @return string 重写后的 URL
+     * URL 指向已转换格式的文件（同名新格式文件存在）时替换扩展名。
+     * 原格式文件转换后已从 uploads 移除，不替换则只能是死链。
+     *
+     * @param string $content 文章内容
+     * @return string
      */
-    private function rewrite_url( string $url ): string {
+    public function filter_content( $content ) {
+        if ( ! is_string( $content ) || '' === $content || ! $this->is_conversion_enabled() ) {
+            return $content;
+        }
+
+        return preg_replace_callback(
+            '/[^\s"\'<>()]+\.(?:png|jpe?g|gif|svg)(?=[\s"\'<>()]|$)/i',
+            array( $this, 'replace_content_url' ),
+            $content
+        );
+    }
+
+    /**
+     * the_content 回调：命中 URL 时尝试替换为新格式
+     *
+     * @param array $matches 正则匹配
+     * @return string 原始或替换后的 URL
+     */
+    private function replace_content_url( $matches ): string {
+        $url      = $matches[0];
         $settings = $this->get_convert_settings();
 
         if ( empty( $settings['formats'] ) ) {
@@ -551,97 +816,21 @@ class Libre_Compress_Converter {
             return $url;
         }
 
-        $sidecar_path = $this->get_sidecar_path( $resolved['local_path'], $settings['target'] );
+        $target_path = $this->get_target_path( $resolved['local_path'], $settings['target'] );
 
-        if ( ! file_exists( $sidecar_path ) ) {
+        if ( ! file_exists( $target_path ) ) {
             return $url;
         }
 
-        // 仅替换 URL 路径部分的扩展名，保留查询串等其他内容
-        $new_url_path = substr( $resolved['url_path'], 0, -strlen( $extension ) ) . $extension . '.' . $settings['target'];
+        $new_url_path = substr( $resolved['url_path'], 0, -strlen( $extension ) ) . $settings['target'];
 
         return str_replace( $resolved['url_path'], $new_url_path, $url );
     }
 
     /**
-     * 过滤附件 URL
-     *
-     * @param string $url           附件 URL
-     * @param int    $attachment_id 附件 ID
-     * @return string
-     */
-    public function filter_attachment_url( $url, $attachment_id = 0 ) {
-        return $this->rewrite_url( (string) $url );
-    }
-
-    /**
-     * 过滤附件图片 src
-     *
-     * @param array|false $image 图片数据
-     * @return array|false
-     */
-    public function filter_image_src( $image ) {
-        if ( is_array( $image ) && ! empty( $image[0] ) && is_string( $image[0] ) ) {
-            $image[0] = $this->rewrite_url( $image[0] );
-        }
-
-        return $image;
-    }
-
-    /**
-     * 过滤响应式图片 srcset
-     *
-     * @param array $sources srcset 候选列表
-     * @return array
-     */
-    public function filter_image_srcset( $sources ) {
-        if ( is_array( $sources ) ) {
-            foreach ( $sources as $key => $source ) {
-                if ( ! empty( $source['url'] ) && is_string( $source['url'] ) ) {
-                    $sources[ $key ]['url'] = $this->rewrite_url( $source['url'] );
-                }
-            }
-        }
-
-        return $sources;
-    }
-
-    /**
-     * 过滤文章内容中的图片 URL
-     *
-     * 文章内已固化的原图 URL 在副本存在时替换为新格式
-     *
-     * @param string $content 文章内容
-     * @return string
-     */
-    public function filter_content( $content ) {
-        if ( ! is_string( $content ) || '' === $content || ! $this->is_conversion_enabled() ) {
-            return $content;
-        }
-
-        // 已带目标扩展的 URL（如 .png.webp）不会被匹配：正则要求扩展名后紧跟边界
-        return preg_replace_callback(
-            '/[^\s"\'<>()]+\.(?:png|jpe?g|gif|svg)(?=[\s"\'<>()]|$)/i',
-            array( $this, 'replace_content_url' ),
-            $content
-        );
-    }
-
-    /**
-     * the_content 回调：命中 URL 时尝试重写
-     *
-     * @param array $matches 正则匹配
-     * @return string 原始或重写后的 URL
-     */
-    private function replace_content_url( $matches ): string {
-        $url       = $matches[0];
-        $rewritten = $this->rewrite_url( $url );
-
-        return $rewritten;
-    }
-
-    /**
      * AJAX: 获取未转换的附件列表
+     *
+     * 附件 MIME 仍为源格式即视为未转换（转换后 MIME 已更新）
      */
     public function ajax_get_unconverted() {
         check_ajax_referer( 'libre_compress_nonce', 'nonce' );
@@ -655,8 +844,6 @@ class Libre_Compress_Converter {
         if ( empty( $settings['formats'] ) ) {
             wp_send_json_error( array( 'message' => __( '尚未启用任何格式的转换', 'libre-compress' ) ) );
         }
-
-        $target = $settings['target'];
 
         $mimes = array();
         foreach ( $settings['formats'] as $format ) {
@@ -684,16 +871,11 @@ class Libre_Compress_Converter {
             $files         = $compressor->get_attachment_files( $attachment_id );
 
             foreach ( $files as $file ) {
-                // 跳过已存在副本的文件
-                if ( file_exists( $this->get_sidecar_path( $file['file_path'], $target ) ) ) {
-                    continue;
-                }
-
-                // 跳过格式未启用的文件（同附件可能混有其他格式缩略图）
                 $extension = strtolower( pathinfo( $file['file_path'], PATHINFO_EXTENSION ) );
                 if ( 'jpeg' === $extension ) {
                     $extension = 'jpg';
                 }
+
                 if ( ! in_array( $extension, $settings['formats'], true ) ) {
                     continue;
                 }

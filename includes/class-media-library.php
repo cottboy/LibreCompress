@@ -315,6 +315,9 @@ class Libre_Compress_Media_Library {
         $result = $backup->restore_backup( $attachment_id );
 
         if ( $result ) {
+            // 通知子模块做恢复后处理（如移除格式转换产生的新格式文件）
+            do_action( 'libre_compress_after_restore', $attachment_id );
+
             wp_send_json_success( array( 'message' => __( '恢复成功', 'libre-compress' ) ) );
         } else {
             wp_send_json_error( array( 'message' => __( '恢复失败', 'libre-compress' ) ) );
@@ -441,6 +444,9 @@ class Libre_Compress_Media_Library {
 
         foreach ( $attachment_ids as $attachment_id ) {
             if ( $backup->restore_backup( absint( $attachment_id ) ) ) {
+                // 通知子模块做恢复后处理（如移除格式转换产生的新格式文件）
+                do_action( 'libre_compress_after_restore', absint( $attachment_id ) );
+
                 $success_count++;
             } else {
                 $failed_count++;

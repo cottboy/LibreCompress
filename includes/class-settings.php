@@ -190,7 +190,7 @@ class Libre_Compress_Settings {
                             <input type="checkbox" name="libre_compress_general[convert_svg]" value="1" <?php checked( ! empty( $options['convert_svg'] ) ); ?>>
                             <?php esc_html_e( 'SVG', 'libre-compress' ); ?>
                         </label>
-                        <p class="description"><?php esc_html_e( '勾选的格式上传时将自动转换为新格式，前端直接显示新格式（不考虑浏览器兼容性）。默认不勾选即不转换。', 'libre-compress' ); ?></p>
+                        <p class="description"><?php esc_html_e( '勾选的格式上传后将直接转换为目标新格式（原文件按备份设置处理），前端直接显示新格式。默认不勾选即不转换。', 'libre-compress' ); ?></p>
                     </td>
                 </tr>
                 <tr>
@@ -230,7 +230,7 @@ class Libre_Compress_Settings {
                     </button>
                 </td>
                 <td style="padding: 10px 0;">
-                    <span class="description"><?php esc_html_e( '为媒体库中已启用格式的图片生成新格式副本（按上方格式转换设置）', 'libre-compress' ); ?></span>
+                    <span class="description"><?php esc_html_e( '为媒体库中已启用格式的图片执行格式转换（按上方格式转换设置）', 'libre-compress' ); ?></span>
                 </td>
             </tr>
             <tr>
