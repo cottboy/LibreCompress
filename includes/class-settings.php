@@ -337,33 +337,33 @@ class Libre_Compress_Settings {
 
         $exec_available = function_exists( 'exec' ) && ! in_array( 'exec', array_map( 'trim', explode( ',', ini_get( 'disable_functions' ) ) ), true );
 
-        // 转换/压缩流程用到的辅助工具（不属于压缩渠道，单独列出）
-        $aux_tools = array(
-            array(
-                'name'  => 'avifdec',
-                'usage' => __( 'AVIF 解码（压缩 AVIF 时先解码为 PNG 再重新编码）', 'libre-compress' ),
-                'path'  => isset( $tools['libavif'] ) ? $tools['libavif']->get_decoder_path() : false,
-                'url'   => 'https://github.com/AOMediaCodec/libavif/releases',
-            ),
-            array(
-                'name'  => 'gif2webp',
-                'usage' => __( '动画 GIF 转 WebP', 'libre-compress' ),
-                'path'  => $converter->find_local_tool( 'gif2webp' ),
-                'url'   => 'https://developers.google.com/speed/webp/download',
-            ),
-            array(
-                'name'  => 'ffmpeg',
-                'usage' => __( '动画 GIF 转 AVIF（解码 GIF 帧序列）', 'libre-compress' ),
-                'path'  => $converter->find_local_tool( 'ffmpeg' ),
-                'url'   => 'https://ffmpeg.org/download.html',
-            ),
-            array(
-                'name'  => 'resvg',
-                'usage' => __( 'SVG 栅格化为 PNG（SVG 转换依赖）', 'libre-compress' ),
-                'path'  => $converter->find_local_tool( 'resvg' ),
-                'url'   => 'https://github.com/linebender/resvg/releases',
-            ),
+        // 全部工具（压缩渠道 + 转换辅助），按格式相邻排序
+        $all_tools = array(
+            array( 'name' => 'jpegoptim', 'usage' => __( 'JPEG 压缩', 'libre-compress' ), 'tool' => $tools['jpegoptim'] ),
+            array( 'name' => 'pngquant', 'usage' => __( 'PNG 压缩（有损）', 'libre-compress' ), 'tool' => $tools['pngquant'] ),
+            array( 'name' => 'oxipng', 'usage' => __( 'PNG 压缩（无损）', 'libre-compress' ), 'tool' => $tools['oxipng'] ),
+            array( 'name' => 'gifsicle', 'usage' => __( 'GIF 压缩', 'libre-compress' ), 'tool' => $tools['gifsicle'] ),
+            array( 'name' => 'gif2webp', 'usage' => __( '动画 GIF 转 WebP', 'libre-compress' ), 'tool' => null, 'path' => $converter->find_local_tool( 'gif2webp' ), 'url' => 'https://developers.google.com/speed/webp/download' ),
+            array( 'name' => 'ffmpeg', 'usage' => __( '动画 GIF 转 AVIF', 'libre-compress' ), 'tool' => null, 'path' => $converter->find_local_tool( 'ffmpeg' ), 'url' => 'https://ffmpeg.org/download.html' ),
+            array( 'name' => 'cwebp', 'usage' => __( 'WEBP 压缩 / 转换编码', 'libre-compress' ), 'tool' => $tools['cwebp'] ),
+            array( 'name' => 'avifenc + avifdec', 'usage' => __( 'AVIF 压缩 / 转换编码', 'libre-compress' ), 'tool' => $tools['avifenc'], 'dual' => true ),
+            array( 'name' => 'svgo', 'usage' => __( 'SVG 优化', 'libre-compress' ), 'tool' => $tools['svgo'] ),
+            array( 'name' => 'resvg', 'usage' => __( 'SVG 栅格化（转换依赖）', 'libre-compress' ), 'tool' => null, 'path' => $converter->find_local_tool( 'resvg' ), 'url' => 'https://github.com/linebender/resvg/releases' ),
         );
+
+        // 统一为渲染字段：available(bool)、paths(array)、url
+        foreach ( $all_tools as $index => $row ) {
+            if ( null !== $row['tool'] ) {
+                $all_tools[ $index ]['available'] = $row['tool']->is_tool_available();
+                $all_tools[ $index ]['url']       = $row['tool']->get_download_url();
+                $all_tools[ $index ]['paths']     = ! empty( $row['dual'] )
+                    ? array( $converter->find_local_tool( 'avifenc' ), $converter->find_local_tool( 'avifdec' ) )
+                    : array( $row['tool']->get_tool_binary_path() );
+            } else {
+                $all_tools[ $index ]['available'] = false !== $row['path'];
+                $all_tools[ $index ]['paths']     = array( $row['path'] );
+            }
+        }
         ?>
         <h2><?php esc_html_e( '系统状态', 'libre-compress' ); ?></h2>
         <table class="widefat" style="max-width: 900px;">
@@ -382,79 +382,41 @@ class Libre_Compress_Settings {
             </tr>
         </table>
 
-        <h2><?php esc_html_e( '压缩工具状态', 'libre-compress' ); ?></h2>
+        <h2><?php esc_html_e( '工具状态', 'libre-compress' ); ?></h2>
         <table class="widefat" style="max-width: 900px;">
             <thead>
                 <tr>
-                    <th style="width: 110px;"><?php esc_html_e( '工具', 'libre-compress' ); ?></th>
-                    <th style="width: 80px;"><?php esc_html_e( '格式', 'libre-compress' ); ?></th>
+                    <th style="width: 170px;"><?php esc_html_e( '工具', 'libre-compress' ); ?></th>
+                    <th style="width: 180px;"><?php esc_html_e( '用途', 'libre-compress' ); ?></th>
                     <th style="width: 90px;"><?php esc_html_e( '状态', 'libre-compress' ); ?></th>
                     <th><?php esc_html_e( '安装路径', 'libre-compress' ); ?></th>
                     <th style="width: 50px;"><?php esc_html_e( '链接', 'libre-compress' ); ?></th>
                 </tr>
             </thead>
             <tbody>
-                <?php foreach ( $tools as $tool ) : ?>
-                    <?php $binary_path = $tool->get_tool_binary_path(); ?>
+                <?php foreach ( $all_tools as $row ) : ?>
                     <tr>
-                        <td><strong><?php echo esc_html( $tool->get_name() ); ?></strong></td>
-                        <td><?php echo esc_html( strtoupper( implode( ', ', $tool->get_supported_formats() ) ) ); ?></td>
+                        <td><strong><?php echo esc_html( $row['name'] ); ?></strong></td>
+                        <td><?php echo esc_html( $row['usage'] ); ?></td>
                         <td>
-                            <?php if ( $tool->is_tool_available() ) : ?>
+                            <?php if ( $row['available'] ) : ?>
                                 <span style="color: #00a32a;">✓ <?php esc_html_e( '已安装', 'libre-compress' ); ?></span>
                             <?php else : ?>
                                 <span style="color: #d63638;">✗ <?php esc_html_e( '未安装', 'libre-compress' ); ?></span>
                             <?php endif; ?>
                         </td>
                         <td>
-                            <?php if ( false !== $binary_path ) : ?>
-                                <code style="word-break: break-all; font-size: 11px;"><?php echo esc_html( $binary_path ); ?></code>
-                            <?php else : ?>
-                                —
-                            <?php endif; ?>
+                            <?php foreach ( $row['paths'] as $path_index => $path ) : ?>
+                                <?php if ( $path_index > 0 ) : ?><br><?php endif; ?>
+                                <?php if ( false !== $path ) : ?>
+                                    <code style="word-break: break-all; font-size: 11px;"><?php echo esc_html( $path ); ?></code>
+                                <?php else : ?>
+                                    —
+                                <?php endif; ?>
+                            <?php endforeach; ?>
                         </td>
                         <td>
-                            <a href="<?php echo esc_url( $tool->get_download_url() ); ?>" target="_blank" rel="noopener noreferrer">
-                                <?php esc_html_e( '跳转', 'libre-compress' ); ?>
-                            </a>
-                        </td>
-                    </tr>
-                <?php endforeach; ?>
-            </tbody>
-        </table>
-
-        <h2 style="margin-top: 30px;"><?php esc_html_e( '转换辅助工具', 'libre-compress' ); ?></h2>
-        <table class="widefat" style="max-width: 900px;">
-            <thead>
-                <tr>
-                    <th style="width: 110px;"><?php esc_html_e( '工具', 'libre-compress' ); ?></th>
-                    <th style="width: 260px;"><?php esc_html_e( '用途', 'libre-compress' ); ?></th>
-                    <th style="width: 90px;"><?php esc_html_e( '状态', 'libre-compress' ); ?></th>
-                    <th><?php esc_html_e( '安装路径', 'libre-compress' ); ?></th>
-                    <th style="width: 50px;"><?php esc_html_e( '链接', 'libre-compress' ); ?></th>
-                </tr>
-            </thead>
-            <tbody>
-                <?php foreach ( $aux_tools as $aux ) : ?>
-                    <tr>
-                        <td><strong><?php echo esc_html( $aux['name'] ); ?></strong></td>
-                        <td><?php echo esc_html( $aux['usage'] ); ?></td>
-                        <td>
-                            <?php if ( false !== $aux['path'] ) : ?>
-                                <span style="color: #00a32a;">✓ <?php esc_html_e( '已安装', 'libre-compress' ); ?></span>
-                            <?php else : ?>
-                                <span style="color: #d63638;">✗ <?php esc_html_e( '未安装', 'libre-compress' ); ?></span>
-                            <?php endif; ?>
-                        </td>
-                        <td>
-                            <?php if ( false !== $aux['path'] ) : ?>
-                                <code style="word-break: break-all; font-size: 11px;"><?php echo esc_html( $aux['path'] ); ?></code>
-                            <?php else : ?>
-                                —
-                            <?php endif; ?>
-                        </td>
-                        <td>
-                            <a href="<?php echo esc_url( $aux['url'] ); ?>" target="_blank" rel="noopener noreferrer">
+                            <a href="<?php echo esc_url( $row['url'] ); ?>" target="_blank" rel="noopener noreferrer">
                                 <?php esc_html_e( '跳转', 'libre-compress' ); ?>
                             </a>
                         </td>
@@ -464,10 +426,7 @@ class Libre_Compress_Settings {
         </table>
 
         <p class="description" style="max-width: 900px; margin-top: 10px;">
-            <?php esc_html_e( '安装方式（二选一）：① 推荐：把工具的可执行文件直接放进 /wp-content/LibreCompress-bin/ 目录，无需其他配置，随站点一起备份迁移；② 或将工具安装到电脑任意位置后，把它所在的文件夹加入系统的 Path 环境变量。', 'libre-compress' ); ?>
-        </p>
-        <p class="description" style="max-width: 900px;">
-            <?php esc_html_e( 'Path 环境变量的添加方法（Windows）：右键「此电脑」→ 属性 → 高级系统设置 → 环境变量，在「用户变量」或「系统变量」中选中 Path 点「编辑」→「新建」，粘贴工具所在文件夹的完整路径后一路确定，改完重启 PHP 站点生效。Linux/macOS 可用包管理器安装（如 apt install、brew install）。两处同时存在同一种工具时，优先使用 LibreCompress-bin 目录中的版本。', 'libre-compress' ); ?>
+            <?php esc_html_e( '安装方式：① 把可执行文件直接放进 /wp-content/LibreCompress-bin 目录；② 把工具所在文件夹加入系统 Path 环境变量；③ 使用包管理器安装。', 'libre-compress' ); ?>
         </p>
 
         <h2 style="margin-top: 30px;"><?php esc_html_e( '路径支持状态', 'libre-compress' ); ?></h2>
@@ -677,7 +636,9 @@ class Libre_Compress_Settings {
             $available[ $name ] = $tool->is_tool_available();
         }
 
-        $available['avifdec']  = isset( $tools['libavif'] ) && false !== $tools['libavif']->get_decoder_path();
+        // avifenc/avifdec 按可执行文件独立判定（AVIF 压缩需要两者，转换只需要编码器 avifenc）
+        $available['avifenc'] = false !== $converter->find_local_tool( 'avifenc' );
+        $available['avifdec'] = false !== $converter->find_local_tool( 'avifdec' );
         $available['gif2webp'] = false !== $converter->find_local_tool( 'gif2webp' );
         $available['ffmpeg']   = false !== $converter->find_local_tool( 'ffmpeg' );
         $available['resvg']    = false !== $converter->find_local_tool( 'resvg' );

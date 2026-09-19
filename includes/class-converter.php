@@ -36,7 +36,7 @@ class Libre_Compress_Converter {
      */
     private $target_tools = array(
         'webp' => 'cwebp',
-        'avif' => 'libavif',
+        'avif' => 'avifenc',
     );
 
     /**

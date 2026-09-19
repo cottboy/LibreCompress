@@ -32,7 +32,7 @@ class Libre_Compress_Avif extends Libre_Compress_Tool_Base {
      * @return string 渠道名称
      */
     public function get_name(): string {
-        return 'libavif';
+        return 'avifenc';
     }
 
     /**
