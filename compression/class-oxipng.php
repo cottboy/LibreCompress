@@ -87,7 +87,7 @@ class Libre_Compress_Oxipng extends Libre_Compress_Tool_Base {
      * @return string 下载链接
      */
     public function get_download_url(): string {
-        return 'https://github.com/shssoichiro/oxipng';
+        return 'https://github.com/oxipng/oxipng';
     }
 
     /**

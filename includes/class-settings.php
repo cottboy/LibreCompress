@@ -346,10 +346,10 @@ class Libre_Compress_Settings {
             array( 'name' => 'gif2webp', 'tool' => null, 'path' => $converter->find_local_tool( 'gif2webp' ), 'url' => 'https://developers.google.com/speed/webp/download' ),
             array( 'name' => 'ffmpeg', 'tool' => null, 'path' => $converter->find_local_tool( 'ffmpeg' ), 'url' => 'https://ffmpeg.org/download.html' ),
             array( 'name' => 'cwebp', 'tool' => $tools['cwebp'] ),
-            array( 'name' => 'avifenc', 'tool' => null, 'path' => $converter->find_local_tool( 'avifenc' ), 'url' => 'https://github.com/AOMediaCodec/libavif/releases' ),
-            array( 'name' => 'avifdec', 'tool' => null, 'path' => $converter->find_local_tool( 'avifdec' ), 'url' => 'https://github.com/AOMediaCodec/libavif/releases' ),
+            array( 'name' => 'avifenc', 'tool' => null, 'path' => $converter->find_local_tool( 'avifenc' ), 'url' => 'https://github.com/AOMediaCodec/libavif' ),
+            array( 'name' => 'avifdec', 'tool' => null, 'path' => $converter->find_local_tool( 'avifdec' ), 'url' => 'https://github.com/AOMediaCodec/libavif' ),
             array( 'name' => 'svgo', 'tool' => $tools['svgo'] ),
-            array( 'name' => 'resvg', 'tool' => null, 'path' => $converter->find_local_tool( 'resvg' ), 'url' => 'https://github.com/linebender/resvg/releases' ),
+            array( 'name' => 'resvg', 'tool' => null, 'path' => $converter->find_local_tool( 'resvg' ), 'url' => 'https://github.com/linebender/resvg' ),
         );
 
         // 统一为渲染字段：available(bool)、path、url

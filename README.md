@@ -46,15 +46,15 @@
 | --- | --- | --- |
 | jpegoptim | JPEG 压缩 | <https://github.com/tjko/jpegoptim> |
 | pngquant | PNG 有损压缩 | <https://pngquant.org> |
-| oxipng | PNG 无损压缩 | <https://github.com/shssoichiro/oxipng> |
+| oxipng | PNG 无损压缩 | <https://github.com/oxipng/oxipng> |
 | gifsicle | GIF 压缩 | <https://www.lcdf.org/gifsicle/> |
 | cwebp | WebP 压缩、转换编码 | <https://developers.google.com/speed/webp/download> |
 | gif2webp | 动画 GIF 转 WebP | <https://developers.google.com/speed/webp/download> |
-| avifenc | AVIF 编码（压缩与转换） | <https://github.com/AOMediaCodec/libavif/releases> |
-| avifdec | AVIF 解码（压缩需要） | <https://github.com/AOMediaCodec/libavif/releases> |
+| avifenc | AVIF 编码（压缩与转换） | <https://github.com/AOMediaCodec/libavif> |
+| avifdec | AVIF 解码（压缩需要） | <https://github.com/AOMediaCodec/libavif> |
 | svgo | SVG 优化（`npm install -g svgo`） | <https://github.com/svg/svgo> |
 | ffmpeg | 动画 GIF 转 AVIF | <https://ffmpeg.org/download.html> |
-| resvg | SVG 转 WebP/AVIF 渲染 | <https://github.com/linebender/resvg/releases> |
+| resvg | SVG 转 WebP/AVIF 渲染 | <https://github.com/linebender/resvg> |
 
 ### 各功能的依赖关系
 
