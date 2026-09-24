@@ -549,15 +549,21 @@
                     var item = queue.shift();
                     running++;
 
+                    var requestData = {
+                        action: ajaxAction,
+                        nonce: self.nonce,
+                        attachment_id: item.attachment_id
+                    };
+
+                    // 压缩按文件处理；转换按附件处理，不提交尺寸参数。
+                    if (item.size_type) {
+                        requestData.size_type = item.size_type;
+                    }
+
                     $.ajax({
                         url: self.ajaxUrl,
                         type: 'POST',
-                        data: {
-                            action: ajaxAction,
-                            nonce: self.nonce,
-                            attachment_id: item.attachment_id,
-                            size_type: item.size_type
-                        },
+                        data: requestData,
                         success: function(response) {
                             if (response.success) {
                                 countResult(response.data);

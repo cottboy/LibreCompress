@@ -1066,6 +1066,8 @@ class Libre_Compress_Converter {
 
         $compressor = libre_compress()->compressor;
 
+        // 转换会同时处理原图和缩略图，因此每个附件只创建一个任务。
+        // 若按尺寸创建任务，后端处理整个附件时会重复转换同一批文件。
         $items = array();
         foreach ( $attachment_ids as $attachment_id ) {
             $attachment_id = absint( $attachment_id );
@@ -1081,11 +1083,11 @@ class Libre_Compress_Converter {
                     continue;
                 }
 
+                // 整个附件由单次 AJAX 请求处理，不再按尺寸重复提交。
                 $items[] = array(
                     'attachment_id' => $attachment_id,
-                    'size_type'     => $file['size_type'],
-                    'file_path'     => $file['file_path'],
                 );
+                break;
             }
         }
 
