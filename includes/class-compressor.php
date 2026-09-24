@@ -28,7 +28,6 @@ class Libre_Compress_Compressor {
      */
     public function __construct() {
         $this->register_default_tools();
-        $this->init_hooks();
     }
 
     /**
@@ -44,13 +43,6 @@ class Libre_Compress_Compressor {
         $this->register_tool( new Libre_Compress_Svgo() );
 
         do_action( 'libre_compress_register_tools', $this );
-    }
-
-    /**
-     * 初始化钩子
-     */
-    private function init_hooks() {
-        add_filter( 'wp_generate_attachment_metadata', array( $this, 'auto_compress_on_upload' ), 10, 2 );
     }
 
     /**
@@ -91,11 +83,7 @@ class Libre_Compress_Compressor {
                 return $this->tools[ $tool_name ];
             }
 
-            $fallback_tool_name = $use_lossy ? 'oxipng' : 'pngquant';
-            if ( isset( $this->tools[ $fallback_tool_name ] ) && $this->tools[ $fallback_tool_name ]->is_tool_available() ) {
-                return $this->tools[ $fallback_tool_name ];
-            }
-
+            // 不跨有损/无损模式回退，避免实际行为偏离用户设置。
             return null;
         }
 
@@ -114,50 +102,68 @@ class Libre_Compress_Compressor {
      * @param int $attachment_id 附件 ID
      * @return array 文件列表
      */
-    public function get_attachment_files( int $attachment_id ): array {
+    public function get_attachment_files( int $attachment_id, ?array $metadata = null ): array {
         $files = array();
 
         $upload_dir = wp_upload_dir();
         $base_dir   = $upload_dir['basedir'];
 
-        $metadata = wp_get_attachment_metadata( $attachment_id );
-
-        if ( empty( $metadata ) || empty( $metadata['file'] ) ) {
-            return $files;
+        if ( null === $metadata ) {
+            $metadata = wp_get_attachment_metadata( $attachment_id );
         }
 
-        $original_file = $base_dir . '/' . $metadata['file'];
-        if ( file_exists( $original_file ) ) {
-            $files[] = array(
-                'size_type' => 'full',
-                'file_path' => $original_file,
-            );
-        }
+        $has_full = false;
 
-        if ( ! empty( $metadata['original_image'] ) ) {
-            $file_dir            = dirname( $metadata['file'] );
-            $original_image_path = $base_dir . '/' . $file_dir . '/' . $metadata['original_image'];
-            if ( file_exists( $original_image_path ) ) {
+        if ( ! empty( $metadata ) && ! empty( $metadata['file'] ) ) {
+            $original_file = $base_dir . '/' . $metadata['file'];
+            if ( file_exists( $original_file ) ) {
                 $files[] = array(
-                    'size_type' => 'original_image',
-                    'file_path' => $original_image_path,
+                    'size_type' => 'full',
+                    'file_path' => $original_file,
                 );
+                $has_full = true;
+            }
+
+            if ( ! empty( $metadata['original_image'] ) ) {
+                $file_dir            = dirname( $metadata['file'] );
+                $original_image_path = $base_dir . '/' . $file_dir . '/' . $metadata['original_image'];
+                if ( file_exists( $original_image_path ) ) {
+                    $files[] = array(
+                        'size_type' => 'original_image',
+                        'file_path' => $original_image_path,
+                    );
+                }
+            }
+
+            if ( ! empty( $metadata['sizes'] ) && is_array( $metadata['sizes'] ) ) {
+                $file_dir = dirname( $metadata['file'] );
+
+                foreach ( $metadata['sizes'] as $size_name => $size_data ) {
+                    if ( ! empty( $size_data['file'] ) ) {
+                        $thumb_file = $base_dir . '/' . $file_dir . '/' . $size_data['file'];
+                        if ( file_exists( $thumb_file ) ) {
+                            $files[] = array(
+                                'size_type' => sanitize_text_field( $size_name ),
+                                'file_path' => $thumb_file,
+                            );
+                        }
+                    }
+                }
             }
         }
 
-        if ( ! empty( $metadata['sizes'] ) && is_array( $metadata['sizes'] ) ) {
-            $file_dir = dirname( $metadata['file'] );
+        // SVG 和部分第三方图片可能没有完整元数据，始终用规范附件路径补齐主文件。
+        if ( ! $has_full ) {
+            $attached_file = get_attached_file( $attachment_id );
 
-            foreach ( $metadata['sizes'] as $size_name => $size_data ) {
-                if ( ! empty( $size_data['file'] ) ) {
-                    $thumb_file = $base_dir . '/' . $file_dir . '/' . $size_data['file'];
-                    if ( file_exists( $thumb_file ) ) {
-                        $files[] = array(
-                            'size_type' => sanitize_text_field( $size_name ),
-                            'file_path' => $thumb_file,
-                        );
-                    }
-                }
+            if ( is_string( $attached_file ) && file_exists( $attached_file ) ) {
+                array_unshift(
+                    $files,
+                    array(
+                        'size_type' => 'full',
+                        'file_path' => $attached_file,
+                    )
+                );
             }
         }
 
@@ -174,8 +180,6 @@ class Libre_Compress_Compressor {
      * @return array 压缩结果
      */
     public function compress_file( int $attachment_id, string $file_path, string $size_type = 'full', array $options = array() ): array {
-        do_action( 'libre_compress_before_compress', $attachment_id, $file_path, $size_type );
-
         if ( ! file_exists( $file_path ) ) {
             return array(
                 'success' => false,
@@ -222,11 +226,17 @@ class Libre_Compress_Compressor {
 
         if ( $backup_enabled ) {
             $backup = libre_compress()->backup;
-            $backup->create_backup( $attachment_id, $file_path );
+            if ( ! $backup->create_backup( $attachment_id, $file_path ) ) {
+                return array(
+                    'success' => false,
+                    'message' => __( '无法创建原图备份，已停止压缩', 'libre-compress' ),
+                    'status'  => 'failed',
+                );
+            }
         }
 
-        // 无条件创建临时回滚副本：压缩结果变大或失败时还原原文件，与备份开关无关
-        $rollback_path = $file_path . '.lc-rollback';
+        // 使用唯一回滚副本，避免异常中断或并发遗留文件互相覆盖。
+        $rollback_path = $file_path . '.lc-rollback-' . wp_generate_password( 12, false, false );
 
         // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_copy
         if ( ! copy( $file_path, $rollback_path ) ) {
@@ -241,8 +251,11 @@ class Libre_Compress_Compressor {
         $result        = $tool->compress( $file_path, $options );
 
         if ( ! $result['success'] ) {
-            // 工具执行失败，还原原文件（即使文件未被工具改动，还原也是无害的）
-            $this->rollback_file( $rollback_path, $file_path );
+            // 工具执行失败后必须成功还原，才能清理回滚副本。
+            $rolled_back = $this->rollback_file( $rollback_path, $file_path );
+            $message     = $rolled_back
+                ? $result['message']
+                : __( '压缩失败且回滚失败，请保留回滚副本并检查磁盘状态', 'libre-compress' );
 
             $this->save_compression_record(
                 $attachment_id,
@@ -252,12 +265,12 @@ class Libre_Compress_Compressor {
                 $original_size,
                 $tool->get_name(),
                 'failed',
-                $result['message']
+                $message
             );
 
             return array(
                 'success'         => false,
-                'message'         => $result['message'],
+                'message'         => $message,
                 'status'          => 'failed',
                 'original_size'   => $original_size,
                 'compressed_size' => $original_size,
@@ -268,8 +281,12 @@ class Libre_Compress_Compressor {
         $compressed_size = filesize( $file_path );
 
         if ( $compressed_size >= $original_size ) {
-            // 压缩后体积更大，用回滚副本还原原文件
-            $this->rollback_file( $rollback_path, $file_path );
+            // 压缩后没有变小，使用回滚副本还原原文件。
+            $rolled_back = $this->rollback_file( $rollback_path, $file_path );
+            $status      = $rolled_back ? 'skipped' : 'failed';
+            $message     = $rolled_back
+                ? __( '压缩后体积没有变小，已跳过', 'libre-compress' )
+                : __( '压缩结果无效且回滚失败，请保留回滚副本并检查磁盘状态', 'libre-compress' );
 
             $this->save_compression_record(
                 $attachment_id,
@@ -278,14 +295,14 @@ class Libre_Compress_Compressor {
                 $original_size,
                 $original_size,
                 $tool->get_name(),
-                'skipped',
-                __( '压缩后体积更大，已跳过', 'libre-compress' )
+                $status,
+                $message
             );
 
             return array(
-                'success'         => true,
-                'message'         => __( '压缩后体积更大，已跳过', 'libre-compress' ),
-                'status'          => 'skipped',
+                'success'         => $rolled_back,
+                'message'         => $message,
+                'status'          => $status,
                 'original_size'   => $original_size,
                 'compressed_size' => $original_size,
             );
@@ -293,10 +310,8 @@ class Libre_Compress_Compressor {
 
         $ratio = round( ( 1 - $compressed_size / $original_size ) * 100, 2 );
 
-        // 压缩有效，清理回滚副本
-        $this->cleanup_rollback( $rollback_path );
-
-        $this->save_compression_record(
+        // 统一状态必须先可靠写入，记录失败时恢复原文件。
+        $record_saved = $this->save_compression_record(
             $attachment_id,
             $file_path,
             $size_type,
@@ -306,7 +321,22 @@ class Libre_Compress_Compressor {
             'success'
         );
 
-        do_action( 'libre_compress_after_compress', $attachment_id, $file_path, $size_type, $result );
+        if ( ! $record_saved ) {
+            $rolled_back = $this->rollback_file( $rollback_path, $file_path );
+            $message     = $rolled_back
+                ? __( '压缩记录保存失败，已恢复原文件', 'libre-compress' )
+                : __( '压缩记录保存失败且回滚失败，请保留回滚副本并检查数据库状态', 'libre-compress' );
+
+            return array(
+                'success'         => false,
+                'message'         => $message,
+                'status'          => 'failed',
+                'original_size'   => $original_size,
+                'compressed_size' => $rolled_back ? $original_size : $compressed_size,
+            );
+        }
+
+        $this->cleanup_rollback( $rollback_path );
 
         return array(
             'success'         => true,
@@ -316,74 +346,6 @@ class Libre_Compress_Compressor {
             'compressed_size' => $compressed_size,
             'ratio'           => $ratio,
         );
-    }
-
-    /**
-     * 压缩附件的所有相关文件
-     *
-     * @param int   $attachment_id 附件 ID
-     * @param array $options       压缩选项
-     * @return array 统计结果
-     */
-    public function compress_attachment( int $attachment_id, array $options = array() ): array {
-        $files   = $this->get_attachment_files( $attachment_id );
-        $results = array(
-            'total'       => count( $files ),
-            'success'     => 0,
-            'failed'      => 0,
-            'skipped'     => 0,
-            'saved_bytes' => 0,
-            'details'     => array(),
-        );
-
-        foreach ( $files as $file ) {
-            $result = $this->compress_file(
-                $attachment_id,
-                $file['file_path'],
-                $file['size_type'],
-                $options
-            );
-
-            $results['details'][] = array_merge( $file, $result );
-
-            if ( 'success' === $result['status'] ) {
-                $results['success']++;
-                $results['saved_bytes'] += ( $result['original_size'] - $result['compressed_size'] );
-            } elseif ( 'failed' === $result['status'] ) {
-                $results['failed']++;
-            } else {
-                $results['skipped']++;
-            }
-        }
-
-        return $results;
-    }
-
-    /**
-     * 上传后自动压缩
-     *
-     * @param array $metadata      附件元数据
-     * @param int   $attachment_id 附件 ID
-     * @return array
-     */
-    public function auto_compress_on_upload( $metadata, $attachment_id ) {
-        $settings      = get_option( 'libre_compress_general', array() );
-        $auto_compress = isset( $settings['auto_compress'] ) ? (bool) $settings['auto_compress'] : false;
-
-        if ( ! $auto_compress ) {
-            return $metadata;
-        }
-
-        $mime_type     = get_post_mime_type( $attachment_id );
-        $allowed_types = array( 'image/jpeg', 'image/png', 'image/webp', 'image/avif', 'image/gif', 'image/svg+xml' );
-
-        if ( ! in_array( $mime_type, $allowed_types, true ) ) {
-            return $metadata;
-        }
-
-        $this->compress_attachment( $attachment_id );
-
-        return $metadata;
     }
 
     /**
@@ -398,7 +360,7 @@ class Libre_Compress_Compressor {
      * @param string $status          状态
      * @param string $error_message   错误信息
      */
-    private function save_compression_record(
+    public function save_compression_record(
         int $attachment_id,
         string $file_path,
         string $size_type,
@@ -407,41 +369,35 @@ class Libre_Compress_Compressor {
         string $tool_name,
         string $status,
         string $error_message = ''
-    ) {
+    ): bool {
         $database = libre_compress()->database;
 
         $upload_dir    = wp_upload_dir();
-        $relative_path = str_replace( $upload_dir['basedir'] . '/', '', $file_path );
+        $base_dir      = untrailingslashit( wp_normalize_path( $upload_dir['basedir'] ) );
+        $normalized    = wp_normalize_path( $file_path );
+        $relative_path = 0 === strpos( $normalized, $base_dir . '/' )
+            ? ltrim( substr( $normalized, strlen( $base_dir ) ), '/' )
+            : ltrim( $normalized, '/' );
         $ratio         = $original_size > 0 ? round( ( 1 - $compressed_size / $original_size ) * 100, 2 ) : 0;
         $existing      = $database->get_record( $attachment_id, $size_type );
+        $record_data   = array(
+            'file_path'         => $relative_path,
+            'original_size'     => $original_size,
+            'compressed_size'   => $compressed_size,
+            'compression_ratio' => $ratio,
+            'tool_name'         => $tool_name,
+            'status'            => $status,
+            'error_message'     => $error_message,
+        );
 
         if ( $existing ) {
-            $database->update_record(
-                $existing['id'],
-                array(
-                    'original_size'     => $original_size,
-                    'compressed_size'   => $compressed_size,
-                    'compression_ratio' => $ratio,
-                    'status'            => $status,
-                    'error_message'     => $error_message,
-                )
-            );
-            return;
+            return $database->update_record( $existing['id'], $record_data );
         }
 
-        $database->add_record(
-            array(
-                'attachment_id'     => $attachment_id,
-                'file_path'         => $relative_path,
-                'size_type'         => $size_type,
-                'original_size'     => $original_size,
-                'compressed_size'   => $compressed_size,
-                'compression_ratio' => $ratio,
-                'tool_name'         => $tool_name,
-                'status'            => $status,
-                'error_message'     => $error_message,
-            )
-        );
+        $record_data['attachment_id'] = $attachment_id;
+        $record_data['size_type']     = $size_type;
+
+        return false !== $database->add_record( $record_data );
     }
 
     /**
@@ -450,12 +406,18 @@ class Libre_Compress_Compressor {
      * @param string $rollback_path 回滚副本路径
      * @param string $file_path     原文件路径
      */
-    private function rollback_file( string $rollback_path, string $file_path ): void {
-        if ( file_exists( $rollback_path ) ) {
-            // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_copy
-            copy( $rollback_path, $file_path );
-            $this->cleanup_rollback( $rollback_path );
+    private function rollback_file( string $rollback_path, string $file_path ): bool {
+        if ( ! file_exists( $rollback_path ) ) {
+            return false;
         }
+
+        // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_copy
+        if ( ! copy( $rollback_path, $file_path ) ) {
+            return false;
+        }
+
+        $this->cleanup_rollback( $rollback_path );
+        return true;
     }
 
     /**
@@ -485,7 +447,10 @@ class Libre_Compress_Compressor {
             return false;
         }
 
-        if ( 0 !== strpos( $real_path, $base_dir ) ) {
+        $base_dir = untrailingslashit( wp_normalize_path( $base_dir ) );
+        $real_path = untrailingslashit( wp_normalize_path( $real_path ) );
+
+        if ( 0 !== strpos( $real_path, $base_dir . '/' ) ) {
             return false;
         }
 

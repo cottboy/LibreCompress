@@ -13,7 +13,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 /**
  * SVGO SVG 压缩渠道
  *
- * 使用 svgo 命令行工具优化 SVG 图片（需要系统安装 Node.js）
+ * 使用 svgo 命令行工具压缩 SVG 图片（需要系统安装 Node.js）
  */
 class Libre_Compress_Svgo extends Libre_Compress_Tool_Base {
 
@@ -54,7 +54,7 @@ class Libre_Compress_Svgo extends Libre_Compress_Tool_Base {
     protected function build_command( string $file_path, array $options ): string {
         $executable = $this->get_executable_path();
 
-        // 获取优化精度设置（数值有效位数，越小文件越小但可能损失精度）
+        // 获取压缩精度设置（数值有效位数，越小文件越小但可能损失精度）
         $settings  = get_option( 'libre_compress_tools', array() );
         $precision = isset( $settings['svg_precision'] ) ? absint( $settings['svg_precision'] ) : 3;
 
@@ -69,7 +69,7 @@ class Libre_Compress_Svgo extends Libre_Compress_Tool_Base {
         // 创建临时输出文件路径
         $temp_output = $file_path . '.tmp.svg';
 
-        // 构建命令：-q 静默输出，--multipass 多轮优化更彻底
+        // 构建命令：-q 静默输出，--multipass 多轮压缩更彻底
         $command_parts = array(
             escapeshellarg( $executable ),
             '-q',
@@ -81,7 +81,7 @@ class Libre_Compress_Svgo extends Libre_Compress_Tool_Base {
             escapeshellarg( $temp_output ),
         );
 
-        // 优化成功后替换原文件（move /y 直接覆盖，优化失败时不会破坏原文件）
+        // 压缩成功后替换原文件（move /y 直接覆盖，压缩失败时不会破坏原文件）
         if ( $this->is_windows() ) {
             $move_command = sprintf(
                 '&& move /y "%s" "%s"',

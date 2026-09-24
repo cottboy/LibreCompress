@@ -69,7 +69,7 @@ abstract class Libre_Compress_Tool_Base {
     abstract protected function build_command( string $file_path, array $options ): string;
 
     /**
-     * 获取单张图片最大尺寸限制（KB）
+     * 获取单张图片最大文件大小（MB）
      *
      * 默认无限制
      *
@@ -85,20 +85,7 @@ abstract class Libre_Compress_Tool_Base {
      * @return bool 是否可用
      */
     public function is_exec_available(): bool {
-        // 检查函数是否存在
-        if ( ! function_exists( 'exec' ) ) {
-            return false;
-        }
-
-        // 检查函数是否被禁用
-        $disabled_functions = explode( ',', ini_get( 'disable_functions' ) );
-        $disabled_functions = array_map( 'trim', $disabled_functions );
-
-        if ( in_array( 'exec', $disabled_functions, true ) ) {
-            return false;
-        }
-
-        return true;
+        return self::is_command_execution_available();
     }
 
     /**
@@ -197,7 +184,7 @@ abstract class Libre_Compress_Tool_Base {
     }
 
     /**
-     * 获取工具二进制路径（供转换等其他子系统复用工具查找逻辑）
+     * 获取工具二进制路径（供统一压缩的其他处理路径复用）
      *
      * @return string|false 可执行文件路径或 false
      */
@@ -215,26 +202,149 @@ abstract class Libre_Compress_Tool_Base {
      *               - return_code: int 返回码
      */
     protected function execute_command( string $command ): array {
-        if ( ! $this->is_exec_available() ) {
+        return self::run_command( $command );
+    }
+
+    /**
+     * 执行带超时和进程树终止保护的本地命令
+     *
+     * @param string $command 完整命令
+     * @param int    $timeout 超时秒数
+     * @return array{success:bool,output:string,return_code:int}
+     */
+    public static function run_command( string $command, int $timeout = 120 ): array {
+        if ( ! self::is_command_execution_available() ) {
             return array(
                 'success'     => false,
-                'output'      => __( 'exec() 函数不可用', 'libre-compress' ),
+                'output'      => __( '本地命令执行功能不可用', 'libre-compress' ),
                 'return_code' => -1,
             );
         }
 
-        $output      = array();
-        $return_code = 0;
+        $stdout_path = tempnam( sys_get_temp_dir(), 'lc_stdout_' );
+        $stderr_path = tempnam( sys_get_temp_dir(), 'lc_stderr_' );
+        if ( false === $stdout_path || false === $stderr_path ) {
+            if ( $stdout_path && file_exists( $stdout_path ) ) {
+                unlink( $stdout_path );
+            }
+            if ( $stderr_path && file_exists( $stderr_path ) ) {
+                unlink( $stderr_path );
+            }
+            return array(
+                'success'     => false,
+                'output'      => __( '无法创建命令输出缓冲区', 'libre-compress' ),
+                'return_code' => -1,
+            );
+        }
 
-        // 用分组括号包住整条命令再做 2>&1，否则命令链中 2>&1 只作用于末段，前面命令的错误会漏到 stderr
-        // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.system_calls_exec
-        exec( '(' . $command . ') 2>&1', $output, $return_code );
+        $descriptors = array(
+            0 => array( 'pipe', 'r' ),
+            1 => array( 'file', $stdout_path, 'w' ),
+            2 => array( 'file', $stderr_path, 'w' ),
+        );
+        $pipes       = array();
+        $process     = proc_open( $command, $descriptors, $pipes );
+        if ( ! is_resource( $process ) ) {
+            unlink( $stdout_path );
+            unlink( $stderr_path );
+            return array(
+                'success'     => false,
+                'output'      => __( '无法启动本地命令', 'libre-compress' ),
+                'return_code' => -1,
+            );
+        }
+
+        fclose( $pipes[0] );
+        $started  = microtime( true );
+        $exitcode = -1;
+        $timedout = false;
+
+        while ( true ) {
+            $status = proc_get_status( $process );
+            if ( ! $status['running'] ) {
+                $exitcode = (int) $status['exitcode'];
+                break;
+            }
+
+            if ( microtime( true ) - $started > max( 1, $timeout ) ) {
+                $timedout = true;
+                self::terminate_process( $process, (int) $status['pid'] );
+                break;
+            }
+
+            usleep( 100000 );
+        }
+
+        $close_code = proc_close( $process );
+        if ( -1 === $exitcode && 0 === $close_code ) {
+            $exitcode = 0;
+        }
+
+        $max_output_bytes = 1024 * 1024;
+        $output = (string) file_get_contents( $stdout_path, false, null, 0, $max_output_bytes )
+            . (string) file_get_contents( $stderr_path, false, null, 0, $max_output_bytes );
+        unlink( $stdout_path );
+        unlink( $stderr_path );
+
+        if ( $timedout ) {
+            return array(
+                'success'     => false,
+                'output'      => __( '本地命令执行超时', 'libre-compress' ),
+                'return_code' => 124,
+            );
+        }
 
         return array(
-            'success'     => 0 === $return_code,
-            'output'      => implode( "\n", $output ),
-            'return_code' => $return_code,
+            'success'     => 0 === $exitcode,
+            'output'      => $output,
+            'return_code' => $exitcode,
         );
+    }
+
+    /**
+     * 检查本地命令执行依赖
+     *
+     * @return bool
+     */
+    public static function is_command_execution_available(): bool {
+        if ( ! function_exists( 'proc_open' ) || ! function_exists( 'exec' ) ) {
+            return false;
+        }
+
+        $disabled = array_map( 'trim', explode( ',', (string) ini_get( 'disable_functions' ) ) );
+        return ! in_array( 'proc_open', $disabled, true ) && ! in_array( 'exec', $disabled, true );
+    }
+
+    /**
+     * 终止命令进程树
+     *
+     * @param resource $process 进程资源
+     * @param int      $pid      进程 ID
+     */
+    private static function terminate_process( $process, int $pid ): void {
+        if ( 'WIN' === strtoupper( substr( PHP_OS, 0, 3 ) ) && $pid > 0 ) {
+            // Windows 的 proc_terminate 不保证结束 cmd.exe 的子进程，使用 taskkill /T。
+            // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.system_calls_exec
+            @exec( 'taskkill /F /T /PID ' . absint( $pid ) . ' >NUL 2>&1', $taskkill_output, $taskkill_rc );
+            if ( 0 === (int) $taskkill_rc ) {
+                return;
+            }
+        }
+
+        if ( function_exists( 'posix_kill' ) && defined( 'SIGTERM' ) && $pid > 0 ) {
+            @posix_kill( $pid, SIGTERM );
+        } else {
+            proc_terminate( $process );
+        }
+        usleep( 200000 );
+        $status = proc_get_status( $process );
+        if ( $status['running'] ) {
+            if ( function_exists( 'posix_kill' ) && defined( 'SIGKILL' ) && $pid > 0 ) {
+                @posix_kill( $pid, SIGKILL );
+            } else {
+                proc_terminate( $process, 9 );
+            }
+        }
     }
 
     /**

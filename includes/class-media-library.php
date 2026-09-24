@@ -80,30 +80,25 @@ class Libre_Compress_Media_Library {
 
         // 检查是否为图片
         $mime_type     = get_post_mime_type( $attachment_id );
-        $allowed_types = array( 'image/jpeg', 'image/png', 'image/webp', 'image/avif', 'image/gif', 'image/svg+xml' );
+        $allowed_types = libre_compress()->processor->get_supported_mimes();
 
         if ( ! in_array( $mime_type, $allowed_types, true ) ) {
             echo '<span class="libre-compress-na">—</span>';
             return;
         }
 
-        // 获取压缩统计
-        $database = libre_compress()->database;
-        $stats    = $database->get_attachment_stats( $attachment_id );
-
-        // 检查是否有备份
+        $processor = libre_compress()->processor;
+        $state     = $processor->get_attachment_state( $attachment_id );
         $has_backup = libre_compress()->backup->has_backup( $attachment_id );
 
-        // 渲染状态
-        if ( empty( $stats ) || 0 === (int) $stats['total_files'] ) {
-            // 未压缩
-            $this->render_uncompressed_status( $attachment_id );
-        } elseif ( (int) $stats['failed_count'] > 0 && 0 === (int) $stats['success_count'] ) {
-            // 全部失败
+        if ( 'complete' === $state['status'] ) {
+            $this->render_compressed_status( $attachment_id, $state, $has_backup );
+        } elseif ( 'partial' === $state['status'] ) {
+            $this->render_partial_status( $attachment_id, $state, $has_backup );
+        } elseif ( 'failed' === $state['status'] ) {
             $this->render_failed_status( $attachment_id );
         } else {
-            // 已压缩
-            $this->render_compressed_status( $attachment_id, $stats, $has_backup );
+            $this->render_uncompressed_status( $attachment_id );
         }
     }
 
@@ -135,6 +130,39 @@ class Libre_Compress_Media_Library {
             <button type="button" class="button button-small libre-compress-btn" data-action="compress" data-attachment-id="<?php echo esc_attr( $attachment_id ); ?>">
                 <?php esc_html_e( '重试', 'libre-compress' ); ?>
             </button>
+        </div>
+        <?php
+    }
+
+    /**
+     * 渲染部分压缩状态
+     *
+     * @param int   $attachment_id 附件 ID
+     * @param array $state         统一状态
+     * @param bool  $has_backup    是否有备份
+     */
+    private function render_partial_status( int $attachment_id, array $state, bool $has_backup ) {
+        ?>
+        <div class="libre-compress-status" data-attachment-id="<?php echo esc_attr( $attachment_id ); ?>">
+            <span class="status-text" style="color: #dba617;">
+                <?php
+                printf(
+                    /* translators: 1: 已成功文件数，2: 总文件数 */
+                    esc_html__( '部分已压缩 %1$d/%2$d', 'libre-compress' ),
+                    (int) $state['success_count'],
+                    (int) $state['total_files']
+                );
+                ?>
+            </span>
+            <br>
+            <button type="button" class="button button-small libre-compress-btn" data-action="compress" data-attachment-id="<?php echo esc_attr( $attachment_id ); ?>">
+                <?php esc_html_e( '继续压缩', 'libre-compress' ); ?>
+            </button>
+            <?php if ( $has_backup ) : ?>
+                <button type="button" class="button button-small libre-compress-btn" data-action="restore" data-attachment-id="<?php echo esc_attr( $attachment_id ); ?>">
+                    <?php esc_html_e( '恢复原图', 'libre-compress' ); ?>
+                </button>
+            <?php endif; ?>
         </div>
         <?php
     }
@@ -187,102 +215,52 @@ class Libre_Compress_Media_Library {
     }
 
     /**
-     * AJAX: 获取未压缩图片列表
+     * AJAX: 按游标获取未压缩图片列表
      */
     public function ajax_get_uncompressed() {
-        // 验证 nonce
         check_ajax_referer( 'libre_compress_nonce', 'nonce' );
 
-        // 验证权限
         if ( ! current_user_can( 'manage_options' ) ) {
             wp_send_json_error( array( 'message' => __( '权限不足', 'libre-compress' ) ) );
         }
 
-        $database = libre_compress()->database;
-        $compressor = libre_compress()->compressor;
+        $after_id       = isset( $_POST['after'] ) ? absint( $_POST['after'] ) : 0;
+        $batch_size    = 100;
+        $attachment_ids = libre_compress()->database->get_image_attachment_ids_after( $after_id, $batch_size );
+        $items          = array();
 
-        // 获取未压缩的附件
-        $attachments = $database->get_uncompressed_attachments( 1000, 0 );
-
-        $items = array();
-        foreach ( $attachments as $attachment ) {
-            $attachment_id = absint( $attachment['ID'] );
-            $files = $compressor->get_attachment_files( $attachment_id );
-
-            foreach ( $files as $file ) {
-                // 检查该文件是否已有成功的压缩记录
-                $record = $database->get_record( $attachment_id, $file['size_type'] );
-                if ( $record && 'success' === $record['status'] ) {
-                    continue;
-                }
-
-                $items[] = array(
-                    'attachment_id' => $attachment_id,
-                    'size_type'     => $file['size_type'],
-                    'file_path'     => $file['file_path'],
-                );
+        foreach ( $attachment_ids as $attachment_id ) {
+            if ( libre_compress()->processor->has_pending_files( $attachment_id ) ) {
+                $items[] = array( 'attachment_id' => $attachment_id );
             }
         }
 
+        $next_after = empty( $attachment_ids ) ? $after_id : max( array_map( 'absint', $attachment_ids ) );
         wp_send_json_success(
             array(
-                'total' => count( $items ),
-                'items' => $items,
+                'items'     => $items,
+                'next_after' => $next_after,
+                'has_more'  => count( $attachment_ids ) === $batch_size,
             )
         );
     }
 
     /**
-     * AJAX: 压缩单个文件
+     * AJAX: 使用统一流程压缩单个附件
      */
     public function ajax_compress_single() {
-        // 验证 nonce
         check_ajax_referer( 'libre_compress_nonce', 'nonce' );
 
-        // 验证权限
         if ( ! current_user_can( 'manage_options' ) ) {
             wp_send_json_error( array( 'message' => __( '权限不足', 'libre-compress' ) ) );
         }
 
-        // 获取参数
         $attachment_id = isset( $_POST['attachment_id'] ) ? absint( $_POST['attachment_id'] ) : 0;
-        $size_type     = isset( $_POST['size_type'] ) ? sanitize_text_field( wp_unslash( $_POST['size_type'] ) ) : '';
-
-        if ( ! $attachment_id ) {
-            wp_send_json_error( array( 'message' => __( '无效的附件 ID', 'libre-compress' ) ) );
+        if ( ! libre_compress()->processor->is_valid_attachment( $attachment_id ) ) {
+            wp_send_json_error( array( 'message' => __( '无效的图片附件', 'libre-compress' ) ) );
         }
 
-        $compressor = libre_compress()->compressor;
-
-        // 如果指定了 size_type，只压缩该文件
-        if ( ! empty( $size_type ) ) {
-            $files = $compressor->get_attachment_files( $attachment_id );
-            $target_file = null;
-
-            foreach ( $files as $file ) {
-                if ( $file['size_type'] === $size_type ) {
-                    $target_file = $file;
-                    break;
-                }
-            }
-
-            if ( ! $target_file ) {
-                wp_send_json_error( array( 'message' => __( '文件不存在', 'libre-compress' ) ) );
-            }
-
-            $result = $compressor->compress_file(
-                $attachment_id,
-                $target_file['file_path'],
-                $target_file['size_type']
-            );
-
-            wp_send_json_success( $result );
-        }
-
-        // 否则压缩整个附件
-        $result = $compressor->compress_attachment( $attachment_id );
-
-        wp_send_json_success( $result );
+        wp_send_json_success( libre_compress()->processor->compress_attachment( $attachment_id ) );
     }
 
     /**
@@ -311,13 +289,10 @@ class Libre_Compress_Media_Library {
             wp_send_json_error( array( 'message' => __( '没有可用的备份', 'libre-compress' ) ) );
         }
 
-        // 恢复备份
-        $result = $backup->restore_backup( $attachment_id );
+        // 使用附件级锁和统一恢复流程，避免恢复后立即再次自动压缩。
+        $result = libre_compress()->processor->restore_attachment( $attachment_id );
 
         if ( $result ) {
-            // 通知子模块做恢复后处理（如移除格式转换产生的新格式文件）
-            do_action( 'libre_compress_after_restore', $attachment_id );
-
             wp_send_json_success( array( 'message' => __( '恢复成功', 'libre-compress' ) ) );
         } else {
             wp_send_json_error( array( 'message' => __( '恢复失败', 'libre-compress' ) ) );
@@ -336,10 +311,14 @@ class Libre_Compress_Media_Library {
             wp_send_json_error( array( 'message' => __( '权限不足', 'libre-compress' ) ) );
         }
 
-        $database = libre_compress()->database;
+        $lock = libre_compress()->processor->acquire_global_lock( true );
+        if ( false === $lock ) {
+            wp_send_json_error( array( 'message' => __( '当前有图片正在处理，请稍后再试', 'libre-compress' ) ) );
+        }
 
-        // 清除所有压缩记录
-        $count = $database->clear_all_records();
+        $database = libre_compress()->database;
+        $count    = $database->clear_all_records();
+        libre_compress()->processor->release_attachment_lock( $lock );
 
         wp_send_json_success(
             array(
@@ -376,7 +355,7 @@ class Libre_Compress_Media_Library {
         }
 
         // 删除备份
-        $result = $backup->delete_backup( $attachment_id );
+        $result = libre_compress()->processor->delete_backup( $attachment_id );
 
         if ( $result ) {
             wp_send_json_success( array( 'message' => __( '备份已删除', 'libre-compress' ) ) );
@@ -397,10 +376,14 @@ class Libre_Compress_Media_Library {
             wp_send_json_error( array( 'message' => __( '权限不足', 'libre-compress' ) ) );
         }
 
-        $backup = libre_compress()->backup;
+        $lock = libre_compress()->processor->acquire_global_lock( true );
+        if ( false === $lock ) {
+            wp_send_json_error( array( 'message' => __( '当前有图片正在处理，请稍后再试', 'libre-compress' ) ) );
+        }
 
-        // 删除所有备份
-        $count = $backup->delete_all_backups();
+        $backup = libre_compress()->backup;
+        $count  = $backup->delete_all_backups();
+        libre_compress()->processor->release_attachment_lock( $lock );
 
         wp_send_json_success(
             array(
@@ -427,7 +410,6 @@ class Libre_Compress_Media_Library {
         }
 
         $database = libre_compress()->database;
-        $backup   = libre_compress()->backup;
 
         // 获取所有备份记录
         $backups = $database->get_all_backups();
@@ -443,10 +425,7 @@ class Libre_Compress_Media_Library {
         $failed_count  = 0;
 
         foreach ( $attachment_ids as $attachment_id ) {
-            if ( $backup->restore_backup( absint( $attachment_id ) ) ) {
-                // 通知子模块做恢复后处理（如移除格式转换产生的新格式文件）
-                do_action( 'libre_compress_after_restore', absint( $attachment_id ) );
-
+            if ( libre_compress()->processor->restore_attachment( absint( $attachment_id ) ) ) {
                 $success_count++;
             } else {
                 $failed_count++;

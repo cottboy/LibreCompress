@@ -75,7 +75,7 @@ class Libre_Compress_Jpegoptim extends Libre_Compress_Tool_Base {
         $command_parts = array(
             escapeshellarg( $executable ),
             '--strip-all',  // 移除所有元数据
-            '--all-progressive',  // 转换为渐进式 JPEG
+            '--all-progressive',  // 编码为渐进式 JPEG
         );
 
         if ( $lossless ) {

@@ -1,18 +1,38 @@
 # LibreCompress
 
-免费的 WordPress 图片压缩与格式转换插件。所有压缩均在服务器本地调用开源命令行工具完成，**不依赖任何第三方云服务**：无配额限制、无图片数量上限、无需注册 API Key，图片也不会被上传到外部服务器。
+免费的纯本地 WordPress 图片压缩插件。所有处理都在服务器本地调用开源命令行工具完成，**不依赖任何第三方云服务**：无需 API Key，图片不会上传到外部服务器。
+
+## 核心规则
+
+插件对用户只提供一个概念：**压缩**。
+
+一次压缩会根据当前设置，为每个文件选择以下一种处理方式：
+
+1. **同格式压缩**：JPEG → JPEG、PNG → PNG、WebP → WebP 等。
+2. **目标格式输出**：把勾选的 PNG、JPG、GIF、SVG 压缩为 WebP 或 AVIF。
+
+以下入口全部共用同一套处理流程和压缩记录：
+
+- 上传图片时自动压缩；
+- 媒体库单张图片的“压缩”按钮；
+- 设置页的“批量压缩未压缩的图片”按钮；
+- 重试未完成的图片。
+
+同格式压缩成功和目标格式输出成功都会写入同一个压缩记录表，并统一视为“已压缩”。如果附件只有部分文件成功，媒体库会显示“部分已压缩”，批量操作只重试尚未完成的文件。
 
 ## 功能特性
 
-- **六种格式压缩**：JPEG、PNG、WebP、AVIF、GIF、SVG，均支持有损/无损模式与质量参数调节
-- **格式转换**：PNG / JPG / GIF / SVG 一键转换为 WebP 或 AVIF，前端直接输出新格式
-- **上传自动化**：上传时自动压缩（可选），随后按勾选的源格式自动转换
-- **原图备份**：压缩/转换前自动备份，可随时恢复单张或全部原图
-- **媒体库集成**：列表新增压缩状态列，显示节省空间，支持单图压缩、恢复、删除备份
-- **批量操作**：批量压缩、批量转换、清除压缩记录、恢复/删除全部备份
-- **缩略图管理**：禁止生成缩略图、删除已有缩略图（自动替换文章内链接）、按需重新生成
-- **SVG 安全上传**：上传时自动清理脚本等危险内容（防 XSS / XXE）
-- **多语言就绪**：所有界面文字基于翻译域 `libre-compress`，可通过语言文件翻译
+- **六种格式压缩**：JPEG、PNG、WebP、AVIF、GIF、SVG。
+- **可配置目标格式**：PNG / JPG / GIF / SVG 可按设置压缩为 WebP 或 AVIF。
+- **统一批量入口**：一个按钮按当前设置处理所有未压缩图片，使用附件 ID 游标分页，不存在固定数量上限。
+- **统一状态**：媒体库、批量操作和上传自动处理使用相同的文件级成功记录。
+- **原图备份**：压缩前可自动备份，支持恢复单张或全部原图。
+- **附件级排他锁**：同一附件的压缩、恢复和缩略图操作不会并发互相覆盖。
+- **元数据同步**：目标格式输出后同步 `_wp_attached_file`、附件 metadata、文件大小和 MIME；主文件失败时不会把整个附件错误标记为新格式。
+- **内容 URL 修复**：文章中的旧源格式 URL 根据持久化映射替换为实际压缩结果。
+- **缩略图管理**：禁止生成、删除已有缩略图、按需重新生成。
+- **SVG 安全上传**：清理脚本、事件属性和危险协议，写入失败时终止上传。
+- **多语言就绪**：界面文字使用翻译域 `libre-compress`。
 
 ## 环境要求
 
@@ -20,140 +40,150 @@
 | --- | --- |
 | WordPress | 5.0 及以上 |
 | PHP | 7.4 及以上 |
-| `exec()` 函数 | 必须可用（压缩依赖命令行工具，设置页会自动检测） |
-| 压缩工具 | 按需安装（见下文），装多少用多少，缺工具的格式自动跳过 |
-| Node.js | 仅优化 SVG（svgo）时需要 |
+| `exec()` / `proc_open()` | 必须可用，压缩依赖本地命令行工具并使用超时保护 |
+| PHP DOM 扩展 | 仅启用 SVG 上传时需要 |
+| 压缩工具 | 按需安装，缺少对应工具时该路径会安全跳过 |
 
 ## 安装插件
 
-1. 将 `LibreCompress` 目录上传到 `/wp-content/plugins/`
-2. 在 WordPress 后台「插件」页面启用
-3. 进入「设置 → LibreCompress」配置
+1. 将 `LibreCompress` 目录上传到 `/wp-content/plugins/`。
+2. 在 WordPress 后台启用插件。
+3. 进入“设置 → LibreCompress”配置。
+4. 在“压缩工具”页面检查本地工具状态。
 
 ## 安装压缩工具
 
-插件本身不带二进制文件，需自行部署所需工具，共三种方式（任选其一）：
+插件不携带二进制文件，可任选一种方式：
 
-1. **内置 bin 目录**：把可执行文件放进 `/wp-content/LibreCompress-bin/` 目录（Windows 下文件需带 `.exe` 扩展名）。该目录在插件更新时不会被覆盖
-2. **系统 PATH**：把工具所在文件夹加入服务器的 Path 环境变量
-3. **包管理器**：如 `apt`、`brew`、`npm` 等直接安装
+1. 放入 `/wp-content/LibreCompress-bin/`（Windows 下通常需要 `.exe` 后缀）。
+2. 将工具目录加入系统 `PATH`。
+3. 使用系统包管理器安装。
 
-安装后在「设置 → LibreCompress → 压缩工具」标签页可查看每个工具的检测状态、安装路径与下载链接。
+### 工具清单
 
-### 工具清单与下载地址
+| 工具 | 用途 |
+| --- | --- |
+| jpegoptim | JPEG 同格式压缩 |
+| pngquant | PNG 有损压缩 |
+| oxipng | PNG 无损压缩 |
+| gifsicle | GIF 同格式压缩 |
+| cwebp | WebP 同格式压缩，以及 PNG/JPG/GIF/SVG 输出为 WebP |
+| gif2webp | 动画 GIF 输出为 WebP |
+| avifenc | AVIF 压缩编码器 |
+| avifdec | AVIF 同格式压缩所需解码器 |
+| ffmpeg | 动画 GIF 输出为 AVIF |
+| svgo | SVG 同格式压缩 |
+| resvg | SVG 输出为 WebP/AVIF 前的栅格化处理 |
 
-| 工具 | 用途 | 下载地址 |
+### 同格式压缩依赖
+
+| 格式 | 依赖 |
+| --- | --- |
+| JPEG | jpegoptim |
+| PNG 有损 | pngquant |
+| PNG 无损 | oxipng |
+| WebP | cwebp |
+| AVIF | avifenc + avifdec |
+| GIF | gifsicle |
+| SVG | svgo |
+
+PNG 严格按当前有损/无损设置选择工具，不会静默切换压缩模式。
+
+### 目标格式输出依赖
+
+| 源格式 | WebP | AVIF |
 | --- | --- | --- |
-| jpegoptim | JPEG 压缩 | <https://github.com/tjko/jpegoptim> |
-| pngquant | PNG 有损压缩 | <https://pngquant.org> |
-| oxipng | PNG 无损压缩 | <https://github.com/oxipng/oxipng> |
-| gifsicle | GIF 压缩 | <https://www.lcdf.org/gifsicle/> |
-| cwebp | WebP 压缩、转换编码 | <https://developers.google.com/speed/webp/download> |
-| gif2webp | 动画 GIF 转 WebP | <https://developers.google.com/speed/webp/download> |
-| avifenc | AVIF 编码（压缩与转换） | <https://github.com/AOMediaCodec/libavif> |
-| avifdec | AVIF 解码（压缩需要） | <https://github.com/AOMediaCodec/libavif> |
-| svgo | SVG 优化（`npm install -g svgo`） | <https://github.com/svg/svgo> |
-| ffmpeg | 动画 GIF 转 AVIF | <https://ffmpeg.org/download.html> |
-| resvg | SVG 转 WebP/AVIF 渲染 | <https://github.com/linebender/resvg> |
+| PNG / JPG | cwebp | avifenc |
+| 静态 GIF | GD + cwebp | GD + avifenc |
+| 动画 GIF | gif2webp | ffmpeg + avifenc |
+| SVG | resvg + cwebp | resvg + avifenc |
 
-### 各功能的依赖关系
-
-**压缩**（按设置的压缩模式选择工具，PNG 两者缺其一时自动回退另一个）：
-
-| 功能 | 依赖 |
-| --- | --- |
-| JPEG 压缩 | jpegoptim |
-| PNG 压缩 | pngquant（有损）或 oxipng（无损） |
-| WebP 压缩 | cwebp |
-| AVIF 压缩 | avifenc + avifdec |
-| GIF 压缩 | gifsicle |
-| SVG 优化 | svgo |
-
-**格式转换**（目标格式 WebP / AVIF 二选一；GD 为 PHP 自带扩展）：
-
-| 功能 | 依赖 |
-| --- | --- |
-| PNG / JPG 转 WebP | cwebp |
-| PNG / JPG 转 AVIF | avifenc |
-| 静态 GIF 转 WebP | GD + cwebp |
-| 静态 GIF 转 AVIF | GD + avifenc |
-| 动画 GIF 转 WebP | gif2webp |
-| 动画 GIF 转 AVIF | ffmpeg + avifenc |
-| SVG 转 WebP | resvg + cwebp |
-| SVG 转 AVIF | resvg + avifenc |
+同格式 AVIF 压缩只支持可确认的单帧文件；动画或多帧 AVIF 会安全跳过，避免静默丢帧。
 
 ## 使用说明
 
 ### 基本设置
 
-- **自动压缩**：上传图片时自动压缩（原图与全部缩略图）
-- **备份原图**：压缩前把原图备份到独立目录，可随时恢复
-- **压缩并发数**：批量压缩时同时执行的进程数（1-100）
-- **SVG 上传**：允许上传 SVG 文件，上传时自动清理危险内容
-- **格式转换**：勾选 PNG / JPG / GIF / SVG 中需要转换的格式，并选择目标格式（WebP 兼容性好，AVIF 压缩率更高但编码慢）
+- **自动压缩**：上传图片时按当前设置自动压缩原图和全部尺寸。
+- **备份原图**：压缩结果提交前创建可恢复备份；备份失败时停止破坏性处理。
+- **压缩并发数**：批量操作使用的附件级并发数。
+- **SVG 上传**：允许受信任用户上传 SVG，并清理危险内容。
+- **压缩输出格式**：勾选需要输出为 WebP/AVIF 的源格式；未勾选格式只做同格式压缩。
+- **目标格式**：WebP 或 AVIF 二选一。
 
-### 压缩工具页
+### 压缩结果规则
 
-- **系统状态**：检测 `exec()` 是否可用
-- **工具状态**：逐个检测工具是否安装、显示安装路径与下载链接
-- **路径支持状态**：以矩阵形式展示每条压缩/转换路径是否可用、缺少哪些依赖
-- **压缩参数**：各格式的有损/无损模式与质量参数（JPEG/PNG/WebP/AVIF/GIF 质量 0-100，PNG 无损级别 0-6，SVG 精度 0-8）
-
-### 转换行为说明
-
-- 转换后**原文件从原位置移除**（开启备份时先备份），新格式文件同名仅替换扩展名，附件的 MIME 与元数据同步更新，WordPress 前端直接输出新格式 URL
-- 转换产物**不小于**源文件时自动放弃转换、保留原文件
-- 文章内容中已固化的旧格式 URL 会在新格式文件存在时自动替换
-- 恢复原图时会反向处理：移除新格式文件并还原 MIME 与元数据
+- 只有结果文件存在、可识别且体积严格小于源文件时才提交成功。
+- 目标格式结果小于源文件时，以同名不同扩展名文件替换源文件。
+- 同格式压缩和目标格式输出都保存当前文件路径、原始大小、压缩后大小、工具和状态。
+- 压缩记录与当前文件路径不一致时视为未完成，允许重新处理。
+- 附件内任意尺寸失败都不会把附件级 MIME 改成目标格式；只有主文件成功才更新附件级 MIME。
+- 恢复原图时只删除确认属于该附件且路径位于 uploads 目录内的目标结果，并还原 `_wp_attached_file`、metadata 和 MIME。
+- 批量操作只重试尚未成功的文件，不会再次压缩已经成功的尺寸。
 
 ### 批量操作
 
-设置页底部提供：批量压缩未压缩图片、批量转换未转换图片、清除压缩记录、恢复所有原图备份、删除所有原图备份，以及禁止/重新启用缩略图、删除已有缩略图（文章内链接替换为原图）、重新生成缩略图（文章内链接替换为「大」尺寸）。
+设置页提供一个批量入口：
 
-## 安全设计
+- **批量压缩未压缩的图片**
 
-- 所有命令参数经 `escapeshellarg()` 转义，杜绝命令注入
-- 文件路径经 `realpath()` 校验并限定在 uploads 目录内，拒绝 `..` 目录穿越
-- SVG 上传清理：移除 `script` / `foreignObject` 元素、`on*` 事件属性、`javascript:` / `vbscript:` / `data:text/html` 协议；含 `DOCTYPE` / `ENTITY` 的文件直接拒绝（防 XXE），XML 解析启用 `LIBXML_NONET`
-- 全部 AJAX 接口校验 nonce 与用户权限
-- 备份目录与工具 bin 目录均放置 `.htaccess` / `index.php` 防止直接访问
+该按钮按附件 ID 游标逐页读取媒体库，并使用设置中的并发数处理。所有成功路径统一计入“已压缩”。
+
+设置页还提供：
+
+- 清除压缩记录；
+- 恢复所有原图备份；
+- 删除所有原图备份；
+- 禁止/重新启用缩略图；
+- 删除已有缩略图；
+- 重新生成缺少的缩略图。
+
+## 安全与可靠性
+
+- AJAX 接口验证 nonce、管理员权限、附件类型和附件 ID。
+- 用户输入不直接提供文件路径；服务端始终根据附件 ID 和元数据重新解析文件。
+- 文件路径规范化后必须位于 uploads 目录边界内。
+- 备份、压缩、目标格式输出、恢复和缩略图操作使用附件级排他锁。
+- 统一处理器生成的临时文件和回滚文件使用唯一名称。
+- 压缩结果和恢复映射必须成功写入后才提交替换。
+- 备份采用随机文件名，并包含 Apache、IIS 基础访问保护。
+- SVG 清理会拒绝 DOCTYPE/ENTITY、危险元素、事件属性和脚本协议。
 
 ## 数据存储
 
 | 数据 | 位置 |
 | --- | --- |
-| 压缩记录表 | `{表前缀}libre_compress_records` |
-| 备份记录表 | `{表前缀}libre_compress_backups` |
+| 统一压缩记录 | `{表前缀}libre_compress_records` |
+| 备份记录 | `{表前缀}libre_compress_backups` |
+| 目标格式输出恢复映射 | 附件 post meta `_libre_compress_converted` |
 | 原图备份文件 | `/wp-content/uploads/libre-compress-backups/` |
-| 压缩工具二进制 | `/wp-content/LibreCompress-bin/` |
-
-卸载（删除）插件时会自动清理以上全部数据：删除数据表、设置项、备份目录与工具目录。
+| 本地工具 | `/wp-content/LibreCompress-bin/` |
+| 附件处理锁 | `/wp-content/uploads/.libre-compress-locks/` |
 
 ## 目录结构
 
-```
+```text
 LibreCompress/
-├── libre-compress.php            # 插件入口、激活/停用钩子、SVG 上传安全
-├── uninstall.php                 # 卸载清理脚本
-├── compression/                  # 压缩工具封装
-│   ├── class-tool-base.php       # 工具基类（查找、执行、转义）
-│   └── class-{tool}.php          # jpegoptim/pngquant/oxipng/cwebp/avif/gifsicle/svgo
+├── libre-compress.php
+├── uninstall.php
+├── compression/                    # 本地压缩工具封装
 ├── includes/
-│   ├── class-libre-compress.php  # 主类（单例，协调各模块）
-│   ├── class-compressor.php      # 压缩调度器
-│   ├── class-converter.php       # 格式转换器
-│   ├── class-backup.php          # 原图备份
-│   ├── class-media-library.php   # 媒体库集成
+│   ├── class-libre-compress.php    # 主类和模块协调
+│   ├── class-processor.php         # 统一压缩入口、状态和附件锁
+│   ├── class-compressor.php        # 同格式压缩底层处理
+│   ├── class-converter.php         # 目标格式输出底层处理
+│   ├── class-backup.php            # 原图备份和恢复
+│   ├── class-media-library.php     # 媒体库状态和 AJAX
 │   ├── class-thumbnail-manager.php # 缩略图管理
-│   ├── class-settings.php        # 设置页
-│   └── class-database.php        # 数据库表
-├── assets/js/admin.js            # 后台批量与单图操作脚本
-└── languages/libre-compress.pot  # 翻译模板
+│   ├── class-settings.php          # 设置页面
+│   └── class-database.php          # 数据访问
+├── assets/js/admin.js
+└── languages/libre-compress.pot
 ```
 
 ## 开发者接口
 
-自定义压缩工具需继承 `Libre_Compress_Tool_Base` 并实现 `get_name()`、`get_supported_formats()`、`get_executable_name()`、`build_command()` 等方法，然后通过钩子注册：
+自定义同格式压缩工具可继承 `Libre_Compress_Tool_Base`，实现 `get_name()`、`get_supported_formats()`、`get_executable_name()`、`build_command()` 等方法，然后通过以下钩子注册：
 
 ```php
 add_action( 'libre_compress_register_tools', function ( $compressor ) {
@@ -163,10 +193,9 @@ add_action( 'libre_compress_register_tools', function ( $compressor ) {
 
 可用钩子：
 
-- `libre_compress_register_tools` —— 注册自定义压缩工具
-- `libre_compress_before_compress` —— 单文件压缩前触发
-- `libre_compress_after_compress` —— 单文件压缩成功后触发
-- `libre_compress_after_restore` —— 恢复原图后触发（转换器借此反向处理）
+- `libre_compress_register_tools`：注册同格式压缩工具；
+- `libre_compress_before_compress`：每个文件压缩前触发；
+- `libre_compress_after_compress`：每个文件压缩成功后触发。
 
 ## 许可证
 

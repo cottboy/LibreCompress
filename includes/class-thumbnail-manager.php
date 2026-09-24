@@ -83,45 +83,69 @@ class Libre_Compress_Thumbnail_Manager {
      * @return int 删除的文件数量
      */
     public function delete_attachment_thumbnails( int $attachment_id ): int {
-        $metadata = wp_get_attachment_metadata( $attachment_id );
-
-        if ( empty( $metadata ) || empty( $metadata['sizes'] ) ) {
+        $lock = libre_compress()->processor->acquire_attachment_lock( $attachment_id );
+        if ( false === $lock ) {
             return 0;
         }
 
-        $upload_dir = wp_upload_dir();
-        $base_dir   = $upload_dir['basedir'];
-        $file_dir   = dirname( $metadata['file'] );
-        $deleted    = 0;
+        $global_lock = libre_compress()->processor->acquire_global_lock( false );
+        if ( false === $global_lock ) {
+            libre_compress()->processor->release_attachment_lock( $lock );
+            return 0;
+        }
 
-        foreach ( $metadata['sizes'] as $size_name => $size_data ) {
-            if ( ! empty( $size_data['file'] ) ) {
+        try {
+            $metadata = wp_get_attachment_metadata( $attachment_id );
+
+            if ( empty( $metadata ) || empty( $metadata['file'] ) || empty( $metadata['sizes'] ) ) {
+                return 0;
+            }
+
+            $upload_dir = wp_upload_dir();
+            $base_dir   = $upload_dir['basedir'];
+            $file_dir   = dirname( $metadata['file'] );
+            $deleted    = 0;
+            $removed    = array();
+
+            foreach ( $metadata['sizes'] as $size_name => $size_data ) {
+                if ( empty( $size_data['file'] ) ) {
+                    continue;
+                }
+
                 $thumb_path = $base_dir . '/' . $file_dir . '/' . $size_data['file'];
-
-                if ( file_exists( $thumb_path ) ) {
+                if ( file_exists( $thumb_path ) && $this->is_safe_upload_path( $thumb_path ) ) {
                     // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
                     if ( unlink( $thumb_path ) ) {
                         $deleted++;
+                        $removed[ $size_name ] = true;
                     }
                 }
             }
-        }
 
-        // 更新元数据，移除缩略图信息
-        $metadata['sizes'] = array();
-        wp_update_attachment_metadata( $attachment_id, $metadata );
-
-        // 删除相关压缩记录
-        $database = libre_compress()->database;
-        $records  = $database->get_records_by_attachment( $attachment_id );
-
-        foreach ( $records as $record ) {
-            if ( 'full' !== $record['size_type'] ) {
-                $database->delete_record( $record['id'] );
+            foreach ( array_keys( $removed ) as $size_name ) {
+                unset( $metadata['sizes'][ $size_name ] );
             }
-        }
 
-        return $deleted;
+            if ( ! empty( $removed ) ) {
+                $metadata_updated = false !== wp_update_attachment_metadata( $attachment_id, $metadata );
+                if ( ! $metadata_updated ) {
+                    return $deleted;
+                }
+
+                $database = libre_compress()->database;
+                foreach ( array_keys( $removed ) as $size_name ) {
+                    $record = $database->get_record( $attachment_id, $size_name );
+                    if ( $record ) {
+                        $database->delete_record( $record['id'] );
+                    }
+                }
+            }
+
+            return $deleted;
+        } finally {
+            libre_compress()->processor->release_attachment_lock( $global_lock );
+            libre_compress()->processor->release_attachment_lock( $lock );
+        }
     }
 
     /**
@@ -130,25 +154,24 @@ class Libre_Compress_Thumbnail_Manager {
      * @return array 操作结果
      */
     public function delete_all_thumbnails(): array {
-        global $wpdb;
-
-        // 获取所有图片附件
-        $attachments = $wpdb->get_col(
-            "SELECT ID FROM {$wpdb->posts} 
-            WHERE post_type = 'attachment' 
-            AND post_mime_type IN ('image/jpeg', 'image/png', 'image/webp', 'image/avif', 'image/gif', 'image/svg+xml')"
-        );
-
-        $total_deleted = 0;
+        $database            = libre_compress()->database;
+        $after_id            = 0;
+        $total_deleted       = 0;
         $affected_attachments = 0;
 
-        foreach ( $attachments as $attachment_id ) {
-            $deleted = $this->delete_attachment_thumbnails( absint( $attachment_id ) );
-            if ( $deleted > 0 ) {
-                $total_deleted += $deleted;
-                $affected_attachments++;
+        do {
+            $attachments = $database->get_image_attachment_ids_after( $after_id, 100 );
+            foreach ( $attachments as $attachment_id ) {
+                $deleted = $this->delete_attachment_thumbnails( absint( $attachment_id ) );
+                if ( $deleted > 0 ) {
+                    $total_deleted += $deleted;
+                    $affected_attachments++;
+                }
             }
-        }
+            if ( ! empty( $attachments ) ) {
+                $after_id = max( array_map( 'absint', $attachments ) );
+            }
+        } while ( count( $attachments ) === 100 );
 
         return array(
             'deleted_files'        => $total_deleted,
@@ -164,51 +187,50 @@ class Libre_Compress_Thumbnail_Manager {
     public function replace_thumbnails_with_original(): int {
         global $wpdb;
 
-        $upload_dir = wp_upload_dir();
-        $base_url   = $upload_dir['baseurl'];
-        $replaced   = 0;
+        $replaced  = 0;
+        $after_id  = 0;
 
-        // 获取所有包含图片的文章
-        $posts = $wpdb->get_results(
-            "SELECT ID, post_content FROM {$wpdb->posts} 
-            WHERE post_content LIKE '%<img%' 
-            AND post_status != 'trash'"
-        );
+        do {
+            $posts = $wpdb->get_results(
+                $wpdb->prepare(
+                    "SELECT ID, post_content FROM {$wpdb->posts}
+                    WHERE ID > %d
+                    AND post_content LIKE '%<img%'
+                    AND post_status != 'trash'
+                    ORDER BY ID ASC
+                    LIMIT 100",
+                    $after_id
+                )
+            );
 
-        foreach ( $posts as $post ) {
-            $content = $post->post_content;
-            $new_content = $content;
+            foreach ( $posts as $post ) {
+                $content     = $post->post_content;
+                $new_content = $content;
 
-            // 匹配所有图片标签
-            preg_match_all( '/<img[^>]+src=["\']([^"\']+)["\'][^>]*>/i', $content, $matches );
+                preg_match_all( '/<img[^>]+src=["\']([^"\']+)["\'][^>]*>/i', $content, $matches );
+                foreach ( $matches[1] as $img_url ) {
+                    if ( preg_match( '/-\d+x\d+\.(jpg|jpeg|png|gif|webp|avif|svg)$/i', $img_url ) ) {
+                        $original_url = preg_replace( '/-\d+x\d+\./', '.', $img_url );
+                        $new_content  = str_replace( $img_url, $original_url, $new_content );
+                        $replaced++;
+                    }
+                }
 
-            if ( empty( $matches[1] ) ) {
-                continue;
-            }
-
-            foreach ( $matches[1] as $img_url ) {
-                // 检查是否为缩略图 URL（包含尺寸后缀如 -300x200）
-                if ( preg_match( '/-\d+x\d+\.(jpg|jpeg|png|gif|webp|avif|svg)$/i', $img_url ) ) {
-                    // 获取原图 URL
-                    $original_url = preg_replace( '/-\d+x\d+\./', '.', $img_url );
-
-                    // 替换 URL
-                    $new_content = str_replace( $img_url, $original_url, $new_content );
-                    $replaced++;
+                if ( $new_content !== $content ) {
+                    $wpdb->update(
+                        $wpdb->posts,
+                        array( 'post_content' => $new_content ),
+                        array( 'ID' => $post->ID ),
+                        array( '%s' ),
+                        array( '%d' )
+                    );
                 }
             }
 
-            // 如果内容有变化，更新文章
-            if ( $new_content !== $content ) {
-                $wpdb->update(
-                    $wpdb->posts,
-                    array( 'post_content' => $new_content ),
-                    array( 'ID' => $post->ID ),
-                    array( '%s' ),
-                    array( '%d' )
-                );
+            if ( ! empty( $posts ) ) {
+                $after_id = max( array_map( 'absint', wp_list_pluck( $posts, 'ID' ) ) );
             }
-        }
+        } while ( count( $posts ) === 100 );
 
         return $replaced;
     }
@@ -220,24 +242,43 @@ class Libre_Compress_Thumbnail_Manager {
      * @return bool 是否成功
      */
     public function regenerate_attachment_thumbnails( int $attachment_id ): bool {
-        // 获取附件文件路径
-        $file_path = get_attached_file( $attachment_id );
-
-        if ( ! $file_path || ! file_exists( $file_path ) ) {
+        $lock = libre_compress()->processor->acquire_attachment_lock( $attachment_id );
+        if ( false === $lock ) {
             return false;
         }
 
-        // 重新生成元数据（包括缩略图）
-        $metadata = wp_generate_attachment_metadata( $attachment_id, $file_path );
-
-        if ( empty( $metadata ) ) {
+        $global_lock = libre_compress()->processor->acquire_global_lock( false );
+        if ( false === $global_lock ) {
+            libre_compress()->processor->release_attachment_lock( $lock );
             return false;
         }
 
-        // 更新元数据
-        wp_update_attachment_metadata( $attachment_id, $metadata );
+        try {
+            $processor = libre_compress()->processor;
+            $file_path = get_attached_file( $attachment_id );
 
-        return true;
+            if ( ! $file_path || ! file_exists( $file_path ) ) {
+                return false;
+            }
+
+            // 元数据重建期间明确暂停自动压缩，避免插件自己处理刚生成的尺寸。
+            $was_suppressed = $processor->is_auto_compress_suppressed();
+            $processor->set_auto_compress_suppressed( true );
+            try {
+                $metadata = wp_generate_attachment_metadata( $attachment_id, $file_path );
+            } finally {
+                $processor->set_auto_compress_suppressed( $was_suppressed );
+            }
+
+            if ( empty( $metadata ) ) {
+                return false;
+            }
+
+            return false !== wp_update_attachment_metadata( $attachment_id, $metadata );
+        } finally {
+            libre_compress()->processor->release_attachment_lock( $global_lock );
+            libre_compress()->processor->release_attachment_lock( $lock );
+        }
     }
 
     /**
@@ -246,32 +287,30 @@ class Libre_Compress_Thumbnail_Manager {
      * @return array 操作结果
      */
     public function regenerate_missing_thumbnails(): array {
-        global $wpdb;
+        $database = libre_compress()->database;
+        $after_id = 0;
+        $success  = 0;
+        $failed   = 0;
 
-        // 获取所有图片附件
-        $attachments = $wpdb->get_col(
-            "SELECT ID FROM {$wpdb->posts} 
-            WHERE post_type = 'attachment' 
-            AND post_mime_type IN ('image/jpeg', 'image/png', 'image/webp', 'image/avif', 'image/gif', 'image/svg+xml')"
-        );
+        do {
+            $attachments = $database->get_image_attachment_ids_after( $after_id, 100 );
+            foreach ( $attachments as $attachment_id ) {
+                $metadata = wp_get_attachment_metadata( $attachment_id );
+                if ( ! empty( $metadata['sizes'] ) ) {
+                    continue;
+                }
 
-        $success = 0;
-        $failed  = 0;
-
-        foreach ( $attachments as $attachment_id ) {
-            $attachment_id = absint( $attachment_id );
-
-            // 检查是否缺少缩略图
-            $metadata = wp_get_attachment_metadata( $attachment_id );
-
-            if ( empty( $metadata['sizes'] ) ) {
                 if ( $this->regenerate_attachment_thumbnails( $attachment_id ) ) {
                     $success++;
                 } else {
                     $failed++;
                 }
             }
-        }
+
+            if ( ! empty( $attachments ) ) {
+                $after_id = max( $attachments );
+            }
+        } while ( count( $attachments ) === 100 );
 
         return array(
             'success' => $success,
@@ -287,58 +326,80 @@ class Libre_Compress_Thumbnail_Manager {
     public function replace_original_with_large(): int {
         global $wpdb;
 
-        $upload_dir = wp_upload_dir();
-        $replaced   = 0;
+        $replaced = 0;
+        $after_id = 0;
 
-        // 获取所有包含图片的文章
-        $posts = $wpdb->get_results(
-            "SELECT ID, post_content FROM {$wpdb->posts} 
-            WHERE post_content LIKE '%<img%' 
-            AND post_status != 'trash'"
-        );
+        do {
+            $posts = $wpdb->get_results(
+                $wpdb->prepare(
+                    "SELECT ID, post_content FROM {$wpdb->posts}
+                    WHERE ID > %d
+                    AND post_content LIKE '%<img%'
+                    AND post_status != 'trash'
+                    ORDER BY ID ASC
+                    LIMIT 100",
+                    $after_id
+                )
+            );
 
-        foreach ( $posts as $post ) {
-            $content = $post->post_content;
-            $new_content = $content;
+            foreach ( $posts as $post ) {
+                $content     = $post->post_content;
+                $new_content = $content;
+                preg_match_all( '/<img[^>]+src=["\']([^"\']+)["\'][^>]*>/i', $content, $matches );
 
-            // 匹配所有图片标签
-            preg_match_all( '/<img[^>]+src=["\']([^"\']+)["\'][^>]*>/i', $content, $matches );
+                foreach ( $matches[1] as $img_url ) {
+                    if ( preg_match( '/-\d+x\d+\.(jpg|jpeg|png|gif|webp|avif|svg)$/i', $img_url ) ) {
+                        continue;
+                    }
 
-            if ( empty( $matches[1] ) ) {
-                continue;
-            }
-
-            foreach ( $matches[1] as $img_url ) {
-                // 检查是否为原图 URL（不包含尺寸后缀）
-                if ( ! preg_match( '/-\d+x\d+\.(jpg|jpeg|png|gif|webp|avif|svg)$/i', $img_url ) ) {
-                    // 尝试获取对应的附件 ID
                     $attachment_id = attachment_url_to_postid( $img_url );
-
                     if ( $attachment_id ) {
-                        // 获取"大"尺寸 URL
                         $large_url = wp_get_attachment_image_url( $attachment_id, 'large' );
-
                         if ( $large_url && $large_url !== $img_url ) {
                             $new_content = str_replace( $img_url, $large_url, $new_content );
                             $replaced++;
                         }
                     }
                 }
+
+                if ( $new_content !== $content ) {
+                    $wpdb->update(
+                        $wpdb->posts,
+                        array( 'post_content' => $new_content ),
+                        array( 'ID' => $post->ID ),
+                        array( '%s' ),
+                        array( '%d' )
+                    );
+                }
             }
 
-            // 如果内容有变化，更新文章
-            if ( $new_content !== $content ) {
-                $wpdb->update(
-                    $wpdb->posts,
-                    array( 'post_content' => $new_content ),
-                    array( 'ID' => $post->ID ),
-                    array( '%s' ),
-                    array( '%d' )
-                );
+            if ( ! empty( $posts ) ) {
+                $after_id = max( array_map( 'absint', wp_list_pluck( $posts, 'ID' ) ) );
             }
-        }
+        } while ( count( $posts ) === 100 );
 
         return $replaced;
+    }
+
+    /**
+     * 验证文件位于 uploads 目录内
+     *
+     * @param string $file_path 文件路径
+     * @return bool
+     */
+    private function is_safe_upload_path( string $file_path ): bool {
+        $upload_dir = wp_upload_dir();
+        $base_dir   = realpath( $upload_dir['basedir'] );
+        $real_path  = realpath( $file_path );
+
+        if ( false === $base_dir || false === $real_path || false !== strpos( $file_path, '..' ) ) {
+            return false;
+        }
+
+        $base_dir  = untrailingslashit( wp_normalize_path( $base_dir ) );
+        $real_path = untrailingslashit( wp_normalize_path( $real_path ) );
+
+        return 0 === strpos( $real_path, $base_dir . '/' );
     }
 
     /**

@@ -27,6 +27,13 @@ class Libre_Compress_Avif extends Libre_Compress_Tool_Base {
     protected $decoder_path = null;
 
     /**
+     * 当前调用产生的临时文件
+     *
+     * @var array
+     */
+    private $temporary_files = array();
+
+    /**
      * 获取渠道名称
      *
      * @return string 渠道名称
@@ -91,11 +98,74 @@ class Libre_Compress_Avif extends Libre_Compress_Tool_Base {
      * @return bool 是否可用
      */
     public function is_tool_available(): bool {
-        if ( ! parent::is_tool_available() ) {
+        if ( ! $this->has_encoder() ) {
             return false;
         }
 
         return false !== $this->get_decoder_path();
+    }
+
+    /**
+     * 检查编码器是否可用
+     *
+     * 目标格式输出只需要 avifenc；同格式 AVIF 压缩还需要 avifdec。
+     *
+     * @return bool
+     */
+    public function has_encoder(): bool {
+        return parent::is_tool_available();
+    }
+
+    /**
+     * 压缩 AVIF 前确认文件只有单帧
+     *
+     * 当前同格式处理链只支持单张 PNG 中间文件，动画或多帧文件必须跳过，
+     * 防止静默丢失动画帧。
+     *
+     * @param string $file_path 文件路径
+     * @param array  $options   压缩选项
+     * @return array
+     */
+    public function compress( string $file_path, array $options = array() ): array {
+        $this->temporary_files = array();
+        $decoder = $this->get_decoder_path();
+
+        if ( false === $decoder || ! $this->is_exec_available() ) {
+            return parent::compress( $file_path, $options );
+        }
+
+        $command = escapeshellarg( $decoder ) . ' --info ' . escapeshellarg( $file_path );
+        $result  = self::run_command( $command, 15 );
+        $info    = $result['output'];
+
+        if ( ! $result['success'] || ! preg_match( '/Image\s+Count\s*:\s*(\d+)/i', $info, $matches ) ) {
+            return array(
+                'success'         => false,
+                'message'         => __( '无法确认 AVIF 帧数，已停止压缩以保护动画内容', 'libre-compress' ),
+                'original_size'   => file_exists( $file_path ) ? (int) filesize( $file_path ) : 0,
+                'compressed_size' => file_exists( $file_path ) ? (int) filesize( $file_path ) : 0,
+            );
+        }
+
+        if ( (int) $matches[1] > 1 ) {
+            return array(
+                'success'         => false,
+                'message'         => __( '动画或多帧 AVIF 暂不支持同格式压缩，已保持原文件不变', 'libre-compress' ),
+                'original_size'   => (int) filesize( $file_path ),
+                'compressed_size' => (int) filesize( $file_path ),
+            );
+        }
+
+        $result = parent::compress( $file_path, $options );
+        foreach ( $this->temporary_files as $temporary_file ) {
+            if ( file_exists( $temporary_file ) ) {
+                // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
+                unlink( $temporary_file );
+            }
+        }
+        $this->temporary_files = array();
+
+        return $result;
     }
 
     /**
@@ -126,9 +196,11 @@ class Libre_Compress_Avif extends Libre_Compress_Tool_Base {
         // 确保质量在有效范围内
         $quality = max( 0, min( 100, $quality ) );
 
-        // 临时文件：解码中间 PNG 与编码输出
-        $temp_png  = $file_path . '.tmp.png';
-        $temp_avif = $file_path . '.tmp.avif';
+        // 临时文件：使用唯一名称，避免异常重试互相覆盖。
+        $token           = wp_generate_password( 12, false, false );
+        $temp_png        = $file_path . '.lc-avif-' . $token . '.png';
+        $temp_avif       = $file_path . '.lc-avif-' . $token . '.avif';
+        $this->temporary_files = array( $temp_png, $temp_avif );
 
         // 第一步：无损解码为 PNG，保留完整像素
         $command_parts = array(

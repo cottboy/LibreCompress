@@ -79,7 +79,7 @@ class Libre_Compress_Gifsicle extends Libre_Compress_Tool_Base {
         // 构建命令
         $command_parts = array(
             escapeshellarg( $executable ),
-            '-O3',  // 最高级别无损优化
+            '-O3',  // 最高级别无损压缩
         );
 
         if ( ! $lossless ) {
@@ -91,7 +91,7 @@ class Libre_Compress_Gifsicle extends Libre_Compress_Tool_Base {
         $command_parts[] = escapeshellarg( $temp_output );
         $command_parts[] = escapeshellarg( $file_path );
 
-        // 优化成功后替换原文件（move /y 直接覆盖，优化失败时不会破坏原文件）
+        // 压缩成功后替换原文件（move /y 直接覆盖，压缩失败时不会破坏原文件）
         if ( $this->is_windows() ) {
             $move_command = sprintf(
                 '&& move /y "%s" "%s"',

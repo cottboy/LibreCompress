@@ -28,6 +28,10 @@ delete_option( 'libre_compress_general' );
 delete_option( 'libre_compress_tools' );
 delete_option( 'libre_compress_db_version' );
 
+// 删除目标格式输出映射；统一压缩记录已随数据表删除。
+// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+$wpdb->query( "DELETE FROM {$wpdb->postmeta} WHERE meta_key = '_libre_compress_converted'" );
+
 // 删除备份文件目录
 $upload_dir = wp_upload_dir();
 $backup_dir = $upload_dir['basedir'] . '/libre-compress-backups';

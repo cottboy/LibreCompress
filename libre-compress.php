@@ -3,7 +3,7 @@
  * Plugin Name: LibreCompress
  * Plugin URI: https://github.com/cottboy/libre-compress
  * Description: 免费的 WordPress 图片压缩插件。
- * Version: 1.0.0
+ * Version: 1.2.0
  * Author: cottboy
  * Author URI: https://github.com/cottboy
  * License: GPL v2 or later
@@ -24,7 +24,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 /**
  * 插件版本号
  */
-define( 'LIBRE_COMPRESS_VERSION', '1.1.0' );
+define( 'LIBRE_COMPRESS_VERSION', '1.2.0' );
 
 /**
  * 插件文件路径
@@ -55,7 +55,7 @@ define( 'LIBRE_COMPRESS_BIN_PATH', WP_CONTENT_DIR . '/LibreCompress-bin/' );
 /**
  * 数据库版本号
  */
-define( 'LIBRE_COMPRESS_DB_VERSION', '1.1.0' );
+define( 'LIBRE_COMPRESS_DB_VERSION', '1.2.0' );
 
 /**
  * 加载插件文本域
@@ -128,6 +128,10 @@ function libre_compress_sanitize_svg_content( string $content ) {
         return false;
     }
 
+    if ( ! class_exists( 'DOMDocument' ) ) {
+        return false;
+    }
+
     $doc = new DOMDocument();
 
     libxml_use_internal_errors( true );
@@ -166,8 +170,10 @@ function libre_compress_sanitize_svg_content( string $content ) {
             foreach ( iterator_to_array( $element->attributes ) as $attribute ) {
                 $name  = strtolower( $attribute->nodeName );
                 $value = strtolower( trim( (string) $attribute->nodeValue ) );
+                // 浏览器会忽略 URL 协议中的 ASCII 控制字符，清理后再判断协议。
+                $value = preg_replace( '/[\x00-\x20\x7F]+/', '', $value );
 
-                if ( 0 === strpos( $name, 'on' ) || preg_match( '/^(javascript|vbscript)\s*:|^\s*data\s*:\s*text\/html/', $value ) ) {
+                if ( 0 === strpos( $name, 'on' ) || preg_match( '/^(javascript|vbscript):|^data:text\/html/', $value ) ) {
                     $element->removeAttributeNode( $attribute );
                 }
             }
@@ -192,6 +198,11 @@ function libre_compress_sanitize_svg_upload( $file ) {
         return $file;
     }
 
+    if ( ! class_exists( 'DOMDocument' ) ) {
+        $file['error'] = __( '服务器缺少 DOM 扩展，无法安全处理 SVG', 'libre-compress' );
+        return $file;
+    }
+
     // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_get_contents
     $content = file_get_contents( $file['tmp_name'] );
 
@@ -208,7 +219,11 @@ function libre_compress_sanitize_svg_upload( $file ) {
     }
 
     // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents
-    file_put_contents( $file['tmp_name'], $clean );
+    $written = file_put_contents( $file['tmp_name'], $clean );
+
+    if ( false === $written || $written !== strlen( $clean ) ) {
+        $file['error'] = __( '无法安全写入清理后的 SVG 文件', 'libre-compress' );
+    }
 
     return $file;
 }
@@ -233,6 +248,7 @@ function libre_compress_load_dependencies() {
     require_once LIBRE_COMPRESS_PATH . 'includes/class-backup.php';
     require_once LIBRE_COMPRESS_PATH . 'includes/class-compressor.php';
     require_once LIBRE_COMPRESS_PATH . 'includes/class-converter.php';
+    require_once LIBRE_COMPRESS_PATH . 'includes/class-processor.php';
     require_once LIBRE_COMPRESS_PATH . 'includes/class-media-library.php';
     require_once LIBRE_COMPRESS_PATH . 'includes/class-thumbnail-manager.php';
     require_once LIBRE_COMPRESS_PATH . 'includes/class-settings.php';

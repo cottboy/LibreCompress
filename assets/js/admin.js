@@ -39,7 +39,6 @@
             $('#libre-compress-delete-thumbnails').on('click', this.handleDeleteThumbnails.bind(this));
             $('#libre-compress-regenerate-thumbnails').on('click', this.handleRegenerateThumbnails.bind(this));
             $('#libre-compress-bulk-compress').on('click', this.handleBulkCompress.bind(this));
-            $('#libre-compress-bulk-convert').on('click', this.handleBulkConvert.bind(this));
             $('#libre-compress-delete-all-backups').on('click', this.handleDeleteAllBackups.bind(this));
         },
 
@@ -57,6 +56,7 @@
                 return;
             }
 
+            $btn.data('original-label', $btn.text());
             $btn.prop('disabled', true).text(this.i18n.processing);
 
             if (action === 'compress') {
@@ -88,12 +88,12 @@
                         location.reload();
                     } else {
                         alert(response.data.message || self.i18n.error);
-                        $btn.prop('disabled', false).text(self.i18n.compressing.replace('...', ''));
+                        $btn.prop('disabled', false).text($btn.data('original-label'));
                     }
                 },
                 error: function() {
                     alert(self.i18n.error);
-                    $btn.prop('disabled', false).text(self.i18n.compressing.replace('...', ''));
+                    $btn.prop('disabled', false).text($btn.data('original-label'));
                 }
             });
         },
@@ -117,12 +117,12 @@
                         location.reload();
                     } else {
                         alert(response.data.message || self.i18n.error);
-                        $btn.prop('disabled', false).text(self.i18n.restoring.replace('...', ''));
+                        $btn.prop('disabled', false).text($btn.data('original-label'));
                     }
                 },
                 error: function() {
                     alert(self.i18n.error);
-                    $btn.prop('disabled', false).text(self.i18n.restoring.replace('...', ''));
+                    $btn.prop('disabled', false).text($btn.data('original-label'));
                 }
             });
         },
@@ -386,7 +386,7 @@
         },
 
         /**
-         * 批量压缩
+         * 按附件游标分页批量压缩
          */
         handleBulkCompress: function(e) {
             e.preventDefault();
@@ -396,73 +396,144 @@
             var $progress = $('#libre-compress-bulk-progress');
             var $progressFill = $progress.find('.progress-fill');
             var $progressText = $progress.find('.progress-text');
+            var after = 0;
+            var completed = 0;
+            var success = 0;
+            var failed = 0;
+            var skipped = 0;
+            var hadError = false;
+            var concurrency = parseInt(libreCompressData.concurrency, 10) || 5;
 
             $btn.prop('disabled', true);
             $progress.show();
+            $progressFill.css('width', '0%');
             $progressText.text(this.i18n.processing);
 
-            // 首先获取未压缩的图片列表
-            $.ajax({
-                url: this.ajaxUrl,
-                type: 'POST',
-                data: {
-                    action: 'libre_compress_get_uncompressed',
-                    nonce: this.nonce
-                },
-                success: function(response) {
-                    if (response.success && response.data.items.length > 0) {
-                        self.processBulkCompress(response.data.items, $progressFill, $progressText, $btn);
-                    } else {
-                        $progressText.text(self.i18n.completed + ' - ' + (response.data.message || '没有需要压缩的图片'));
-                        $btn.prop('disabled', false);
-                    }
-                },
-                error: function() {
-                    alert(self.i18n.error);
-                    $btn.prop('disabled', false);
-                    $progress.hide();
+            function updateProgress() {
+                $progressText.text(self.i18n.batchProgress.replace('%d', completed));
+            }
+
+            function finish() {
+                if (completed === 0 && hadError) {
+                    $progressFill.css('width', '100%');
+                    $progressText.text(self.i18n.error);
+                } else if (completed === 0) {
+                    $progressFill.css('width', '100%');
+                    $progressText.text(self.i18n.noCompressItems);
+                } else {
+                    var summary = self.i18n.batchSummary
+                        .replace('%1$s', completed)
+                        .replace('%2$d', success)
+                        .replace('%3$d', skipped)
+                        .replace('%4$d', failed);
+                    $progressFill.css('width', '100%');
+                    $progressText.text(summary);
                 }
-            });
-        },
+                $btn.prop('disabled', false);
+            }
 
-        /**
-         * 批量转换
-         */
-        handleBulkConvert: function(e) {
-            e.preventDefault();
-
-            var self = this;
-            var $btn = $(e.currentTarget);
-            var $progress = $('#libre-compress-bulk-progress');
-            var $progressFill = $progress.find('.progress-fill');
-            var $progressText = $progress.find('.progress-text');
-
-            $btn.prop('disabled', true);
-            $progress.show();
-            $progressText.text(this.i18n.processing);
-
-            // 首先获取未转换的图片列表
-            $.ajax({
-                url: this.ajaxUrl,
-                type: 'POST',
-                data: {
-                    action: 'libre_compress_get_unconverted',
-                    nonce: this.nonce
-                },
-                success: function(response) {
-                    if (response.success && response.data.items.length > 0) {
-                        self.processBulkTasks(response.data.items, 'libre_compress_convert_single', $progressFill, $progressText, $btn);
-                    } else {
-                        $progressText.text(self.i18n.completed + ' - ' + (response.data.message || self.i18n.noConvertItems));
-                        $btn.prop('disabled', false);
-                    }
-                },
-                error: function() {
-                    alert(self.i18n.error);
-                    $btn.prop('disabled', false);
-                    $progress.hide();
+            function countResult(data) {
+                if (data && data.status === 'success') {
+                    success++;
+                } else if (data && (data.status === 'failed' || data.status === 'partial')) {
+                    failed++;
+                } else {
+                    skipped++;
                 }
-            });
+            }
+
+            function processPage(items, nextAfter, hasMore) {
+                var queue = items.slice();
+                var running = 0;
+
+                function processNext() {
+                    while (running < concurrency && queue.length > 0) {
+                        var item = queue.shift();
+                        running++;
+
+                        $.ajax({
+                            url: self.ajaxUrl,
+                            type: 'POST',
+                            data: {
+                                action: 'libre_compress_compress_single',
+                                nonce: self.nonce,
+                                attachment_id: item.attachment_id
+                            },
+                            success: function(response) {
+                                if (response.success) {
+                                    countResult(response.data);
+                                } else {
+                                    failed++;
+                                }
+                            },
+                            error: function() {
+                                failed++;
+                            },
+                            complete: function() {
+                                running--;
+                                completed++;
+                                updateProgress();
+
+                                if (queue.length > 0) {
+                                    processNext();
+                                } else if (running === 0) {
+                                    if (hasMore && nextAfter > after) {
+                                        after = nextAfter;
+                                        loadPage();
+                                    } else {
+                                        finish();
+                                    }
+                                }
+                            }
+                        });
+                    }
+
+                    if (items.length === 0) {
+                        if (hasMore && nextAfter > after) {
+                            after = nextAfter;
+                            loadPage();
+                        } else {
+                            finish();
+                        }
+                    }
+                }
+
+                processNext();
+            }
+
+            function loadPage() {
+                $.ajax({
+                    url: self.ajaxUrl,
+                    type: 'POST',
+                    data: {
+                        action: 'libre_compress_get_uncompressed',
+                        nonce: self.nonce,
+                        after: after
+                    },
+                    success: function(response) {
+                        if (!response.success) {
+                            hadError = true;
+                            failed++;
+                            finish();
+                            return;
+                        }
+
+                        processPage(
+                            response.data.items || [],
+                            parseInt(response.data.next_after, 10) || after,
+                            !!response.data.has_more
+                        );
+                    },
+                    error: function() {
+                        alert(self.i18n.error);
+                        hadError = true;
+                        failed++;
+                        finish();
+                    }
+                });
+            }
+
+            loadPage();
         },
 
         /**
@@ -503,101 +574,6 @@
             });
         },
 
-        /**
-         * 处理批量压缩
-         */
-        processBulkCompress: function(items, $progressFill, $progressText, $btn) {
-            this.processBulkTasks(items, 'libre_compress_compress_single', $progressFill, $progressText, $btn);
-        },
-
-        /**
-         * 通用批量任务处理（压缩/转换共用）
-         *
-         * 压缩结果带 status 字段；转换为附件级统计（success/failed/skipped 计数）
-         */
-        processBulkTasks: function(items, ajaxAction, $progressFill, $progressText, $btn) {
-            var self = this;
-            var total = items.length;
-            var completed = 0;
-            var success = 0;
-            var failed = 0;
-            var skipped = 0;
-
-            // 获取并发数设置
-            var concurrency = 5;
-
-            // 创建任务队列
-            var queue = items.slice();
-            var running = 0;
-
-            function countResult(data) {
-                if (data && typeof data.status === 'string') {
-                    if (data.status === 'success') { success++; }
-                    else if (data.status === 'failed') { failed++; }
-                    else { skipped++; }
-                } else if (data && typeof data.failed === 'number') {
-                    if (data.success > 0) { success++; }
-                    else if (data.failed > 0) { failed++; }
-                    else { skipped++; }
-                } else {
-                    failed++;
-                }
-            }
-
-            function processNext() {
-                while (running < concurrency && queue.length > 0) {
-                    var item = queue.shift();
-                    running++;
-
-                    var requestData = {
-                        action: ajaxAction,
-                        nonce: self.nonce,
-                        attachment_id: item.attachment_id
-                    };
-
-                    // 压缩按文件处理；转换按附件处理，不提交尺寸参数。
-                    if (item.size_type) {
-                        requestData.size_type = item.size_type;
-                    }
-
-                    $.ajax({
-                        url: self.ajaxUrl,
-                        type: 'POST',
-                        data: requestData,
-                        success: function(response) {
-                            if (response.success) {
-                                countResult(response.data);
-                            } else {
-                                failed++;
-                            }
-                        },
-                        error: function() {
-                            failed++;
-                        },
-                        complete: function() {
-                            running--;
-                            completed++;
-
-                            // 更新进度
-                            var percent = Math.round((completed / total) * 100);
-                            $progressFill.css('width', percent + '%');
-                            $progressText.text(completed + ' / ' + total + ' (' + percent + '%)');
-
-                            // 继续处理下一个
-                            if (queue.length > 0) {
-                                processNext();
-                            } else if (running === 0) {
-                                // 全部完成
-                                $progressText.text(self.i18n.completed + ' - 成功: ' + success + ', 跳过: ' + skipped + ', 失败: ' + failed);
-                                $btn.prop('disabled', false);
-                            }
-                        }
-                    });
-                }
-            }
-
-            processNext();
-        }
     };
 
     // DOM 加载完成后初始化

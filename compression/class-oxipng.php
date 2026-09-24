@@ -63,11 +63,11 @@ class Libre_Compress_Oxipng extends Libre_Compress_Tool_Base {
             $level = absint( $options['level'] );
         }
 
-        // 确保优化级别在有效范围内（0-6）
+        // 确保无损压缩级别在有效范围内（0-6）
         $level = max( 0, min( 6, $level ) );
 
         // 构建命令
-        // -o: 优化级别（0-6）
+        // -o: 无损压缩级别（0-6）
         // --strip: 移除所有元数据
         // --quiet: 静默模式
         $command_parts = array(

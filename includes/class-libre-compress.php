@@ -46,11 +46,18 @@ class Libre_Compress {
     public $compressor;
 
     /**
-     * 格式转换器实例
+     * 目标格式底层处理器实例
      *
      * @var Libre_Compress_Converter
      */
     public $converter;
+
+    /**
+     * 统一图片压缩处理器实例
+     *
+     * @var Libre_Compress_Processor
+     */
+    public $processor;
 
     /**
      * 媒体库集成模块实例
@@ -122,9 +129,12 @@ class Libre_Compress {
         // 初始化压缩调度器
         $this->compressor = new Libre_Compress_Compressor();
 
-        // 初始化格式转换器
+        // 初始化目标格式底层处理器
         $this->converter = new Libre_Compress_Converter();
         $this->converter->init_hooks();
+
+        // 初始化统一图片压缩处理器
+        $this->processor = new Libre_Compress_Processor();
 
         // 初始化媒体库集成模块
         $this->media_library = new Libre_Compress_Media_Library();
@@ -180,17 +190,15 @@ class Libre_Compress {
         );
 
         // 传递数据到 JavaScript
+        $general_settings = get_option( 'libre_compress_general', array() );
         wp_localize_script(
             'libre-compress-admin',
             'libreCompressData',
             array(
-                'ajaxUrl'   => admin_url( 'admin-ajax.php' ),
-                'nonce'     => wp_create_nonce( 'libre_compress_nonce' ),
-                'i18n'      => array(
-                    'compressing'             => __( '压缩中...', 'libre-compress' ),
-                    'restoring'               => __( '恢复中...', 'libre-compress' ),
-                    'converting'              => __( '转换中...', 'libre-compress' ),
-                    'success'                 => __( '操作成功', 'libre-compress' ),
+                'ajaxUrl'     => admin_url( 'admin-ajax.php' ),
+                'nonce'       => wp_create_nonce( 'libre_compress_nonce' ),
+                'concurrency' => max( 1, min( 100, absint( isset( $general_settings['tool_concurrency'] ) ? $general_settings['tool_concurrency'] : 5 ) ) ),
+                'i18n'        => array(
                     'error'                   => __( '操作失败', 'libre-compress' ),
                     'confirmClear'            => __( '确定要清除所有压缩记录吗？此操作不可撤销。', 'libre-compress' ),
                     'confirmRestoreAll'       => __( '确定要恢复所有原图备份吗？此操作不可撤销。', 'libre-compress' ),
@@ -199,9 +207,10 @@ class Libre_Compress {
                     'confirmDeleteBackup'     => __( '确定要删除此图片的备份吗？删除后将无法恢复原图。', 'libre-compress' ),
                     'confirmDeleteAllBackups' => __( '确定要删除所有原图备份吗？删除后将无法恢复原图。', 'libre-compress' ),
                     'deleteBackup'            => __( '删除备份', 'libre-compress' ),
-                    'noConvertItems'          => __( '没有需要转换的图片，请先在上方勾选要转换的格式并保存', 'libre-compress' ),
+                    'noCompressItems'         => __( '没有需要压缩的图片', 'libre-compress' ),
                     'processing'              => __( '处理中...', 'libre-compress' ),
-                    'completed'               => __( '已完成', 'libre-compress' ),
+                    'batchProgress'           => __( '已处理 %d 个图片', 'libre-compress' ),
+                    'batchSummary'            => __( '%1$s - 成功: %2$d, 跳过: %3$d, 失败: %4$d', 'libre-compress' ),
                 ),
             )
         );

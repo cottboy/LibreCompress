@@ -112,7 +112,8 @@ class Libre_Compress_Database {
             backup_path VARCHAR(500) NOT NULL,
             created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
             PRIMARY KEY (id),
-            KEY attachment_id (attachment_id)
+            KEY attachment_id (attachment_id),
+            KEY original_path (original_path)
         ) {$charset_collate};";
 
         require_once ABSPATH . 'wp-admin/includes/upgrade.php';
@@ -254,6 +255,11 @@ class Libre_Compress_Database {
         $update_data = array();
         $format      = array();
 
+        if ( isset( $data['file_path'] ) ) {
+            $update_data['file_path'] = sanitize_text_field( $data['file_path'] );
+            $format[]                  = '%s';
+        }
+
         if ( isset( $data['original_size'] ) ) {
             $update_data['original_size'] = absint( $data['original_size'] );
             $format[]                     = '%d';
@@ -267,6 +273,11 @@ class Libre_Compress_Database {
         if ( isset( $data['compression_ratio'] ) ) {
             $update_data['compression_ratio'] = floatval( $data['compression_ratio'] );
             $format[]                         = '%f';
+        }
+
+        if ( isset( $data['tool_name'] ) ) {
+            $update_data['tool_name'] = sanitize_text_field( $data['tool_name'] );
+            $format[]                  = '%s';
         }
 
         if ( isset( $data['status'] ) ) {
@@ -355,74 +366,36 @@ class Libre_Compress_Database {
     }
 
     /**
-     * 获取未压缩的附件列表
+     * 按附件 ID 游标获取图片附件
      *
-     * @param int $limit  数量限制
-     * @param int $offset 偏移量
-     * @return array
+     * @param int $after_id 上一批最后处理的附件 ID
+     * @param int $limit    本批数量
+     * @return int[]
      */
-    public function get_uncompressed_attachments( $limit = 100, $offset = 0 ) {
+    public function get_image_attachment_ids_after( $after_id = 0, $limit = 100 ): array {
         global $wpdb;
 
-        $limit  = absint( $limit );
-        $offset = absint( $offset );
-
-        $sql = $wpdb->prepare(
-            "SELECT p.ID, p.guid, pm.meta_value as file_path
-            FROM {$wpdb->posts} p
-            LEFT JOIN {$wpdb->postmeta} pm ON p.ID = pm.post_id AND pm.meta_key = '_wp_attached_file'
-            WHERE p.post_type = 'attachment'
-            AND p.post_mime_type IN ('image/jpeg', 'image/png', 'image/webp')
-            AND p.ID NOT IN (
-                SELECT DISTINCT attachment_id FROM {$this->records_table} WHERE size_type = 'full' AND status = 'success'
-            )
-            ORDER BY p.ID DESC
-            LIMIT %d OFFSET %d",
-            $limit,
-            $offset
-        );
+        $after_id = absint( $after_id );
+        $limit    = max( 1, min( 200, absint( $limit ) ) );
+        $mimes    = array( 'image/jpeg', 'image/png', 'image/webp', 'image/avif', 'image/gif', 'image/svg+xml' );
+        $mimes_sql = "'" . implode( "','", array_map( 'esc_sql', $mimes ) ) . "'";
 
         // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
-        return $wpdb->get_results( $sql, ARRAY_A );
-    }
-
-    /**
-     * 获取附件压缩统计
-     *
-     * @param int $attachment_id 附件 ID
-     * @return array|null
-     */
-    public function get_attachment_stats( $attachment_id ) {
-        global $wpdb;
-
-        $attachment_id = absint( $attachment_id );
-
-        // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-        $result = $wpdb->get_row(
+        $ids = $wpdb->get_col(
             $wpdb->prepare(
-                "SELECT
-                    COUNT(*) as total_files,
-                    SUM(original_size) as total_original_size,
-                    SUM(compressed_size) as total_compressed_size,
-                    SUM(CASE WHEN status = 'success' THEN 1 ELSE 0 END) as success_count,
-                    SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) as failed_count
-                FROM {$this->records_table}
-                WHERE attachment_id = %d",
-                $attachment_id
-            ),
-            ARRAY_A
+                "SELECT ID FROM {$wpdb->posts}
+                WHERE post_type = 'attachment'
+                AND post_status != 'trash'
+                AND post_mime_type IN ({$mimes_sql})
+                AND ID > %d
+                ORDER BY ID ASC
+                LIMIT %d",
+                $after_id,
+                $limit
+            )
         );
 
-        if ( $result && $result['total_original_size'] > 0 ) {
-            $result['total_ratio'] = round(
-                ( 1 - $result['total_compressed_size'] / $result['total_original_size'] ) * 100,
-                2
-            );
-        } else {
-            $result['total_ratio'] = 0;
-        }
-
-        return $result;
+        return array_map( 'absint', $ids );
     }
 
     /**

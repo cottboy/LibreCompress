@@ -44,14 +44,17 @@ class Libre_Compress_Settings {
     public function sanitize_general_settings( $input ) {
         $sanitized = array();
 
+        $current_general = get_option( 'libre_compress_general', array() );
         $sanitized['auto_compress']      = ! empty( $input['auto_compress'] );
         $sanitized['backup_enabled']     = ! empty( $input['backup_enabled'] );
         $sanitized['tool_concurrency']   = isset( $input['tool_concurrency'] ) ? absint( $input['tool_concurrency'] ) : 5;
-        $sanitized['disable_thumbnails'] = ! empty( $input['disable_thumbnails'] );
+        $sanitized['disable_thumbnails'] = array_key_exists( 'disable_thumbnails', $input )
+            ? ! empty( $input['disable_thumbnails'] )
+            : ! empty( $current_general['disable_thumbnails'] );
 
         $sanitized['tool_concurrency'] = max( 1, min( 100, $sanitized['tool_concurrency'] ) );
 
-        // 格式转换：勾选启用的源格式，目标格式二选一（默认 WebP）
+        // 压缩输出设置沿用已有配置键，界面统一按“压缩”概念展示。
         $sanitized['convert_png'] = ! empty( $input['convert_png'] );
         $sanitized['convert_jpg'] = ! empty( $input['convert_jpg'] );
         $sanitized['convert_gif'] = ! empty( $input['convert_gif'] );
@@ -183,7 +186,7 @@ class Libre_Compress_Settings {
                     </td>
                 </tr>
                 <tr>
-                    <th scope="row"><?php esc_html_e( '格式转换', 'libre-compress' ); ?></th>
+                    <th scope="row"><?php esc_html_e( '压缩输出格式', 'libre-compress' ); ?></th>
                     <td>
                         <label>
                             <input type="checkbox" name="libre_compress_general[convert_png]" value="1" <?php checked( ! empty( $options['convert_png'] ) ); ?>>
@@ -204,20 +207,20 @@ class Libre_Compress_Settings {
                             <input type="checkbox" name="libre_compress_general[convert_svg]" value="1" <?php checked( ! empty( $options['convert_svg'] ) ); ?>>
                             <?php esc_html_e( 'SVG', 'libre-compress' ); ?>
                         </label>
-                        <p class="description"><?php esc_html_e( '勾选的格式上传后将直接转换为目标新格式（原文件按备份设置处理），前端直接显示新格式。默认不勾选即不转换。', 'libre-compress' ); ?></p>
+                        <p class="description"><?php esc_html_e( '勾选的源格式执行压缩时输出为目标格式；未勾选的格式只执行同格式压缩。所有成功结果都记为已压缩。', 'libre-compress' ); ?></p>
                     </td>
                 </tr>
                 <tr>
-                    <th scope="row"><?php esc_html_e( '转换目标格式', 'libre-compress' ); ?></th>
+                    <th scope="row"><?php esc_html_e( '目标格式', 'libre-compress' ); ?></th>
                     <td>
                         <span class="libre-compress-seg">
                             <input type="radio" name="libre_compress_general[convert_target]" value="webp" id="libre-compress-seg-webp" <?php checked( ( $options['convert_target'] ?? 'webp' ), 'webp' ); ?>>
-                            <label for="libre-compress-seg-webp">WebP</label>
+                            <label for="libre-compress-seg-webp"><?php esc_html_e( 'WebP', 'libre-compress' ); ?></label>
                             <input type="radio" name="libre_compress_general[convert_target]" value="avif" id="libre-compress-seg-avif" <?php checked( ( $options['convert_target'] ?? 'webp' ), 'avif' ); ?>>
-                            <label for="libre-compress-seg-avif">AVIF</label>
+                            <label for="libre-compress-seg-avif"><?php esc_html_e( 'AVIF', 'libre-compress' ); ?></label>
                             <span class="seg-thumb"></span>
                         </span>
-                        <p class="description"><?php esc_html_e( '选择转换的目标格式：AVIF 压缩率更高但编码更慢，WebP 兼容性更好', 'libre-compress' ); ?></p>
+                        <p class="description"><?php esc_html_e( '选择目标格式：AVIF 压缩率更高但压缩更慢，WebP 兼容性更好。', 'libre-compress' ); ?></p>
                     </td>
                 </tr>
             </table>
@@ -235,17 +238,7 @@ class Libre_Compress_Settings {
                     </button>
                 </td>
                 <td style="padding: 10px 0;">
-                    <span class="description"><?php esc_html_e( '压缩媒体库中所有未压缩的图片', 'libre-compress' ); ?></span>
-                </td>
-            </tr>
-            <tr>
-                <td style="padding: 10px 0;">
-                    <button type="button" class="button" id="libre-compress-bulk-convert">
-                        <?php esc_html_e( '批量转换未转换的图片', 'libre-compress' ); ?>
-                    </button>
-                </td>
-                <td style="padding: 10px 0;">
-                    <span class="description"><?php esc_html_e( '为媒体库中已启用格式的图片执行格式转换', 'libre-compress' ); ?></span>
+                    <span class="description"><?php esc_html_e( '按当前设置压缩媒体库中所有未压缩的图片', 'libre-compress' ); ?></span>
                 </td>
             </tr>
             <tr>
@@ -335,9 +328,13 @@ class Libre_Compress_Settings {
         $converter  = libre_compress()->converter;
         $tools      = $compressor->get_tools();
 
-        $exec_available = function_exists( 'exec' ) && ! in_array( 'exec', array_map( 'trim', explode( ',', ini_get( 'disable_functions' ) ) ), true );
+        $disabled_functions = array_map( 'trim', explode( ',', (string) ini_get( 'disable_functions' ) ) );
+        $exec_available = function_exists( 'exec' )
+            && function_exists( 'proc_open' )
+            && ! in_array( 'exec', $disabled_functions, true )
+            && ! in_array( 'proc_open', $disabled_functions, true );
 
-        // 全部工具（压缩渠道 + 转换辅助），按格式相邻排序
+        // 全部压缩工具，按格式相邻排序
         $all_tools = array(
             array( 'name' => 'jpegoptim', 'tool' => $tools['jpegoptim'] ),
             array( 'name' => 'pngquant', 'tool' => $tools['pngquant'] ),
@@ -366,14 +363,14 @@ class Libre_Compress_Settings {
         <h2><?php esc_html_e( '系统状态', 'libre-compress' ); ?></h2>
         <table class="widefat" style="max-width: 900px;">
             <tr>
-                <td style="width: 120px;"><strong>exec()</strong></td>
+                <td style="width: 120px;"><strong>proc_open()</strong></td>
                 <td style="width: 150px;"></td>
                 <td>
                     <?php if ( $exec_available ) : ?>
                         <span style="color: #00a32a;">✓ <?php esc_html_e( '可用', 'libre-compress' ); ?></span>
                     <?php else : ?>
                         <span style="color: #d63638;">✗ <?php esc_html_e( '不可用', 'libre-compress' ); ?></span>
-                        <p class="description"><?php esc_html_e( '压缩依赖 exec() 函数，请联系主机商启用', 'libre-compress' ); ?></p>
+                        <p class="description"><?php esc_html_e( '压缩依赖 exec() 和 proc_open() 函数，请联系主机商启用', 'libre-compress' ); ?></p>
                     <?php endif; ?>
                 </td>
                 <td></td>
@@ -508,11 +505,11 @@ class Libre_Compress_Settings {
                     </td>
                 </tr>
                 <tr>
-                    <th scope="row"><?php esc_html_e( '无损优化级别', 'libre-compress' ); ?></th>
+                    <th scope="row"><?php esc_html_e( '无损压缩级别', 'libre-compress' ); ?></th>
                     <td>
                         <input type="range" name="libre_compress_tools[png_lossless_level]" value="<?php echo esc_attr( $options['png_lossless_level'] ?? 6 ); ?>" min="0" max="6" oninput="this.nextElementSibling.value = this.value">
                         <output><?php echo esc_html( $options['png_lossless_level'] ?? 6 ); ?></output>
-                        <p class="description"><?php esc_html_e( 'oxipng 优化级别，0-6，数值越高压缩越慢但效果越好', 'libre-compress' ); ?></p>
+                        <p class="description"><?php esc_html_e( 'oxipng 无损压缩级别，0-6，数值越高压缩越慢但效果越好', 'libre-compress' ); ?></p>
                     </td>
                 </tr>
             </table>
@@ -595,10 +592,10 @@ class Libre_Compress_Settings {
                 </tr>
             </table>
 
-            <h3><?php esc_html_e( 'SVG 优化', 'libre-compress' ); ?></h3>
+            <h3><?php esc_html_e( 'SVG 压缩', 'libre-compress' ); ?></h3>
             <table class="form-table">
                 <tr>
-                    <th scope="row"><?php esc_html_e( '优化精度', 'libre-compress' ); ?></th>
+                    <th scope="row"><?php esc_html_e( '压缩精度', 'libre-compress' ); ?></th>
                     <td>
                         <input type="range" name="libre_compress_tools[svg_precision]" value="<?php echo esc_attr( $options['svg_precision'] ?? 3 ); ?>" min="0" max="8" oninput="this.nextElementSibling.value = this.value">
                         <output><?php echo esc_html( $options['svg_precision'] ?? 3 ); ?></output>
@@ -613,10 +610,10 @@ class Libre_Compress_Settings {
     }
 
     /**
-     * 构建压缩/转换路径支持状态行
+     * 构建压缩路径支持状态行
      *
      * groups 为"或"关系：任一组内依赖全部可用即视为支持该路径，
-     * 组内为"与"关系（如动画 GIF 转 AVIF 需 ffmpeg 与 avifenc 同时可用）
+     * 组内为"与"关系（如动画 GIF 压缩为 AVIF 需 ffmpeg 与 avifenc 同时可用）
      *
      * @return array[] 每行包含 label、deps_display、supported、missing
      */
@@ -629,7 +626,7 @@ class Libre_Compress_Settings {
             $available[ $name ] = $tool->is_tool_available();
         }
 
-        // avifenc/avifdec 按可执行文件独立判定（AVIF 压缩需要两者，转换只需要编码器 avifenc）
+        // avifenc/avifdec 按可执行文件独立判定（同格式 AVIF 需要两者，目标输出只需要 avifenc）
         $available['avifenc'] = false !== $converter->find_local_tool( 'avifenc' );
         $available['avifdec'] = false !== $converter->find_local_tool( 'avifdec' );
         $available['gif2webp'] = false !== $converter->find_local_tool( 'gif2webp' );
@@ -654,19 +651,19 @@ class Libre_Compress_Settings {
 
         $rows_definition = array(
             array( 'label' => __( 'JPEG 压缩', 'libre-compress' ), 'groups' => array( array( 'jpegoptim' ) ) ),
-            array( 'label' => __( 'PNG 压缩', 'libre-compress' ), 'groups' => array( array( 'pngquant' ), array( 'oxipng' ) ) ),
+            array( 'label' => __( 'PNG 压缩（按模式使用其中一种）', 'libre-compress' ), 'groups' => array( array( 'pngquant' ), array( 'oxipng' ) ) ),
             array( 'label' => __( 'WEBP 压缩', 'libre-compress' ), 'groups' => array( array( 'cwebp' ) ) ),
             array( 'label' => __( 'AVIF 压缩', 'libre-compress' ), 'groups' => array( array( 'avifenc', 'avifdec' ) ) ),
             array( 'label' => __( 'GIF 压缩', 'libre-compress' ), 'groups' => array( array( 'gifsicle' ) ) ),
-            array( 'label' => __( 'SVG 优化', 'libre-compress' ), 'groups' => array( array( 'svgo' ) ) ),
-            array( 'label' => __( 'PNG/JPG 转 WebP', 'libre-compress' ),          'groups' => array( array( 'cwebp' ) ) ),
-            array( 'label' => __( 'PNG/JPG 转 AVIF', 'libre-compress' ),          'groups' => array( array( 'avifenc' ) ) ),
-            array( 'label' => __( '静态 GIF 转 WebP', 'libre-compress' ),          'groups' => array( array( 'gd', 'cwebp' ) ) ),
-            array( 'label' => __( '静态 GIF 转 AVIF', 'libre-compress' ),          'groups' => array( array( 'gd', 'avifenc' ) ) ),
-            array( 'label' => __( '动画 GIF 转 WebP', 'libre-compress' ),          'groups' => array( array( 'gif2webp' ) ) ),
-            array( 'label' => __( '动画 GIF 转 AVIF', 'libre-compress' ),          'groups' => array( array( 'ffmpeg', 'avifenc' ) ) ),
-            array( 'label' => __( 'SVG 转 WebP', 'libre-compress' ),              'groups' => array( array( 'resvg', 'cwebp' ) ) ),
-            array( 'label' => __( 'SVG 转 AVIF', 'libre-compress' ),              'groups' => array( array( 'resvg', 'avifenc' ) ) ),
+            array( 'label' => __( 'SVG 压缩', 'libre-compress' ), 'groups' => array( array( 'svgo' ) ) ),
+            array( 'label' => __( 'PNG/JPG 压缩为 WebP', 'libre-compress' ),          'groups' => array( array( 'cwebp' ) ) ),
+            array( 'label' => __( 'PNG/JPG 压缩为 AVIF', 'libre-compress' ),          'groups' => array( array( 'avifenc' ) ) ),
+            array( 'label' => __( '静态 GIF 压缩为 WebP', 'libre-compress' ),          'groups' => array( array( 'gd', 'cwebp' ) ) ),
+            array( 'label' => __( '静态 GIF 压缩为 AVIF', 'libre-compress' ),          'groups' => array( array( 'gd', 'avifenc' ) ) ),
+            array( 'label' => __( '动画 GIF 压缩为 WebP', 'libre-compress' ),          'groups' => array( array( 'gif2webp' ) ) ),
+            array( 'label' => __( '动画 GIF 压缩为 AVIF', 'libre-compress' ),          'groups' => array( array( 'ffmpeg', 'avifenc' ) ) ),
+            array( 'label' => __( 'SVG 压缩为 WebP', 'libre-compress' ),              'groups' => array( array( 'resvg', 'cwebp' ) ) ),
+            array( 'label' => __( 'SVG 压缩为 AVIF', 'libre-compress' ),              'groups' => array( array( 'resvg', 'avifenc' ) ) ),
         );
 
         $rows = array();
