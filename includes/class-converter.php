@@ -17,14 +17,14 @@ if ( ! defined( 'ABSPATH' ) ) {
  * 压缩结果小于源文件时，以同名不同扩展名的文件替换源文件，并同步更新
  * 附件 MIME 与元数据。结果不小于源文件时保留原文件。
  */
-class Libre_Compress_Converter {
+class Libre_Compress_Output {
 
     /**
      * 目标格式输出映射 post meta 键（供恢复原图时反向处理）
      *
      * @var string
      */
-    const CONVERTED_META_KEY = '_libre_compress_converted';
+    const OUTPUT_META_KEY = '_libre_compress_output';
 
     /**
      * 目标格式对应的编码工具注册名
@@ -81,11 +81,11 @@ class Libre_Compress_Converter {
     public function get_output_settings(): array {
         $general = get_option( 'libre_compress_general', array() );
 
-        $target = ( isset( $general['convert_target'] ) && 'avif' === $general['convert_target'] ) ? 'avif' : 'webp';
+        $target = ( isset( $general['output_format'] ) && 'avif' === $general['output_format'] ) ? 'avif' : 'webp';
 
         $formats = array();
         foreach ( $this->source_formats as $format ) {
-            if ( ! empty( $general[ 'convert_' . $format ] ) ) {
+            if ( ! empty( $general[ 'output_' . $format ] ) ) {
                 $formats[] = $format;
             }
         }
@@ -108,6 +108,11 @@ class Libre_Compress_Converter {
 
         if ( 'jpeg' === $format ) {
             $format = 'jpg';
+        }
+
+        // WebP / AVIF 本身是可直接压缩的格式，不允许再次输出目标格式。
+        if ( in_array( $format, array( 'webp', 'avif' ), true ) ) {
+            return false;
         }
 
         return in_array( $format, $settings['formats'], true );
@@ -231,7 +236,7 @@ class Libre_Compress_Converter {
                 }
 
                 if ( ! is_array( $existing_mapping )
-                    && ! $this->add_converted_record(
+                    && ! $this->add_output_record(
                         $attachment_id,
                         $file_path,
                         $target_path,
@@ -433,7 +438,7 @@ class Libre_Compress_Converter {
             return $result_template;
         }
 
-        $mapping_saved = $this->add_converted_record(
+        $mapping_saved = $this->add_output_record(
             $attachment_id,
             $file_path,
             $target_path,
@@ -506,7 +511,7 @@ class Libre_Compress_Converter {
      * @return array|null
      */
     public function get_output_record_for_file( int $attachment_id, string $file_path ): ?array {
-        $records = get_post_meta( $attachment_id, self::CONVERTED_META_KEY, true );
+        $records = get_post_meta( $attachment_id, self::OUTPUT_META_KEY, true );
         if ( ! is_array( $records ) ) {
             return null;
         }
@@ -536,7 +541,7 @@ class Libre_Compress_Converter {
      * @param int    $compressed_size 压缩结果大小
      * @return bool 是否保存成功
      */
-    private function add_converted_record(
+    private function add_output_record(
         int $attachment_id,
         string $from_path,
         string $to_path,
@@ -544,7 +549,7 @@ class Libre_Compress_Converter {
         int $original_size,
         int $compressed_size
     ): bool {
-        $records = get_post_meta( $attachment_id, self::CONVERTED_META_KEY, true );
+        $records = get_post_meta( $attachment_id, self::OUTPUT_META_KEY, true );
 
         if ( ! is_array( $records ) ) {
             $records = array();
@@ -558,7 +563,7 @@ class Libre_Compress_Converter {
             'compressed_size' => $compressed_size,
         );
 
-        return false !== update_post_meta( $attachment_id, self::CONVERTED_META_KEY, $records );
+        return false !== update_post_meta( $attachment_id, self::OUTPUT_META_KEY, $records );
     }
 
     /**
@@ -1059,7 +1064,7 @@ class Libre_Compress_Converter {
      * @return bool 是否完整恢复路径和元数据
      */
     public function handle_after_restore( int $attachment_id ): bool {
-        $records = get_post_meta( $attachment_id, self::CONVERTED_META_KEY, true );
+        $records = get_post_meta( $attachment_id, self::OUTPUT_META_KEY, true );
 
         if ( ! is_array( $records ) || empty( $records ) ) {
             return true;
@@ -1184,7 +1189,7 @@ class Libre_Compress_Converter {
             }
         }
 
-        if ( $success && false === delete_post_meta( $attachment_id, self::CONVERTED_META_KEY ) ) {
+        if ( $success && false === delete_post_meta( $attachment_id, self::OUTPUT_META_KEY ) ) {
             $success = false;
         }
 
@@ -1302,7 +1307,7 @@ class Libre_Compress_Converter {
                 "SELECT post_id FROM {$wpdb->postmeta}
                 WHERE meta_key = %s AND meta_value LIKE %s
                 LIMIT 1",
-                self::CONVERTED_META_KEY,
+                self::OUTPUT_META_KEY,
                 '%' . $wpdb->esc_like( $normalized ) . '%'
             )
         );
@@ -1311,7 +1316,7 @@ class Libre_Compress_Converter {
             return '';
         }
 
-        $records = get_post_meta( absint( $attachment_id ), self::CONVERTED_META_KEY, true );
+        $records = get_post_meta( absint( $attachment_id ), self::OUTPUT_META_KEY, true );
         if ( ! is_array( $records ) ) {
             return '';
         }

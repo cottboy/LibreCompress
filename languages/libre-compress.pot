@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: LibreCompress 1.2.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-09-25 02:10+0800\n"
+"POT-Creation-Date: 2026-09-26 18:30+0800\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -91,7 +91,7 @@ msgid "%s 不可用"
 msgstr ""
 
 #: compression\class-tool-base.php:376 includes\class-compressor.php:186
-#: includes\class-converter.php:167
+#: includes\class-converter.php:172
 msgid "文件不存在"
 msgstr ""
 
@@ -100,15 +100,15 @@ msgid "不支持的文件格式"
 msgstr ""
 
 #: compression\class-tool-base.php:415 includes\class-compressor.php:343
-#: includes\class-converter.php:252 includes\class-converter.php:474
+#: includes\class-converter.php:257 includes\class-converter.php:479
 msgid "压缩成功"
 msgstr ""
 
-#: includes\class-compressor.php:194 includes\class-converter.php:172
+#: includes\class-compressor.php:194 includes\class-converter.php:177
 msgid "文件路径不安全"
 msgstr ""
 
-#: includes\class-compressor.php:207 includes\class-converter.php:338
+#: includes\class-compressor.php:207 includes\class-converter.php:343
 msgid "没有可用的压缩工具"
 msgstr ""
 
@@ -117,7 +117,7 @@ msgstr ""
 msgid "文件大小超过限制（最大 %d MB）"
 msgstr ""
 
-#: includes\class-compressor.php:232 includes\class-converter.php:400
+#: includes\class-compressor.php:232 includes\class-converter.php:405
 msgid "无法创建原图备份，已停止压缩"
 msgstr ""
 
@@ -145,56 +145,56 @@ msgstr ""
 msgid "压缩记录保存失败且回滚失败，请保留回滚副本并检查数据库状态"
 msgstr ""
 
-#: includes\class-converter.php:187
+#: includes\class-converter.php:192
 msgid "该格式未配置目标格式输出"
 msgstr ""
 
-#: includes\class-converter.php:229 includes\class-converter.php:432
+#: includes\class-converter.php:234 includes\class-converter.php:437
 msgid "压缩记录保存失败，已保留原文件"
 msgstr ""
 
-#: includes\class-converter.php:242 includes\class-converter.php:456
-#: includes\class-converter.php:460
+#: includes\class-converter.php:247 includes\class-converter.php:461
+#: includes\class-converter.php:465
 msgid "恢复映射保存失败，已保留原文件"
 msgstr ""
 
-#: includes\class-converter.php:262
+#: includes\class-converter.php:267
 msgid "同名目标文件已存在"
 msgstr ""
 
-#: includes\class-converter.php:287
+#: includes\class-converter.php:292
 msgid "动画 GIF 压缩为 WebP 需要 gif2webp 工具（libwebp 套件）"
 msgstr ""
 
-#: includes\class-converter.php:288
+#: includes\class-converter.php:293
 msgid "动画 GIF 压缩为 AVIF 需要 ffmpeg"
 msgstr ""
 
-#: includes\class-converter.php:300
+#: includes\class-converter.php:305
 msgid "静态 GIF 压缩需要 GD 扩展"
 msgstr ""
 
-#: includes\class-converter.php:308
+#: includes\class-converter.php:313
 msgid "GIF 压缩预处理失败"
 msgstr ""
 
-#: includes\class-converter.php:319
+#: includes\class-converter.php:324
 msgid "SVG 压缩需要 resvg 工具"
 msgstr ""
 
-#: includes\class-converter.php:327
+#: includes\class-converter.php:332
 msgid "SVG 压缩预处理失败"
 msgstr ""
 
-#: includes\class-converter.php:345 includes\class-media-library.php:129
+#: includes\class-converter.php:350 includes\class-media-library.php:129
 msgid "压缩失败"
 msgstr ""
 
-#: includes\class-converter.php:374
+#: includes\class-converter.php:379
 msgid "压缩结果没有变小，已保留原文件"
 msgstr ""
 
-#: includes\class-converter.php:413
+#: includes\class-converter.php:418
 msgid "压缩结果文件写入失败"
 msgstr ""
 
@@ -202,57 +202,86 @@ msgstr ""
 msgid "不允许反序列化单例实例"
 msgstr ""
 
-#: includes\class-libre-compress.php:202
+#: includes\class-libre-compress.php:216
 msgid "操作失败"
 msgstr ""
 
-#: includes\class-libre-compress.php:203
+#: includes\class-libre-compress.php:217
 msgid "确定要清除所有压缩记录吗？此操作不可撤销。"
 msgstr ""
 
-#: includes\class-libre-compress.php:204
+#: includes\class-libre-compress.php:218
 msgid "确定要恢复所有原图备份吗？此操作不可撤销。"
 msgstr ""
 
-#: includes\class-libre-compress.php:205
+#: includes\class-libre-compress.php:219
 msgid "确定要删除所有缩略图吗？此操作不可撤销。"
 msgstr ""
 
-#: includes\class-libre-compress.php:206
+#: includes\class-libre-compress.php:220
 msgid "确定要为缺少缩略图的图片重新生成缩略图吗？这可能需要一些时间。"
 msgstr ""
 
-#: includes\class-libre-compress.php:207
+#: includes\class-libre-compress.php:221
 msgid "确定要删除此图片的备份吗？删除后将无法恢复原图。"
 msgstr ""
 
-#: includes\class-libre-compress.php:208
+#: includes\class-libre-compress.php:222
 msgid "确定要删除所有原图备份吗？删除后将无法恢复原图。"
 msgstr ""
 
-#: includes\class-libre-compress.php:209 includes\class-media-library.php:210
+#: includes\class-libre-compress.php:223 includes\class-media-library.php:210
 msgid "删除备份"
 msgstr ""
 
-#: includes\class-libre-compress.php:210
+#: includes\class-libre-compress.php:224
 msgid "没有需要压缩的图片"
 msgstr ""
 
-#: includes\class-libre-compress.php:211
+#: includes\class-libre-compress.php:225
 msgid "处理中..."
 msgstr ""
 
-#: includes\class-libre-compress.php:212
+#: includes\class-libre-compress.php:226
 #, php-format
 msgid "已处理 %d 个图片"
 msgstr ""
 
-#: includes\class-libre-compress.php:213
+#: includes\class-libre-compress.php:228
 #, php-format
 msgid "%1$s - 成功: %2$d, 跳过: %3$d, 失败: %4$d"
 msgstr ""
 
-#: includes\class-libre-compress.php:241
+#: includes\class-libre-compress.php:229
+#, php-format
+msgid "已恢复 %d 个附件"
+msgstr ""
+
+#: includes\class-libre-compress.php:231
+#, php-format
+msgid "%1$s - 成功: %2$d, 失败: %3$d"
+msgstr ""
+
+#: includes\class-libre-compress.php:232
+msgid "恢复完成"
+msgstr ""
+
+#: includes\class-libre-compress.php:233
+#, php-format
+msgid "失败附件 ID：%s"
+msgstr ""
+
+#: includes\class-libre-compress.php:234
+#, php-format
+msgid "（共 %d 个，仅显示前 10 个）"
+msgstr ""
+
+#: includes\class-libre-compress.php:235
+#, php-format
+msgid "恢复中断：已完成 %d 个附件，再次执行可继续恢复剩余附件。"
+msgstr ""
+
+#: includes\class-libre-compress.php:263
 msgid "设置"
 msgstr ""
 
@@ -291,95 +320,98 @@ msgstr ""
 msgid "%1$s-%2$s=%3$s"
 msgstr ""
 
-#: includes\class-media-library.php:224 includes\class-media-library.php:255
-#: includes\class-media-library.php:275 includes\class-media-library.php:311
-#: includes\class-media-library.php:340 includes\class-media-library.php:376
-#: includes\class-media-library.php:409
+#: includes\class-media-library.php:224 includes\class-media-library.php:260
+#: includes\class-media-library.php:280 includes\class-media-library.php:316
+#: includes\class-media-library.php:345 includes\class-media-library.php:381
+#: includes\class-media-library.php:414
 #: includes\class-thumbnail-manager.php:414
 msgid "权限不足"
 msgstr ""
 
-#: includes\class-media-library.php:260 includes\class-processor.php:157
+#: includes\class-media-library.php:265 includes\class-processor.php:209
 msgid "无效的图片附件"
 msgstr ""
 
-#: includes\class-media-library.php:282 includes\class-media-library.php:347
+#: includes\class-media-library.php:287 includes\class-media-library.php:352
 msgid "无效的附件 ID"
 msgstr ""
 
-#: includes\class-media-library.php:289 includes\class-media-library.php:354
-#: includes\class-media-library.php:418
+#: includes\class-media-library.php:294 includes\class-media-library.php:359
 msgid "没有可用的备份"
 msgstr ""
 
-#: includes\class-media-library.php:296
+#: includes\class-media-library.php:301
 msgid "恢复成功"
 msgstr ""
 
-#: includes\class-media-library.php:298
+#: includes\class-media-library.php:303
 msgid "恢复失败"
 msgstr ""
 
-#: includes\class-media-library.php:316 includes\class-media-library.php:381
+#: includes\class-media-library.php:321 includes\class-media-library.php:386
 msgid "当前有图片正在处理，请稍后再试"
 msgstr ""
 
-#: includes\class-media-library.php:325
+#: includes\class-media-library.php:330
 msgid "压缩记录已清除"
 msgstr ""
 
-#: includes\class-media-library.php:361
+#: includes\class-media-library.php:366
 msgid "备份已删除"
 msgstr ""
 
-#: includes\class-media-library.php:363
+#: includes\class-media-library.php:368
 msgid "删除失败"
 msgstr ""
 
-#: includes\class-media-library.php:392
+#: includes\class-media-library.php:397
 #, php-format
 msgid "已删除 %d 个备份文件"
 msgstr ""
 
-#: includes\class-media-library.php:439
+#: includes\class-media-library.php:450
 #, php-format
-msgid "恢复完成，成功 %1$d 个，失败 %2$d 个"
+msgid "本批恢复完成，成功 %1$d 个，失败 %2$d 个"
 msgstr ""
 
-#: includes\class-processor.php:162
-msgid "该图片正在处理中，请稍后重试"
-msgstr ""
-
-#: includes\class-processor.php:168
-msgid "插件正在执行维护操作，请稍后重试"
-msgstr ""
-
-#: includes\class-processor.php:175
+#: includes\class-processor.php:227
 msgid "未找到可压缩的图片文件"
 msgstr ""
 
-#: includes\class-processor.php:188
+#: includes\class-processor.php:240
 msgid "图片已经压缩"
 msgstr ""
 
-#: includes\class-processor.php:253
+#: includes\class-processor.php:306
 msgid "压缩结果已生成，但附件路径同步失败，请检查数据库状态"
 msgstr ""
 
-#: includes\class-processor.php:266
+#: includes\class-processor.php:319
 msgid "图片压缩完成"
 msgstr ""
 
-#: includes\class-processor.php:269
+#: includes\class-processor.php:322
 msgid "图片仅部分压缩完成，仍有文件需要重试"
 msgstr ""
 
-#: includes\class-processor.php:272
+#: includes\class-processor.php:325
 msgid "图片压缩失败"
 msgstr ""
 
-#: includes\class-processor.php:275
+#: includes\class-processor.php:328
 msgid "没有可用的压缩结果"
+msgstr ""
+
+#: includes\class-processor.php:839
+msgid "插件正在执行维护操作，请稍后重试"
+msgstr ""
+
+#: includes\class-processor.php:840
+msgid "该图片正在处理中，请稍后重试"
+msgstr ""
+
+#: includes\class-processor.php:843
+msgid "无法创建锁文件，请检查上传目录的写入权限"
 msgstr ""
 
 #: includes\class-settings.php:22 includes\class-settings.php:23

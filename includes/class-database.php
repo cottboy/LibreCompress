@@ -537,6 +537,38 @@ class Libre_Compress_Database {
     }
 
     /**
+     * 按附件 ID 游标获取有备份的附件
+     *
+     * 只返回附件记录仍然存在的行，避免把备份写回已删除的附件。
+     *
+     * @param int $after_id 上一批最后处理的附件 ID
+     * @param int $limit    本批数量
+     * @return int[]
+     */
+    public function get_backup_attachment_ids_after( $after_id = 0, $limit = 20 ): array {
+        global $wpdb;
+
+        $after_id = absint( $after_id );
+        $limit    = max( 1, min( 100, absint( $limit ) ) );
+        $ids      = $wpdb->get_col(
+            $wpdb->prepare(
+                "SELECT DISTINCT b.attachment_id
+                 FROM {$this->backups_table} b
+                 INNER JOIN {$wpdb->posts} p ON p.ID = b.attachment_id
+                 WHERE b.attachment_id > %d
+                   AND p.post_type = 'attachment'
+                   AND p.post_status <> 'trash'
+                 ORDER BY b.attachment_id ASC
+                 LIMIT %d",
+                $after_id,
+                $limit
+            )
+        );
+
+        return array_map( 'absint', $ids );
+    }
+
+    /**
      * 获取所有备份
      *
      * @return array

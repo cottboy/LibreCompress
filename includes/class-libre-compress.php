@@ -48,9 +48,9 @@ class Libre_Compress {
     /**
      * 目标格式底层处理器实例
      *
-     * @var Libre_Compress_Converter
+     * @var Libre_Compress_Output
      */
-    public $converter;
+    public $output_processor;
 
     /**
      * 统一图片压缩处理器实例
@@ -130,8 +130,8 @@ class Libre_Compress {
         $this->compressor = new Libre_Compress_Compressor();
 
         // 初始化目标格式底层处理器
-        $this->converter = new Libre_Compress_Converter();
-        $this->converter->init_hooks();
+        $this->output_processor = new Libre_Compress_Output();
+        $this->output_processor->init_hooks();
 
         // 初始化统一图片压缩处理器
         $this->processor = new Libre_Compress_Processor();
@@ -158,8 +158,22 @@ class Libre_Compress {
         // 检查数据库版本并升级
         add_action( 'admin_init', array( $this, 'check_db_version' ) );
 
+        // 确保上传待办收尾任务已注册
+        add_action( 'admin_init', array( $this, 'ensure_scheduled_tasks' ), 30 );
+
         // 添加插件设置链接
         add_filter( 'plugin_action_links_' . LIBRE_COMPRESS_BASENAME, array( $this, 'add_settings_link' ) );
+    }
+
+    /**
+     * 补注册定时任务，兼容插件升级前已启用的站点
+     */
+    public function ensure_scheduled_tasks(): void {
+        if ( wp_next_scheduled( Libre_Compress_Processor::PENDING_SWEEP_HOOK ) ) {
+            return;
+        }
+
+        wp_schedule_event( time() + HOUR_IN_SECONDS, 'hourly', Libre_Compress_Processor::PENDING_SWEEP_HOOK );
     }
 
     /**
@@ -210,7 +224,15 @@ class Libre_Compress {
                     'noCompressItems'         => __( '没有需要压缩的图片', 'libre-compress' ),
                     'processing'              => __( '处理中...', 'libre-compress' ),
                     'batchProgress'           => __( '已处理 %d 个图片', 'libre-compress' ),
+                    /* translators: %1$s: 任务名称, %2$d: 成功数, %3$d: 跳过数, %4$d: 失败数 */
                     'batchSummary'            => __( '%1$s - 成功: %2$d, 跳过: %3$d, 失败: %4$d', 'libre-compress' ),
+                    'restoreProgress'          => __( '已恢复 %d 个附件', 'libre-compress' ),
+                    /* translators: %1$s: 任务名称, %2$d: 成功数, %3$d: 失败数 */
+                    'restoreSummary'           => __( '%1$s - 成功: %2$d, 失败: %3$d', 'libre-compress' ),
+                    'restoreFinished'          => __( '恢复完成', 'libre-compress' ),
+                    'restoreFailedIds'         => __( '失败附件 ID：%s', 'libre-compress' ),
+                    'restoreFailedMore'        => __( '（共 %d 个，仅显示前 10 个）', 'libre-compress' ),
+                    'restoreInterrupted'       => __( '恢复中断：已完成 %d 个附件，再次执行可继续恢复剩余附件。', 'libre-compress' ),
                 ),
             )
         );

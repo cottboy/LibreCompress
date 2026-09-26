@@ -225,9 +225,14 @@ class Libre_Compress_Media_Library {
         }
 
         $after_id       = isset( $_POST['after'] ) ? absint( $_POST['after'] ) : 0;
-        $batch_size    = 100;
-        $attachment_ids = libre_compress()->database->get_image_attachment_ids_after( $after_id, $batch_size );
+        $batch_size     = 100;
+        $attachment_ids = libre_compress()->database->get_image_attachment_ids_after( $after_id, $batch_size + 1 );
+        $has_more       = count( $attachment_ids ) > $batch_size;
         $items          = array();
+
+        if ( $has_more ) {
+            array_pop( $attachment_ids );
+        }
 
         foreach ( $attachment_ids as $attachment_id ) {
             if ( libre_compress()->processor->has_pending_files( $attachment_id ) ) {
@@ -235,12 +240,12 @@ class Libre_Compress_Media_Library {
             }
         }
 
-        $next_after = empty( $attachment_ids ) ? $after_id : max( array_map( 'absint', $attachment_ids ) );
+        $next_after = empty( $attachment_ids ) ? $after_id : max( $attachment_ids );
         wp_send_json_success(
             array(
-                'items'     => $items,
+                'items'      => $items,
                 'next_after' => $next_after,
-                'has_more'  => count( $attachment_ids ) === $batch_size,
+                'has_more'   => $has_more,
             )
         );
     }
@@ -409,39 +414,47 @@ class Libre_Compress_Media_Library {
             wp_send_json_error( array( 'message' => __( '权限不足', 'libre-compress' ) ) );
         }
 
-        $database = libre_compress()->database;
+        $after_id       = isset( $_POST['after'] ) ? absint( $_POST['after'] ) : 0;
+        $batch_size     = 20;
+        $database       = libre_compress()->database;
+        $backup         = libre_compress()->backup;
+        $attachment_ids = $database->get_backup_attachment_ids_after( $after_id, $batch_size + 1 );
+        $has_more       = count( $attachment_ids ) > $batch_size;
+        $success_count  = 0;
+        $failed_ids     = array();
 
-        // 获取所有备份记录
-        $backups = $database->get_all_backups();
-
-        if ( empty( $backups ) ) {
-            wp_send_json_error( array( 'message' => __( '没有可用的备份', 'libre-compress' ) ) );
+        if ( $has_more ) {
+            array_pop( $attachment_ids );
         }
 
-        // 按附件 ID 分组
-        $attachment_ids = array_unique( array_column( $backups, 'attachment_id' ) );
-
-        $success_count = 0;
-        $failed_count  = 0;
-
         foreach ( $attachment_ids as $attachment_id ) {
-            if ( libre_compress()->processor->restore_attachment( absint( $attachment_id ) ) ) {
+            // 备份文件已丢失时直接清理残留记录，避免每次恢复都重复失败
+            if ( ! $backup->has_backup( $attachment_id ) ) {
+                $backup->delete_backup( $attachment_id );
+                continue;
+            }
+
+            if ( libre_compress()->processor->restore_attachment( $attachment_id ) ) {
                 $success_count++;
             } else {
-                $failed_count++;
+                $failed_ids[] = $attachment_id;
             }
         }
 
+        $next_after = empty( $attachment_ids ) ? $after_id : max( $attachment_ids );
         wp_send_json_success(
             array(
                 'message'       => sprintf(
                     /* translators: %1$d: 成功数量, %2$d: 失败数量 */
-                    __( '恢复完成，成功 %1$d 个，失败 %2$d 个', 'libre-compress' ),
+                    __( '本批恢复完成，成功 %1$d 个，失败 %2$d 个', 'libre-compress' ),
                     $success_count,
-                    $failed_count
+                    count( $failed_ids )
                 ),
                 'success_count' => $success_count,
-                'failed_count'  => $failed_count,
+                'failed_count'  => count( $failed_ids ),
+                'failed_ids'    => $failed_ids,
+                'next_after'    => $next_after,
+                'has_more'      => $has_more,
             )
         );
     }

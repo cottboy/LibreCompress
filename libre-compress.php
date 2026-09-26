@@ -285,7 +285,7 @@ function libre_compress_activate() {
         'backup_enabled'     => true,
         'tool_concurrency'   => 5,
         'disable_thumbnails' => false,
-        'convert_target'     => 'webp',
+        'output_format'      => 'webp',
     );
 
     $default_tools = array(
@@ -312,6 +312,11 @@ function libre_compress_activate() {
         add_option( 'libre_compress_tools', $default_tools );
     }
 
+    // 注册上传待办收尾任务，保证没有后台访问时也会排空队列
+    if ( ! wp_next_scheduled( Libre_Compress_Processor::PENDING_SWEEP_HOOK ) ) {
+        wp_schedule_event( time() + HOUR_IN_SECONDS, 'hourly', Libre_Compress_Processor::PENDING_SWEEP_HOOK );
+    }
+
     // 刷新重写规则
     flush_rewrite_rules();
 }
@@ -321,6 +326,11 @@ register_activation_hook( __FILE__, 'libre_compress_activate' );
  * 插件停用时执行
  */
 function libre_compress_deactivate() {
+    // 确保常量可用
+    libre_compress_load_dependencies();
+
+    wp_clear_scheduled_hook( Libre_Compress_Processor::PENDING_SWEEP_HOOK );
+
     // 刷新重写规则
     flush_rewrite_rules();
 }

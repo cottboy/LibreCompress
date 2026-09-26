@@ -83,13 +83,22 @@
                     attachment_id: attachmentId
                 },
                 success: function(response) {
-                    if (response.success) {
-                        // 刷新页面以显示新状态
-                        location.reload();
-                    } else {
+                    if (!response.success) {
                         alert(response.data.message || self.i18n.error);
                         $btn.prop('disabled', false).text($btn.data('original-label'));
+                        return;
                     }
+
+                    // 跳过和失败都要把原因显示出来，避免用户点了没反应
+                    if (response.data.status === 'skipped' || response.data.status === 'failed') {
+                        alert(response.data.message || self.i18n.error);
+                        $btn.prop('disabled', false).text($btn.data('original-label'));
+                        location.reload();
+                        return;
+                    }
+
+                    // 刷新页面以显示新状态
+                    location.reload();
                 },
                 error: function() {
                     alert(self.i18n.error);
@@ -200,7 +209,7 @@
         },
 
         /**
-         * 恢复所有原图备份
+         * 按游标分页恢复所有原图备份
          */
         handleRestoreAll: function(e) {
             e.preventDefault();
@@ -211,30 +220,83 @@
 
             var self = this;
             var $btn = $(e.currentTarget);
+            var after = 0;
+            var success = 0;
+            var failed = 0;
+            var failedIds = [];
+            var pageErrors = 0;
 
             $btn.prop('disabled', true).text(this.i18n.processing);
 
-            $.ajax({
-                url: this.ajaxUrl,
-                type: 'POST',
-                data: {
-                    action: 'libre_compress_restore_all',
-                    nonce: this.nonce
-                },
-                success: function(response) {
-                    if (response.success) {
-                        alert(response.data.message);
-                        location.reload();
-                    } else {
-                        alert(response.data.message || self.i18n.error);
+            function finish(interrupted) {
+                var summary = self.i18n.restoreSummary
+                    .replace('%1$s', self.i18n.restoreFinished)
+                    .replace('%2$d', success)
+                    .replace('%3$d', failed);
+
+                if (failedIds.length) {
+                    var shownIds = failedIds.slice(0, 10).join(', ');
+                    var idText = self.i18n.restoreFailedIds.replace('%s', shownIds);
+
+                    if (failedIds.length > 10) {
+                        idText += self.i18n.restoreFailedMore.replace('%d', failedIds.length);
                     }
-                    $btn.prop('disabled', false);
-                },
-                error: function() {
-                    alert(self.i18n.error);
-                    $btn.prop('disabled', false);
+
+                    summary += '\n' + idText;
                 }
-            });
+
+                if (interrupted) {
+                    summary += '\n' + self.i18n.restoreInterrupted.replace('%d', success + failed);
+                }
+
+                alert(summary);
+                $btn.prop('disabled', false);
+                location.reload();
+            }
+
+            function loadPage() {
+                $.ajax({
+                    url: self.ajaxUrl,
+                    type: 'POST',
+                    data: {
+                        action: 'libre_compress_restore_all',
+                        nonce: self.nonce,
+                        after: after
+                    },
+                    success: function(response) {
+                        pageErrors = 0;
+
+                        if (!response.success) {
+                            finish(true);
+                            return;
+                        }
+
+                        success += parseInt(response.data.success_count, 10) || 0;
+                        failed += parseInt(response.data.failed_count, 10) || 0;
+                        failedIds = failedIds.concat(response.data.failed_ids || []);
+                        $btn.text(self.i18n.restoreProgress.replace('%d', success + failed));
+
+                        if (response.data.has_more && parseInt(response.data.next_after, 10) > after) {
+                            after = parseInt(response.data.next_after, 10);
+                            loadPage();
+                        } else {
+                            finish(false);
+                        }
+                    },
+                    error: function() {
+                        pageErrors++;
+
+                        if (pageErrors <= 3) {
+                            loadPage();
+                            return;
+                        }
+
+                        finish(true);
+                    }
+                });
+            }
+
+            loadPage();
         },
 
         /**

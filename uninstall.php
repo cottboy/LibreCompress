@@ -28,18 +28,27 @@ delete_option( 'libre_compress_general' );
 delete_option( 'libre_compress_tools' );
 delete_option( 'libre_compress_db_version' );
 
-// 删除目标格式输出映射；统一压缩记录已随数据表删除。
+// 删除插件写入的附件处理标记和目标格式输出映射；统一压缩记录已随数据表删除。
 // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
-$wpdb->query( "DELETE FROM {$wpdb->postmeta} WHERE meta_key = '_libre_compress_converted'" );
+$wpdb->query( "DELETE FROM {$wpdb->postmeta} WHERE meta_key IN ('_libre_compress_output', '_libre_compress_pending')" );
 
-// 删除备份文件目录
+// 停用定时任务并清理限流 transient
+wp_clear_scheduled_hook( 'libre_compress_pending_sweep_event' );
+delete_transient( 'libre_compress_pending_sweep' );
+
+// 删除备份文件目录和附件锁目录（目录名需与 Libre_Compress_Processor 常量保持一致）
 $upload_dir = wp_upload_dir();
-$backup_dir = $upload_dir['basedir'] . '/libre-compress-backups';
 
-if ( is_dir( $backup_dir ) ) {
+foreach ( array( 'libre-compress-backups', '.libre-compress-locks' ) as $dir_name ) {
+    $target_dir = $upload_dir['basedir'] . '/' . $dir_name;
+
+    if ( ! is_dir( $target_dir ) ) {
+        continue;
+    }
+
     // 递归删除目录中的所有文件
     $files = new RecursiveIteratorIterator(
-        new RecursiveDirectoryIterator( $backup_dir, RecursiveDirectoryIterator::SKIP_DOTS ),
+        new RecursiveDirectoryIterator( $target_dir, RecursiveDirectoryIterator::SKIP_DOTS ),
         RecursiveIteratorIterator::CHILD_FIRST
     );
 
@@ -51,7 +60,7 @@ if ( is_dir( $backup_dir ) ) {
         }
     }
 
-    rmdir( $backup_dir );
+    rmdir( $target_dir );
 }
 
 // 删除压缩工具二进制目录
