@@ -13,9 +13,13 @@ if ( ! defined( 'ABSPATH' ) ) {
 /**
  * 目标格式输出处理器
  *
- * 将勾选格式的图片（PNG/JPG/GIF/SVG）压缩输出为 WebP 或 AVIF：
- * 压缩结果小于源文件时，以同名不同扩展名的文件替换源文件，并同步更新
- * 附件 MIME 与元数据。结果不小于源文件时保留原文件。
+ * 将勾选格式的图片（PNG/JPG/GIF/SVG）压缩输出为 WebP 或 AVIF，是统一压缩入口
+ * 的一部分：结果小于源文件时生成真实的新文件并替换源文件，同步附件路径、元数据、
+ * MIME 和文章内已固化的图片链接；结果没有变小时保留原图，按节省 0% 记为已压缩。
+ *
+ * 单文件处理分成准备和提交两步。准备阶段只写目标文件和映射，提交阶段负责引用、
+ * 链接和源文件清理，任何一步失败都会把引用退回源文件并记录失败，下次执行凭映射
+ * 接管已有结果继续提交，不会重复编码。
  */
 class Libre_Compress_Output {
 
@@ -25,6 +29,20 @@ class Libre_Compress_Output {
      * @var string
      */
     const OUTPUT_META_KEY = '_libre_compress_output';
+
+    /**
+     * 正文链接扫描的单页文章数量
+     *
+     * @var int
+     */
+    const REFERENCE_BATCH_SIZE = 100;
+
+    /**
+     * 目标文件名分配的最大尝试次数
+     *
+     * @var int
+     */
+    const MAX_NAME_ATTEMPTS = 200;
 
     /**
      * 目标格式对应的编码工具注册名
@@ -66,14 +84,6 @@ class Libre_Compress_Output {
     );
 
     /**
-     * 初始化钩子
-     */
-    public function init_hooks() {
-        // 文章内容中已固化的源格式 URL，根据实际压缩记录替换为结果 URL。
-        add_filter( 'the_content', array( $this, 'filter_content' ), 20 );
-    }
-
-    /**
      * 获取目标格式输出设置
      *
      * @return array target: webp|avif, formats: 已勾选的源格式列表
@@ -104,11 +114,7 @@ class Libre_Compress_Output {
      */
     public function should_output_target( string $file_path ): bool {
         $settings = $this->get_output_settings();
-        $format   = strtolower( pathinfo( $file_path, PATHINFO_EXTENSION ) );
-
-        if ( 'jpeg' === $format ) {
-            $format = 'jpg';
-        }
+        $format   = $this->format_of( $file_path );
 
         // WebP / AVIF 本身是可直接压缩的格式，不允许再次输出目标格式。
         if ( in_array( $format, array( 'webp', 'avif' ), true ) ) {
@@ -119,37 +125,10 @@ class Libre_Compress_Output {
     }
 
     /**
-     * 获取目标格式文件路径（同目录同名，仅替换扩展名）
+     * 将单个文件压缩为目标格式（准备阶段）
      *
-     * @param string $file_path 源文件路径
-     * @param string $target    目标格式
-     * @return string 目标路径
-     */
-    private function get_target_path( string $file_path, string $target ): string {
-        return $this->replace_extension( $file_path, $target );
-    }
-
-    /**
-     * 替换路径的扩展名
-     *
-     * @param string $path   文件路径
-     * @param string $target 目标扩展名
-     * @return string 替换后的路径
-     */
-    private function replace_extension( string $path, string $target ): string {
-        $extension = pathinfo( $path, PATHINFO_EXTENSION );
-
-        if ( '' === $extension ) {
-            return $path . '.' . $target;
-        }
-
-        return substr( $path, 0, -strlen( $extension ) ) . $target;
-    }
-
-    /**
-     * 将单个文件压缩为目标格式
-     *
-     * 结果不小于源文件时保留源文件；提交替换前按设置创建可恢复备份。
+     * 只生成目标文件、压缩记录和恢复映射，不改动附件引用；引用同步和源文件清理
+     * 由提交阶段统一完成，因此结果不更小或备份失败时源文件必然完好。
      *
      * @param int    $attachment_id 附件 ID
      * @param string $file_path     源文件绝对路径
@@ -159,12 +138,12 @@ class Libre_Compress_Output {
      */
     public function compress_to_target_format( int $attachment_id, string $file_path, string $size_type = 'full', string $target = '' ): array {
         $result_template = array(
-            'file_path'      => $file_path,
-            'from'           => $file_path,
-            'to'             => '',
-            'status'         => 'failed',
-            'message'        => '',
-            'original_size'  => 0,
+            'file_path'       => $file_path,
+            'from'            => $file_path,
+            'to'              => '',
+            'status'          => 'failed',
+            'message'         => '',
+            'original_size'   => 0,
             'compressed_size' => 0,
         );
 
@@ -178,115 +157,55 @@ class Libre_Compress_Output {
             return $result_template;
         }
 
-        $settings       = $this->get_output_settings();
-        $resolved_target = in_array( $target, array( 'webp', 'avif' ), true ) ? $target : $settings['target'];
-        $target           = $resolved_target;
+        $settings = $this->get_output_settings();
+        $target   = in_array( $target, array( 'webp', 'avif' ), true ) ? $target : $settings['target'];
+        $format   = $this->format_of( $file_path );
 
-        $extension = strtolower( pathinfo( $file_path, PATHINFO_EXTENSION ) );
-        if ( 'jpeg' === $extension ) {
-            $extension = 'jpg';
-        }
-
-        if ( ! in_array( $extension, $settings['formats'], true ) ) {
+        if ( ! in_array( $format, $settings['formats'], true ) ) {
             $result_template['status']  = 'skipped';
-            $result_template['message'] = __( '该格式未配置目标格式输出', 'libre-compress' );
-            return $result_template;
-        }
-
-        $target_path = $this->get_target_path( $file_path, $target );
-
-        // 同名目标文件已存在时，只有确认它属于本插件的持久化映射才接管，
-        // 避免把无关文件误当成压缩结果，也允许中断后的请求完成提交。
-        if ( file_exists( $target_path ) ) {
-            $existing_mapping = $this->get_output_record_for_file( $attachment_id, $target_path );
-            $existing_record  = libre_compress()->database->get_record( $attachment_id, $size_type );
-            $owned_target     = null !== $existing_mapping
-                && isset( $existing_mapping['from'] )
-                && $this->normalized_path( $existing_mapping['from'] ) === $this->normalized_path( $file_path );
-            $owned_target     = $owned_target || (
-                is_array( $existing_record )
-                && 'success' === $existing_record['status']
-                && $this->normalized_path( $existing_record['file_path'] ) === $this->normalized_path( $this->get_relative_upload_path( $target_path ) )
-            );
-            $source_backup    = libre_compress()->database->get_backup_by_path( $file_path );
-            $owned_target     = $owned_target || (
-                is_array( $source_backup )
-                && ! empty( $source_backup['backup_path'] )
-                && file_exists( $source_backup['backup_path'] )
-            );
-            $owned_target     = $owned_target && (int) filesize( $target_path ) < (int) filesize( $file_path );
-
-            if ( $owned_target ) {
-                $original_size   = is_array( $existing_mapping ) && isset( $existing_mapping['original_size'] )
-                    ? absint( $existing_mapping['original_size'] )
-                    : (int) filesize( $file_path );
-                $compressed_size = (int) filesize( $target_path );
-                $record_saved = libre_compress()->compressor->save_compression_record(
-                    $attachment_id,
-                    $target_path,
-                    $size_type,
-                    $original_size,
-                    $compressed_size,
-                    'target-output',
-                    'success'
-                );
-                if ( ! $record_saved ) {
-                    $result_template['message'] = __( '压缩记录保存失败，已保留原文件', 'libre-compress' );
-                    return $result_template;
-                }
-
-                if ( ! is_array( $existing_mapping )
-                    && ! $this->add_output_record(
-                        $attachment_id,
-                        $file_path,
-                        $target_path,
-                        $size_type,
-                        $original_size,
-                        $compressed_size
-                    ) ) {
-                    $result_template['message'] = __( '恢复映射保存失败，已保留原文件', 'libre-compress' );
-                    return $result_template;
-                }
-
-                return array(
-                    'file_path'              => $target_path,
-                    'from'                   => $file_path,
-                    'to'                     => $target_path,
-                    'size_type'              => $size_type,
-                    'status'                 => 'success',
-                    'message'                => __( '压缩成功', 'libre-compress' ),
-                    'original_size'          => $original_size,
-                    'compressed_size'        => $compressed_size,
-                    'tool_name'              => 'target-output',
-                    'source_cleanup_deferred' => true,
-                );
-            }
-
-            $result_template['to']             = $target_path;
-            $result_template['status']         = 'failed';
-            $result_template['message']        = __( '同名目标文件已存在', 'libre-compress' );
-            $result_template['original_size']  = (int) filesize( $file_path );
-            $result_template['compressed_size'] = (int) filesize( $target_path );
+            $result_template['message'] = __( '该格式未配置格式转换', 'libre-compress' );
             return $result_template;
         }
 
         $original_size = (int) filesize( $file_path );
-        $temp_token    = wp_generate_password( 12, false, false );
+        $tool_name     = $target;
+        $target_path   = '';
 
-        // 编码到同目录唯一临时文件，正式提交前源文件保持不变。
+        // 已有映射说明插件此前确实把该文件转换过一次，可能是上次提交中断。
+        // 只认映射，不能凭同名文件或大小猜测，否则会误把无关图片当作压缩结果接管。
+        $entry = $this->find_output_entry( $attachment_id, $size_type );
+
+        if ( $entry && $this->is_safe_destination_path( $entry['to'] ) ) {
+            if ( $this->is_safe_path( $entry['to'] ) && (int) filesize( $entry['to'] ) < $original_size ) {
+                return $this->prepare_existing_output( $attachment_id, $file_path, $entry['to'], $size_type, $original_size, $tool_name );
+            }
+
+            // 结果文件缺失或已不再比源文件小时，重新编码到同一目标名，不另起新名字留下多余文件。
+            $target_path = $entry['to'];
+        } else {
+            $target_path = $this->allocate_target_path( $file_path, $target );
+        }
+
+        if ( '' === $target_path ) {
+            $result_template['message']       = __( '同名目标文件过多，无法分配新文件名', 'libre-compress' );
+            $result_template['original_size'] = $original_size;
+            return $result_template;
+        }
+
+        $temp_token  = wp_generate_password( 12, false, false );
         $temp_output = $file_path . '.lc-compress-' . $temp_token . '.' . $target;
         $encode_ok   = false;
         $error_msg   = '';
         $temp_source = '';
-        $tool_name   = $target;
+        $command     = false;
 
-        if ( 'gif' === $extension ) {
+        if ( 'gif' === $format ) {
             // 动画 GIF 使用专用工具，静态 GIF 先由 GD 解码为 PNG。
             if ( $this->is_animated_gif( $file_path ) ) {
                 $animated = $this->build_animated_gif_command( $file_path, $temp_output, $target );
 
                 if ( false === $animated ) {
-                    // 缺工具：环境未配齐，记为跳过
+                    // 缺工具：环境未配齐，不写入压缩记录，保留为待处理。
                     $result_template['status']  = 'skipped';
                     $result_template['message'] = ( 'webp' === $target )
                         ? __( '动画 GIF 压缩为 WebP 需要 gif2webp 工具（libwebp 套件）', 'libre-compress' )
@@ -300,7 +219,6 @@ class Libre_Compress_Output {
             } else {
                 $temp_source = $file_path . '.lc-source-' . $temp_token . '.png';
                 if ( ! function_exists( 'imagecreatefromgif' ) || ! function_exists( 'imagepng' ) ) {
-                    // 缺 GD 扩展：环境未配齐，记为跳过
                     $result_template['status']  = 'skipped';
                     $result_template['message'] = __( '静态 GIF 压缩需要 GD 扩展', 'libre-compress' );
                     return $result_template;
@@ -315,11 +233,10 @@ class Libre_Compress_Output {
                 }
                 $command = $this->build_encode_command( $temp_source, $temp_output, $target );
             }
-        } elseif ( 'svg' === $extension ) {
+        } elseif ( 'svg' === $format ) {
             // SVG 需先栅格化为 PNG 中间文件
             $temp_source = $file_path . '.lc-source-' . $temp_token . '.png';
             if ( false === $this->get_resvg_path() ) {
-                // 缺 resvg：环境未配齐，记为跳过
                 $result_template['status']  = 'skipped';
                 $result_template['message'] = __( 'SVG 压缩需要 resvg 工具', 'libre-compress' );
                 return $result_template;
@@ -339,7 +256,7 @@ class Libre_Compress_Output {
         }
 
         if ( false === $command ) {
-            // 缺编码工具（cwebp/avifenc）：环境未配齐，记为跳过
+            // 缺编码工具（cwebp/avifenc）：环境未配齐，不写入压缩记录，保留为待处理。
             $error_msg                 = __( '没有可用的压缩工具', 'libre-compress' );
             $result_template['status'] = 'skipped';
         } else {
@@ -376,20 +293,16 @@ class Libre_Compress_Output {
             // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
             unlink( $temp_output );
 
-            $message = __( '压缩结果没有变小，已保留原文件', 'libre-compress' );
-            libre_compress()->compressor->save_compression_record(
-                $attachment_id,
-                $file_path,
-                $size_type,
-                $original_size,
-                $original_size,
-                $tool_name,
-                'skipped',
-                $message
-            );
+            // 转换后更大说明目标格式对该图片没有收益，保留原图并按 0% 记为已压缩。
+            if ( ! $this->save_record( $attachment_id, $file_path, $size_type, $original_size, $original_size, $tool_name, 'success', '' ) ) {
+                $result_template['message'] = __( '压缩记录保存失败，请重新压缩', 'libre-compress' );
+                return $result_template;
+            }
 
-            $result_template['status']          = 'skipped';
-            $result_template['message']         = $message;
+            $this->remove_output_entry( $attachment_id, $size_type );
+
+            $result_template['status']          = 'success';
+            $result_template['message']         = __( '转换结果没有变小，已保留原图', 'libre-compress' );
             $result_template['original_size']   = $original_size;
             $result_template['compressed_size'] = $original_size;
             return $result_template;
@@ -406,9 +319,9 @@ class Libre_Compress_Output {
             return $result_template;
         }
 
-        // 先复制到目标路径并保留临时文件，状态写入失败时源文件仍然完好。
+        // 先写入目标文件并保留临时文件，状态写入失败时源文件仍然完好。
         // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_copy
-        if ( ! copy( $temp_output, $target_path ) || filesize( $target_path ) !== $compressed_size ) {
+        if ( ! copy( $temp_output, $target_path ) || ! file_exists( $target_path ) || (int) filesize( $target_path ) !== $compressed_size ) {
             if ( file_exists( $target_path ) ) {
                 // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
                 unlink( $target_path );
@@ -419,17 +332,7 @@ class Libre_Compress_Output {
             return $result_template;
         }
 
-        $record_saved = libre_compress()->compressor->save_compression_record(
-            $attachment_id,
-            $target_path,
-            $size_type,
-            $original_size,
-            $compressed_size,
-            $tool_name,
-            'success'
-        );
-
-        if ( ! $record_saved ) {
+        if ( ! $this->save_record( $attachment_id, $target_path, $size_type, $original_size, $compressed_size, $tool_name, 'success', '' ) ) {
             // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
             unlink( $target_path );
             // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
@@ -438,92 +341,501 @@ class Libre_Compress_Output {
             return $result_template;
         }
 
-        $mapping_saved = $this->add_output_record(
-            $attachment_id,
-            $file_path,
-            $target_path,
-            $size_type,
-            $original_size,
-            $compressed_size
-        );
-
-        if ( ! $mapping_saved ) {
+        if ( ! $this->add_output_entry( $attachment_id, $size_type, $file_path, $target_path ) ) {
             // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
             unlink( $target_path );
-            libre_compress()->compressor->save_compression_record(
-                $attachment_id,
-                $file_path,
-                $size_type,
-                $original_size,
-                $original_size,
-                $tool_name,
-                'failed',
-                __( '恢复映射保存失败，已保留原文件', 'libre-compress' )
-            );
+            $this->save_record( $attachment_id, $file_path, $size_type, $original_size, $original_size, $tool_name, 'failed', __( '恢复映射保存失败，已保留原文件', 'libre-compress' ) );
             // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
             unlink( $temp_output );
             $result_template['message'] = __( '恢复映射保存失败，已保留原文件', 'libre-compress' );
             return $result_template;
         }
 
-        // 源文件由统一处理器在 metadata/MIME 提交成功后再清理。
         // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
         unlink( $temp_output );
 
         return array(
-            'file_path'              => $target_path,
-            'from'                   => $file_path,
-            'to'                     => $target_path,
-            'size_type'              => $size_type,
-            'status'                 => 'success',
-            'message'                => __( '压缩成功', 'libre-compress' ),
-            'original_size'          => $original_size,
-            'compressed_size'        => $compressed_size,
-            'tool_name'              => $tool_name,
-            'source_cleanup_deferred' => true,
+            'file_path'       => $target_path,
+            'from'            => $file_path,
+            'to'              => $target_path,
+            'size_type'       => $size_type,
+            'status'          => 'success',
+            'message'         => __( '压缩成功', 'libre-compress' ),
+            'original_size'   => $original_size,
+            'compressed_size' => $compressed_size,
+            'tool_name'       => $tool_name,
         );
     }
 
     /**
-     * 在附件路径和元数据提交成功后清理源文件
+     * 接管此前已生成的转换结果
      *
-     * @param string $source_path 源文件绝对路径
-     * @return bool
+     * @param int    $attachment_id 附件 ID
+     * @param string $file_path     源文件绝对路径
+     * @param string $target_path   已生成的结果文件绝对路径
+     * @param string $size_type     尺寸类型
+     * @param int    $original_size 源文件大小
+     * @param string $tool_name     工具名称
+     * @return array 压缩结果
      */
-    public function remove_source_file( string $source_path ): bool {
-        if ( ! file_exists( $source_path ) ) {
-            return true;
+    private function prepare_existing_output( int $attachment_id, string $file_path, string $target_path, string $size_type, int $original_size, string $tool_name ): array {
+        $compressed_size = (int) filesize( $target_path );
+
+        if ( ! $this->save_record( $attachment_id, $target_path, $size_type, $original_size, $compressed_size, $tool_name, 'success', '' ) ) {
+            return array(
+                'file_path'       => $file_path,
+                'from'            => $file_path,
+                'to'              => '',
+                'status'          => 'failed',
+                'message'         => __( '压缩记录保存失败，已保留原文件', 'libre-compress' ),
+                'size_type'       => $size_type,
+                'original_size'   => $original_size,
+                'compressed_size' => 0,
+            );
         }
 
-        if ( ! $this->is_safe_path( $source_path ) ) {
-            return false;
-        }
-
-        // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
-        return unlink( $source_path );
+        return array(
+            'file_path'       => $target_path,
+            'from'            => $file_path,
+            'to'              => $target_path,
+            'size_type'       => $size_type,
+            'status'          => 'success',
+            'message'         => __( '压缩成功', 'libre-compress' ),
+            'original_size'   => $original_size,
+            'compressed_size' => $compressed_size,
+            'tool_name'       => $tool_name,
+        );
     }
 
     /**
-     * 查找当前文件对应的目标格式输出映射
+     * 提交格式转换结果
+     *
+     * 顺序固定为：附件路径与元数据 → MIME → 文章内图片链接 → 删除源文件。
+     * 任一步失败都把引用退回源文件并把记录写成失败，源文件和转换结果都留在磁盘上，
+     * 下次执行凭映射继续提交，不会留下指向已删除文件的引用。
+     *
+     * @param int   $attachment_id 附件 ID
+     * @param array $output_map    size_type => array( from, to )
+     * @return bool 是否提交成功
+     */
+    public function commit_attachment_format( int $attachment_id, array $output_map ): bool {
+        if ( empty( $output_map ) ) {
+            return true;
+        }
+
+        $entries    = $this->describe_entries( $output_map );
+        $snapshot   = $this->get_reference_snapshot( $attachment_id );
+        $target     = $this->target_of_entries( $entries );
+        $mime       = isset( $this->target_mimes[ $target ] ) ? $this->target_mimes[ $target ] : '';
+
+        if ( ! $this->sync_attachment_paths( $attachment_id, $entries, $target ) ) {
+            return $this->abort_commit( $attachment_id, $snapshot, $entries, __( '附件路径同步失败，已保留原文件', 'libre-compress' ) );
+        }
+
+        if ( '' !== $mime && ! $this->sync_attachment_mime( $attachment_id, $entries, $mime ) ) {
+            return $this->abort_commit( $attachment_id, $snapshot, $entries, __( '附件 MIME 类型同步失败，已保留原文件', 'libre-compress' ) );
+        }
+
+        if ( ! $this->update_content_references( $this->reference_pairs( $entries, false ) ) ) {
+            return $this->abort_commit( $attachment_id, $snapshot, $entries, __( '文章图片链接替换失败，已保留原文件', 'libre-compress' ) );
+        }
+
+        if ( ! $this->remove_replaced_files( $entries ) ) {
+            return $this->abort_commit( $attachment_id, $snapshot, $entries, __( '原文件删除失败，已退回原文件引用', 'libre-compress' ) );
+        }
+
+        return true;
+    }
+
+    /**
+     * 获取附件当前的引用快照，供提交失败时退回
+     *
+     * @param int $attachment_id 附件 ID
+     * @return array
+     */
+    private function get_reference_snapshot( int $attachment_id ): array {
+        return array(
+            'attached' => get_post_meta( $attachment_id, '_wp_attached_file', true ),
+            'metadata' => wp_get_attachment_metadata( $attachment_id ),
+            'mime'     => get_post_mime_type( $attachment_id ),
+        );
+    }
+
+    /**
+     * 提交失败时退回引用、链接和记录
      *
      * @param int    $attachment_id 附件 ID
-     * @param string $file_path     当前文件路径
-     * @return array|null
+     * @param array  $snapshot      引用快照
+     * @param array  $entries       转换条目
+     * @param string $message       失败原因
+     * @return bool 恒为 false
      */
-    public function get_output_record_for_file( int $attachment_id, string $file_path ): ?array {
-        $records = get_post_meta( $attachment_id, self::OUTPUT_META_KEY, true );
-        if ( ! is_array( $records ) ) {
+    private function abort_commit( int $attachment_id, array $snapshot, array $entries, string $message ): bool {
+        $this->restore_reference_snapshot( $attachment_id, $snapshot );
+        $this->update_content_references( $this->reference_pairs( $entries, true ) );
+
+        foreach ( $entries as $entry ) {
+            $size  = file_exists( $entry['from'] ) ? (int) filesize( $entry['from'] ) : 0;
+            $saved = $this->save_record( $attachment_id, $entry['from'], $entry['size_type'], $size, $size, 'target-output', 'failed', $message );
+
+            if ( ! $saved ) {
+                // 连失败记录都写不进去时，绝不能留下成功记录造成误判。
+                libre_compress()->database->delete_records_by_attachment( $attachment_id );
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * 把附件路径、元数据和 MIME 退回快照值
+     *
+     * @param int   $attachment_id 附件 ID
+     * @param array $snapshot      引用快照
+     */
+    private function restore_reference_snapshot( int $attachment_id, array $snapshot ): void {
+        $attached = isset( $snapshot['attached'] ) ? (string) $snapshot['attached'] : '';
+
+        if ( '' === $attached ) {
+            delete_post_meta( $attachment_id, '_wp_attached_file' );
+        } else {
+            update_post_meta( $attachment_id, '_wp_attached_file', wp_slash( $attached ) );
+        }
+
+        $metadata = isset( $snapshot['metadata'] ) ? $snapshot['metadata'] : null;
+        if ( is_array( $metadata ) ) {
+            wp_update_attachment_metadata( $attachment_id, $metadata );
+        } else {
+            delete_post_meta( $attachment_id, '_wp_attachment_metadata' );
+        }
+
+        $mime = isset( $snapshot['mime'] ) ? (string) $snapshot['mime'] : '';
+        if ( '' !== $mime && $mime !== get_post_mime_type( $attachment_id ) ) {
+            wp_update_post(
+                array(
+                    'ID'             => $attachment_id,
+                    'post_mime_type' => $mime,
+                ),
+                true
+            );
+        }
+
+        clean_post_cache( $attachment_id );
+    }
+
+    /**
+     * 同步转换后的附件路径与元数据
+     *
+     * @param int   $attachment_id 附件 ID
+     * @param array $entries       转换条目
+     * @param string $target       目标格式
+     * @return bool
+     */
+    private function sync_attachment_paths( int $attachment_id, array $entries, string $target ): bool {
+        $full     = isset( $entries['full'] ) ? $entries['full'] : null;
+        $metadata = wp_get_attachment_metadata( $attachment_id );
+        $attached = (string) get_post_meta( $attachment_id, '_wp_attached_file', true );
+
+        if ( null !== $full ) {
+            $known = array(
+                $this->normalized_path( $full['from_relative'] ),
+                $this->normalized_path( $full['to_relative'] ),
+            );
+
+            // 附件路径和元数据都不认识这次转换，说明引用已被外部改动，不能盲目覆盖。
+            if ( ! in_array( $this->normalized_path( $attached ), $known, true )
+                && ! ( is_array( $metadata ) && ! empty( $metadata['file'] ) && in_array( $this->normalized_path( (string) $metadata['file'] ), $known, true ) ) ) {
+                return false;
+            }
+
+            if ( ! $this->write_attached_file( $attachment_id, $full['to'] ) ) {
+                return false;
+            }
+        }
+
+        if ( ! is_array( $metadata ) || empty( $metadata['file'] ) ) {
+            // 允许没有完整元数据的图片（SVG、第三方上传）：按目标图片的真实信息建立，读不到就不伪造。
+            $first   = null !== $full ? $full : reset( $entries );
+            $source  = is_array( $first ) ? $first['to'] : '';
+            $created = $this->build_attachment_metadata( $source );
+
+            if ( ! is_array( $created ) ) {
+                return null === $full;
+            }
+
+            return $this->write_metadata( $attachment_id, $created );
+        }
+
+        return $this->write_metadata( $attachment_id, $this->apply_converted_metadata( $metadata, $entries, $target ) );
+    }
+
+    /**
+     * 按转换条目更新元数据中的文件名与 MIME
+     *
+     * @param array  $metadata 现有元数据
+     * @param array  $entries  转换条目
+     * @param string $target   目标格式
+     * @return array
+     */
+    private function apply_converted_metadata( array $metadata, array $entries, string $target ): array {
+        $mime = isset( $this->target_mimes[ $target ] ) ? $this->target_mimes[ $target ] : '';
+
+        if ( isset( $entries['full'] ) ) {
+            $metadata['file']     = $entries['full']['to_relative'];
+            $metadata['filesize'] = file_exists( $entries['full']['to'] ) ? (int) filesize( $entries['full']['to'] ) : 0;
+        }
+
+        if ( isset( $entries['original_image'] ) && ! empty( $metadata['original_image'] ) ) {
+            $metadata['original_image'] = $entries['original_image']['to_name'];
+        }
+
+        if ( ! empty( $metadata['sizes'] ) && is_array( $metadata['sizes'] ) ) {
+            foreach ( $metadata['sizes'] as $size_name => $size_data ) {
+                $entry = isset( $entries[ $size_name ] ) ? $entries[ $size_name ] : null;
+
+                if ( null === $entry && ! empty( $size_data['file'] ) ) {
+                    // 尺寸名与映射不一致时按文件名匹配，避免元数据停留在旧文件。
+                    foreach ( $entries as $candidate ) {
+                        if ( $this->normalized_path( (string) $size_data['file'] ) === $this->normalized_path( $candidate['from_name'] )
+                            || $this->normalized_path( (string) $size_data['file'] ) === $this->normalized_path( $candidate['to_name'] ) ) {
+                            $entry = $candidate;
+                            break;
+                        }
+                    }
+                }
+
+                if ( null === $entry ) {
+                    continue;
+                }
+
+                $metadata['sizes'][ $size_name ]['file']      = $entry['to_name'];
+                $metadata['sizes'][ $size_name ]['mime-type'] = $mime;
+            }
+        }
+
+        return $metadata;
+    }
+
+    /**
+     * 为缺少元数据的图片读取真实信息
+     *
+     * @param string $file_path 图片绝对路径
+     * @return array|null 读不到真实尺寸时返回 null
+     */
+    private function build_attachment_metadata( string $file_path ) {
+        if ( '' === $file_path || ! file_exists( $file_path ) ) {
             return null;
         }
 
-        $current = $this->normalized_path( $file_path );
-        foreach ( $records as $record ) {
-            if ( empty( $record['to'] ) || $this->normalized_path( $record['to'] ) !== $current ) {
+        $size = wp_getimagesize( $file_path );
+
+        if ( empty( $size[0] ) || empty( $size[1] ) ) {
+            return null;
+        }
+
+        $metadata = array(
+            'file'     => $this->get_relative_upload_path( $file_path ),
+            'width'    => (int) $size[0],
+            'height'   => (int) $size[1],
+            'filesize' => (int) filesize( $file_path ),
+        );
+
+        if ( ! empty( $size['mime'] ) ) {
+            $metadata['mime-type'] = (string) $size['mime'];
+        }
+
+        return $metadata;
+    }
+
+    /**
+     * 同步附件级 MIME（只跟随主文件）
+     *
+     * @param int    $attachment_id 附件 ID
+     * @param array  $entries       转换条目
+     * @param string $mime          目标 MIME
+     * @return bool
+     */
+    private function sync_attachment_mime( int $attachment_id, array $entries, string $mime ): bool {
+        if ( ! isset( $entries['full'] ) ) {
+            return true;
+        }
+
+        $updated = wp_update_post(
+            array(
+                'ID'             => $attachment_id,
+                'post_mime_type' => $mime,
+            ),
+            true
+        );
+
+        return ! is_wp_error( $updated ) && $mime === get_post_mime_type( $attachment_id );
+    }
+
+    /**
+     * 写入附件路径并读回校验
+     *
+     * update_post_meta 在值未变化时同样返回 false，因此一律以读回结果为准。
+     *
+     * @param int    $attachment_id 附件 ID
+     * @param string $absolute_path 目标绝对路径
+     * @return bool
+     */
+    private function write_attached_file( int $attachment_id, string $absolute_path ): bool {
+        $relative = $this->get_relative_upload_path( $absolute_path );
+
+        update_attached_file( $attachment_id, $absolute_path );
+
+        return $this->normalized_path( (string) get_post_meta( $attachment_id, '_wp_attached_file', true ) ) === $this->normalized_path( $relative );
+    }
+
+    /**
+     * 写入附件元数据并读回校验
+     *
+     * @param int   $attachment_id 附件 ID
+     * @param array $metadata      期望的元数据
+     * @return bool
+     */
+    private function write_metadata( int $attachment_id, array $metadata ): bool {
+        if ( ! empty( $metadata ) ) {
+            wp_update_attachment_metadata( $attachment_id, $metadata );
+        }
+
+        $saved = wp_get_attachment_metadata( $attachment_id );
+
+        if ( ! is_array( $saved ) ) {
+            return empty( $metadata );
+        }
+
+        if ( isset( $metadata['file'] ) && $this->normalized_path( (string) $saved['file'] ) !== $this->normalized_path( (string) $metadata['file'] ) ) {
+            return false;
+        }
+
+        if ( isset( $metadata['original_image'] ) && (string) $saved['original_image'] !== (string) $metadata['original_image'] ) {
+            return false;
+        }
+
+        if ( ! empty( $metadata['sizes'] ) && is_array( $metadata['sizes'] ) ) {
+            foreach ( $metadata['sizes'] as $size_name => $size_data ) {
+                if ( ! isset( $saved['sizes'][ $size_name ]['file'] ) || $saved['sizes'][ $size_name ]['file'] !== $size_data['file'] ) {
+                    return false;
+                }
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * 获取附件的转换映射条目（绝对路径形式，按尺寸类型索引）
+     *
+     * @param int $attachment_id 附件 ID
+     * @return array
+     */
+    public function get_output_entries( int $attachment_id ): array {
+        $upload_dir = wp_upload_dir();
+        $base_dir   = untrailingslashit( wp_normalize_path( $upload_dir['basedir'] ) );
+        $entries    = array();
+
+        foreach ( $this->read_output_entries( $attachment_id ) as $entry ) {
+            $entries[] = array(
+                'size_type'     => $entry['size_type'],
+                'from'          => $base_dir . '/' . $entry['from'],
+                'to'            => $base_dir . '/' . $entry['to'],
+                'from_relative' => $entry['from'],
+                'to_relative'   => $entry['to'],
+                'from_name'     => basename( $entry['from'] ),
+                'to_name'       => basename( $entry['to'] ),
+            );
+        }
+
+        return $entries;
+    }
+
+    /**
+     * 读取校验后的映射原始数据
+     *
+     * 映射是持久化数据，取出时按不可信处理：只接受 uploads 内的相对路径。
+     *
+     * @param int $attachment_id 附件 ID
+     * @return array size_type => array( from, to, size_type )
+     */
+    private function read_output_entries( int $attachment_id ): array {
+        $stored = get_post_meta( $attachment_id, self::OUTPUT_META_KEY, true );
+
+        if ( ! is_array( $stored ) ) {
+            return array();
+        }
+
+        $entries = array();
+
+        foreach ( $stored as $entry ) {
+            if ( empty( $entry['from'] ) || empty( $entry['to'] ) ) {
                 continue;
             }
 
-            if ( file_exists( $record['to'] ) && $this->is_safe_path( $record['to'] ) ) {
-                return $record;
+            $from = $this->sanitize_relative_path( (string) $entry['from'] );
+            $to   = $this->sanitize_relative_path( (string) $entry['to'] );
+
+            if ( '' === $from || '' === $to ) {
+                continue;
+            }
+
+            $size_type                          = isset( $entry['size_type'] ) ? sanitize_text_field( (string) $entry['size_type'] ) : '';
+            $size_type                          = '' === $size_type ? 'full' : $size_type;
+            $entries[ $size_type ]              = array(
+                'from'      => $from,
+                'to'        => $to,
+                'size_type' => $size_type,
+            );
+        }
+
+        return $entries;
+    }
+
+    /**
+     * 校验并规范化 uploads 内的相对路径
+     *
+     * @param string $path 相对路径
+     * @return string 非法时返回空字符串
+     */
+    private function sanitize_relative_path( string $path ): string {
+        $normalized = ltrim( wp_normalize_path( $path ), '/' );
+
+        if ( '' === $normalized || false !== strpos( $normalized, '..' ) || false !== strpos( $normalized, ':' ) ) {
+            return '';
+        }
+
+        return $normalized;
+    }
+
+    /**
+     * 按尺寸类型删除恢复映射条目
+     *
+     * @param int    $attachment_id 附件 ID
+     * @param string $size_type     尺寸类型
+     */
+    private function remove_output_entry( int $attachment_id, string $size_type ): void {
+        $entries = $this->read_output_entries( $attachment_id );
+
+        if ( ! isset( $entries[ $size_type ] ) ) {
+            return;
+        }
+
+        unset( $entries[ $size_type ] );
+        $this->store_output_entries( $attachment_id, $entries );
+    }
+
+    /**
+     * 查找该尺寸已有的转换映射
+     *
+     * @param int    $attachment_id 附件 ID
+     * @param string $size_type     尺寸类型
+     * @return array|null
+     */
+    private function find_output_entry( int $attachment_id, string $size_type ) {
+        foreach ( $this->get_output_entries( $attachment_id ) as $entry ) {
+            if ( $entry['size_type'] === $size_type ) {
+                return $entry;
             }
         }
 
@@ -531,207 +843,634 @@ class Libre_Compress_Output {
     }
 
     /**
-     * 追加目标格式输出映射，供恢复原图时反向处理
+     * 写入转换映射，供中断续跑和恢复原图使用
      *
-     * @param int    $attachment_id  附件 ID
-     * @param string $from_path      源文件路径
-     * @param string $to_path        压缩结果路径
-     * @param string $size_type      尺寸类型
-     * @param int    $original_size  源文件大小
-     * @param int    $compressed_size 压缩结果大小
+     * @param int    $attachment_id 附件 ID
+     * @param string $size_type     尺寸类型
+     * @param string $from_path     源文件绝对路径
+     * @param string $to_path       结果文件绝对路径
      * @return bool 是否保存成功
      */
-    private function add_output_record(
-        int $attachment_id,
-        string $from_path,
-        string $to_path,
-        string $size_type,
-        int $original_size,
-        int $compressed_size
-    ): bool {
-        $records = get_post_meta( $attachment_id, self::OUTPUT_META_KEY, true );
-
-        if ( ! is_array( $records ) ) {
-            $records = array();
-        }
-
-        $records[] = array(
-            'from'            => $from_path,
-            'to'              => $to_path,
-            'size_type'       => sanitize_text_field( $size_type ),
-            'original_size'   => $original_size,
-            'compressed_size' => $compressed_size,
+    private function add_output_entry( int $attachment_id, string $size_type, string $from_path, string $to_path ): bool {
+        $entries                    = $this->read_output_entries( $attachment_id );
+        $entries[ $size_type ]      = array(
+            'from'      => $this->get_relative_upload_path( $from_path ),
+            'to'        => $this->get_relative_upload_path( $to_path ),
+            'size_type' => $size_type,
         );
 
-        return false !== update_post_meta( $attachment_id, self::OUTPUT_META_KEY, $records );
+        return $this->store_output_entries( $attachment_id, $entries );
     }
 
     /**
-     * 同步目标格式输出后的附件路径与元数据
+     * 持久化映射并读回校验
      *
-     * 附件级 MIME 只跟随主文件；部分尺寸成功不会伪装成整个附件已输出目标格式。
+     * 映射只存 uploads 内相对路径，避免 Windows 绝对路径的反斜杠在元数据写入时被剥掉。
      *
-     * @param int    $attachment_id 附件 ID
-     * @param array  $output_map size_type => array( from, to )
-     * @param string $target        目标格式
-     * @return bool 是否同步成功
+     * @param int   $attachment_id 附件 ID
+     * @param array $entries       size_type => 映射条目
+     * @return bool
      */
-    public function sync_attachment_format( int $attachment_id, array $output_map, string $target ): bool {
-        $mime    = isset( $this->target_mimes[ $target ] ) ? $this->target_mimes[ $target ] : 'image/webp';
-        $success = true;
-        $original_attached = get_post_meta( $attachment_id, '_wp_attached_file', true );
-        $original_metadata = wp_get_attachment_metadata( $attachment_id );
-        $original_mime     = get_post_mime_type( $attachment_id );
-        $full    = isset( $output_map['full'] ) ? $output_map['full'] : null;
-        $full_attached_synced = false;
-        $full_metadata_synced = false;
-        $from_relative = '';
-        $to_relative   = '';
+    private function store_output_entries( int $attachment_id, array $entries ): bool {
+        if ( empty( $entries ) ) {
+            return $this->forget_output_entries( $attachment_id );
+        }
 
-        if ( is_array( $full ) && ! empty( $full['from'] ) && ! empty( $full['to'] ) ) {
-            $from_relative = $this->get_relative_upload_path( $full['from'] );
-            $to_relative   = $this->get_relative_upload_path( $full['to'] );
-            $metadata_snapshot = wp_get_attachment_metadata( $attachment_id );
-            $full_metadata_exists = is_array( $metadata_snapshot ) && ! empty( $metadata_snapshot['file'] )
-                && (
-                    $this->normalized_path( $metadata_snapshot['file'] ) === $this->normalized_path( $from_relative )
-                    || $this->normalized_path( $metadata_snapshot['file'] ) === $this->normalized_path( $to_relative )
-                );
+        update_post_meta( $attachment_id, self::OUTPUT_META_KEY, wp_slash( array_values( $entries ) ) );
+        $saved = $this->read_output_entries( $attachment_id );
 
-            if ( ! $full_metadata_exists ) {
-                $success = false;
+        foreach ( $entries as $size_type => $entry ) {
+            if ( ! isset( $saved[ $size_type ] )
+                || $saved[ $size_type ]['from'] !== $entry['from']
+                || $saved[ $size_type ]['to'] !== $entry['to'] ) {
+                return false;
+            }
+        }
+
+        return count( $saved ) === count( $entries );
+    }
+
+    /**
+     * 删除转换映射
+     *
+     * @param int $attachment_id 附件 ID
+     * @return bool
+     */
+    public function forget_output_entries( int $attachment_id ): bool {
+        if ( '' === get_post_meta( $attachment_id, self::OUTPUT_META_KEY, true ) ) {
+            return true;
+        }
+
+        delete_post_meta( $attachment_id, self::OUTPUT_META_KEY );
+
+        return '' === get_post_meta( $attachment_id, self::OUTPUT_META_KEY, true );
+    }
+
+    /**
+     * 把转换条目整理成提交阶段使用的统一结构
+     *
+     * @param array $output_map size_type => array( from, to )
+     * @return array
+     */
+    private function describe_entries( array $output_map ): array {
+        $entries = array();
+
+        foreach ( $output_map as $size_type => $entry ) {
+            if ( empty( $entry['from'] ) || empty( $entry['to'] ) ) {
+                continue;
             }
 
-            if ( ! $full_metadata_exists ) {
-                $full_attached_synced = false;
-            } elseif ( function_exists( 'update_attached_file' ) ) {
-                $full_attached_synced = false !== update_attached_file( $attachment_id, $full['to'] );
-            } else {
-                $full_attached_synced = false !== update_post_meta( $attachment_id, '_wp_attached_file', $to_relative );
+            $from_relative = $this->get_relative_upload_path( $entry['from'] );
+            $to_relative   = $this->get_relative_upload_path( $entry['to'] );
+
+            $entries[ $size_type ] = array(
+                'size_type'     => (string) $size_type,
+                'from'          => $entry['from'],
+                'to'            => $entry['to'],
+                'from_relative' => $from_relative,
+                'to_relative'   => $to_relative,
+                'from_name'     => basename( $from_relative ),
+                'to_name'       => basename( $to_relative ),
+            );
+        }
+
+        return $entries;
+    }
+
+    /**
+     * 推断本批转换条目的目标格式
+     *
+     * @param array $entries 条目集合
+     * @return string webp|avif，无法判断时返回空字符串
+     */
+    private function target_of_entries( array $entries ): string {
+        foreach ( $entries as $entry ) {
+            $format = $this->format_of( $entry['to'] );
+
+            if ( 'webp' === $format || 'avif' === $format ) {
+                return $format;
             }
-            if ( ! $full_attached_synced ) {
-                $success = false;
-            }
+        }
+
+        return '';
+    }
+
+    /**
+     * 生成正文链接替换用的路径对
+     *
+     * @param array $entries 条目集合
+     * @param bool  $reverse 是否反向（转换结果 → 源文件）
+     * @return array
+     */
+    private function reference_pairs( array $entries, bool $reverse ): array {
+        $pairs = array();
+
+        foreach ( $entries as $entry ) {
+            $pairs[] = $reverse
+                ? array( 'from' => $entry['to'], 'to' => $entry['from'] )
+                : array( 'from' => $entry['from'], 'to' => $entry['to'] );
+        }
+
+        return $pairs;
+    }
+
+    /**
+     * 恢复格式转换前的引用与正文链接
+     *
+     * 只处理引用和链接，不删除任何文件；调用方需先确认备份已经写回原路径。
+     *
+     * @param int   $attachment_id 附件 ID
+     * @param array $entries       需要恢复的映射条目（get_output_entries 的形式）
+     * @return bool
+     */
+    public function revert_attachment_format( int $attachment_id, array $entries ): bool {
+        if ( empty( $entries ) ) {
+            return true;
+        }
+
+        $mapped   = array();
+        foreach ( $entries as $entry ) {
+            $mapped[ $entry['size_type'] ] = $entry;
         }
 
         $metadata = wp_get_attachment_metadata( $attachment_id );
+        $attached = (string) get_post_meta( $attachment_id, '_wp_attached_file', true );
+        $full     = isset( $mapped['full'] ) ? $mapped['full'] : null;
+
+        if ( null !== $full ) {
+            $points_to_target = $this->normalized_path( $attached ) === $this->normalized_path( $full['to_relative'] )
+                || ( is_array( $metadata ) && ! empty( $metadata['file'] ) && $this->normalized_path( $metadata['file'] ) === $this->normalized_path( $full['to_relative'] ) );
+            $points_to_source = $this->normalized_path( $attached ) === $this->normalized_path( $full['from_relative'] )
+                || ( is_array( $metadata ) && ! empty( $metadata['file'] ) && $this->normalized_path( $metadata['file'] ) === $this->normalized_path( $full['from_relative'] ) );
+
+            // 既不是转换结果也不是源文件，说明引用已被外部改动，不能盲目写回。
+            if ( ! $points_to_target && ! $points_to_source ) {
+                return false;
+            }
+
+            if ( $points_to_target && ! $this->write_attached_file( $attachment_id, $full['from'] ) ) {
+                return false;
+            }
+        }
 
         if ( is_array( $metadata ) ) {
-            $changed = false;
+            $metadata = $this->apply_reverted_metadata( $metadata, $mapped );
 
-            if ( is_array( $full ) && ! empty( $metadata['file'] )
-                && (
-                    $this->normalized_path( $metadata['file'] ) === $this->normalized_path( $from_relative )
-                    || $this->normalized_path( $metadata['file'] ) === $this->normalized_path( $to_relative )
-                ) ) {
-                $metadata['file']      = $this->get_relative_upload_path( $full['to'] );
-                $metadata['filesize']   = is_file( $full['to'] ) ? (int) filesize( $full['to'] ) : 0;
-                $full_metadata_synced   = true;
-                $changed                = true;
-            }
-
-            if ( ! empty( $metadata['original_image'] ) && isset( $output_map['original_image'] ) ) {
-                $entry = $output_map['original_image'];
-                $from_name = basename( $entry['from'] );
-                $to_name   = basename( $entry['to'] );
-                if ( $this->normalized_path( $metadata['original_image'] ) === $this->normalized_path( $from_name )
-                    || $this->normalized_path( $metadata['original_image'] ) === $this->normalized_path( $to_name ) ) {
-                    $metadata['original_image'] = $to_name;
-                    $changed                    = true;
-                }
-            }
-
-            if ( ! empty( $metadata['sizes'] ) && is_array( $metadata['sizes'] ) ) {
-                foreach ( $metadata['sizes'] as $size_name => $size_data ) {
-                    if ( empty( $size_data['file'] ) || ! isset( $output_map[ $size_name ] ) ) {
-                        continue;
-                    }
-
-                    $entry    = $output_map[ $size_name ];
-                    $from_name = basename( $entry['from'] );
-                    $to_name   = basename( $entry['to'] );
-                    if ( $this->normalized_path( $size_data['file'] ) !== $this->normalized_path( $from_name )
-                        && $this->normalized_path( $size_data['file'] ) !== $this->normalized_path( $to_name ) ) {
-                        continue;
-                    }
-
-                    $metadata['sizes'][ $size_name ]['file']      = $to_name;
-                    $metadata['sizes'][ $size_name ]['mime-type'] = $mime;
-                    $changed                                      = true;
-                }
-            }
-
-            if ( $changed && false === wp_update_attachment_metadata( $attachment_id, $metadata ) ) {
-                $success = false;
+            if ( ! $this->write_metadata( $attachment_id, $metadata ) ) {
+                return false;
             }
         }
 
-        if ( $success && $full_attached_synced && $full_metadata_synced ) {
-            $post_updated = wp_update_post(
-                array(
-                    'ID'             => $attachment_id,
-                    'post_mime_type' => $mime,
-                ),
-                true
-            );
-            if ( is_wp_error( $post_updated ) || $mime !== get_post_mime_type( $attachment_id ) ) {
-                $success = false;
-            }
-        } elseif ( is_array( $full ) ) {
-            $success = false;
-        }
+        if ( null !== $full ) {
+            $source_mime = $this->source_mime_of( $full['from'] );
 
-        if ( ! $success ) {
-            if ( is_string( $original_attached ) ) {
-                update_post_meta( $attachment_id, '_wp_attached_file', $original_attached );
-            } else {
-                delete_post_meta( $attachment_id, '_wp_attached_file' );
-            }
-            if ( is_array( $original_metadata ) ) {
-                wp_update_attachment_metadata( $attachment_id, $original_metadata );
-            } else {
-                delete_post_meta( $attachment_id, '_wp_attachment_metadata' );
-            }
-            if ( is_string( $original_mime ) ) {
-                wp_update_post(
+            if ( '' !== $source_mime && $source_mime !== get_post_mime_type( $attachment_id ) ) {
+                $updated = wp_update_post(
                     array(
                         'ID'             => $attachment_id,
-                        'post_mime_type' => $original_mime,
-                    )
+                        'post_mime_type' => $source_mime,
+                    ),
+                    true
                 );
+
+                if ( is_wp_error( $updated ) || $source_mime !== get_post_mime_type( $attachment_id ) ) {
+                    return false;
+                }
             }
         }
+
+        return $this->update_content_references( $this->reference_pairs( $mapped, true ) );
+    }
+
+    /**
+     * 按映射把元数据中的文件名改回源格式
+     *
+     * @param array $metadata 现有元数据
+     * @param array $mapped   size_type => 条目
+     * @return array
+     */
+    private function apply_reverted_metadata( array $metadata, array $mapped ): array {
+        if ( isset( $mapped['full'] ) && ! empty( $metadata['file'] )
+            && (
+                $this->normalized_path( $metadata['file'] ) === $this->normalized_path( $mapped['full']['to_relative'] )
+                || $this->normalized_path( $metadata['file'] ) === $this->normalized_path( $mapped['full']['from_relative'] )
+            ) ) {
+            $metadata['file'] = $mapped['full']['from_relative'];
+
+            if ( file_exists( $mapped['full']['from'] ) ) {
+                $metadata['filesize'] = (int) filesize( $mapped['full']['from'] );
+            }
+        }
+
+        if ( isset( $mapped['original_image'] ) && ! empty( $metadata['original_image'] ) ) {
+            $entry = $mapped['original_image'];
+
+            if ( in_array(
+                $this->normalized_path( (string) $metadata['original_image'] ),
+                array( $this->normalized_path( $entry['to_name'] ), $this->normalized_path( $entry['from_name'] ) ),
+                true
+            ) ) {
+                $metadata['original_image'] = $entry['from_name'];
+            }
+        }
+
+        if ( ! empty( $metadata['sizes'] ) && is_array( $metadata['sizes'] ) ) {
+            foreach ( $metadata['sizes'] as $size_name => $size_data ) {
+                if ( empty( $size_data['file'] ) ) {
+                    continue;
+                }
+
+                $entry = isset( $mapped[ $size_name ] ) ? $mapped[ $size_name ] : null;
+
+                if ( null === $entry ) {
+                    foreach ( $mapped as $mapped_entry ) {
+                        if ( $this->normalized_path( $size_data['file'] ) === $this->normalized_path( $mapped_entry['to_name'] ) ) {
+                            $entry = $mapped_entry;
+                            break;
+                        }
+                    }
+                }
+
+                if ( null === $entry ) {
+                    continue;
+                }
+
+                $metadata['sizes'][ $size_name ]['file']      = $entry['from_name'];
+                $metadata['sizes'][ $size_name ]['mime-type'] = $this->source_mime_of( $entry['from'] );
+            }
+        }
+
+        return $metadata;
+    }
+
+    /**
+     * 获取源格式对应的 MIME
+     *
+     * @param string $file_path 文件路径
+     * @return string
+     */
+    private function source_mime_of( string $file_path ): string {
+        $format = $this->format_of( $file_path );
+
+        return isset( $this->format_mimes[ $format ] ) ? $this->format_mimes[ $format ] : '';
+    }
+
+    /**
+     * 删除已被替换掉的源文件
+     *
+     * @param array $entries 条目集合
+     * @return bool 是否全部删除成功
+     */
+    private function remove_replaced_files( array $entries ): bool {
+        foreach ( $entries as $entry ) {
+            if ( ! file_exists( $entry['from'] ) ) {
+                continue;
+            }
+
+            if ( ! $this->is_safe_path( $entry['from'] ) || is_link( $entry['from'] ) ) {
+                return false;
+            }
+
+            // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
+            if ( ! unlink( $entry['from'] ) ) {
+                return false;
+            }
+
+            if ( file_exists( $entry['from'] ) ) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * 分配未被占用的目标文件路径
+     *
+     * 同名目标文件属于谁无法凭名字和大小判断，因此一律换新名字，不覆盖任何文件。
+     *
+     * @param string $file_path 源文件绝对路径
+     * @param string $target    目标格式
+     * @return string 无法分配时返回空字符串
+     */
+    private function allocate_target_path( string $file_path, string $target ): string {
+        $directory = dirname( $file_path );
+        $name      = pathinfo( $file_path, PATHINFO_FILENAME );
+        $candidate = $directory . '/' . $name . '.' . $target;
+        $attempt   = 0;
+
+        while ( file_exists( $candidate ) ) {
+            $attempt++;
+
+            if ( $attempt > self::MAX_NAME_ATTEMPTS ) {
+                return '';
+            }
+
+            $candidate = $directory . '/' . $name . '-' . $attempt . '.' . $target;
+        }
+
+        return $candidate;
+    }
+
+    /**
+     * 写入统一压缩记录
+     *
+     * @param int    $attachment_id   附件 ID
+     * @param string $file_path       文件路径
+     * @param string $size_type       尺寸类型
+     * @param int    $original_size   处理前大小
+     * @param int    $compressed_size 处理后大小
+     * @param string $tool_name       工具名称
+     * @param string $status          状态
+     * @param string $message         附加说明
+     * @return bool 是否写入成功
+     */
+    private function save_record( int $attachment_id, string $file_path, string $size_type, int $original_size, int $compressed_size, string $tool_name, string $status, string $message ): bool {
+        return libre_compress()->compressor->save_compression_record(
+            $attachment_id,
+            $file_path,
+            $size_type,
+            $original_size,
+            $compressed_size,
+            $tool_name,
+            $status,
+            $message
+        );
+    }
+
+    /**
+     * 分页更新文章中的图片链接
+     *
+     * 转换后源文件会被删除，正文里已固化的旧地址必须持久改写；写入前比较原内容，
+     * 避免覆盖用户在编辑器和别处同时做出的修改。
+     *
+     * @param array $replacements 每项包含 from 和 to 绝对路径
+     * @return bool 是否全部更新成功
+     */
+    private function update_content_references( array $replacements ): bool {
+        global $wpdb;
+
+        if ( empty( $replacements ) ) {
+            return true;
+        }
+
+        $like_sql  = array();
+        $like_args = array();
+
+        foreach ( $replacements as $replacement ) {
+            $needle = $this->content_path_of( $replacement['from'] );
+
+            if ( '' === $needle ) {
+                continue;
+            }
+
+            // SQL 侧只做粗筛：同时匹配普通路径和区块 JSON 里 \/ 的转义写法，精确判断交给替换逻辑。
+            foreach ( array( $needle, str_replace( '/', '\\/', $needle ) ) as $pattern ) {
+                $like_sql[]  = 'post_content LIKE %s';
+                $like_args[] = '%' . $wpdb->esc_like( $pattern ) . '%';
+            }
+        }
+
+        if ( empty( $like_sql ) ) {
+            return true;
+        }
+
+        $after_id = 0;
+        $success  = true;
+
+        do {
+            // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+            $posts = $wpdb->get_results(
+                $wpdb->prepare(
+                    "SELECT ID, post_content FROM {$wpdb->posts}
+                    WHERE ID > %d
+                    AND post_type <> 'revision'
+                    AND post_status NOT IN ('trash', 'auto-draft')
+                    AND ( " . implode( ' OR ', $like_sql ) . ' )
+                    ORDER BY ID ASC
+                    LIMIT %d',
+                    array_merge( array( $after_id ), $like_args, array( self::REFERENCE_BATCH_SIZE ) )
+                )
+            );
+
+            $posts     = is_array( $posts ) ? $posts : array();
+            $page_size = count( $posts );
+
+            foreach ( $posts as $post ) {
+                $post_id = (int) $post->ID;
+                $content = (string) $post->post_content;
+                $updated = $this->replace_content_references( $content, $replacements );
+
+                $after_id = max( $after_id, $post_id );
+
+                if ( $updated === $content ) {
+                    continue;
+                }
+
+                if ( $this->write_post_content( $post_id, $content, $updated ) ) {
+                    continue;
+                }
+
+                // 写入未生效：可能已被并发修改，重读最新内容后再替换一次。
+                $current = $this->read_post_content( $post_id );
+
+                if ( $current === $content ) {
+                    $success = false;
+                    continue;
+                }
+
+                $retry = $this->replace_content_references( $current, $replacements );
+
+                if ( $retry !== $current && ! $this->write_post_content( $post_id, $current, $retry ) ) {
+                    $success = false;
+                }
+            }
+        } while ( $page_size >= self::REFERENCE_BATCH_SIZE );
 
         return $success;
     }
 
     /**
-     * 获取上传目录内的相对路径
+     * 读取文章内容
      *
-     * @param string $path 绝对路径或相对路径
+     * @param int $post_id 文章 ID
      * @return string
      */
-    private function get_relative_upload_path( string $path ): string {
-        $upload_dir = wp_upload_dir();
-        $normalized = $this->normalized_path( $path );
-        $base_dir   = $this->normalized_path( $upload_dir['basedir'] );
+    private function read_post_content( int $post_id ): string {
+        global $wpdb;
 
-        if ( 0 === strpos( $normalized, $base_dir . '/' ) ) {
-            return ltrim( substr( $normalized, strlen( $base_dir ) ), '/' );
-        }
-
-        return ltrim( $normalized, '/' );
+        // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+        return (string) $wpdb->get_var(
+            $wpdb->prepare( "SELECT post_content FROM {$wpdb->posts} WHERE ID = %d", $post_id )
+        );
     }
 
     /**
-     * 规范化路径用于精确比较
+     * 比较原内容后写入文章内容
      *
-     * @param string $path 路径
+     * @param int    $post_id  文章 ID
+     * @param string $expected 读取到的原内容
+     * @param string $content  新内容
+     * @return bool 是否写入成功
+     */
+    private function write_post_content( int $post_id, string $expected, string $content ): bool {
+        global $wpdb;
+
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+        $updated = $wpdb->update(
+            $wpdb->posts,
+            array( 'post_content' => $content ),
+            array(
+                'ID'           => $post_id,
+                'post_content' => $expected,
+            ),
+            array( '%s' ),
+            array( '%d', '%s' )
+        );
+
+        if ( 1 !== (int) $updated ) {
+            return false;
+        }
+
+        clean_post_cache( $post_id );
+
+        return true;
+    }
+
+    /**
+     * 按实际映射替换内容中的图片地址
+     *
+     * 只替换文件名部分，保留协议、域名、查询参数、锚点和 srcset 的候选结构；
+     * 同时兼容区块 JSON 里被转义成 \/ 的路径，外站地址与同名前缀文件不动。
+     *
+     * @param string $content     文章内容
+     * @param array  $replacements 每项包含 from 和 to 绝对路径
      * @return string
      */
-    private function normalized_path( string $path ): string {
-        $normalized = wp_normalize_path( $path );
-        return 'WIN' === strtoupper( substr( PHP_OS, 0, 3 ) ) ? strtolower( $normalized ) : $normalized;
+    public function replace_content_references( string $content, array $replacements ): string {
+        foreach ( $replacements as $replacement ) {
+            $content = $this->replace_reference_in_content( $content, $replacement['from'], $replacement['to'] );
+        }
+
+        return $content;
+    }
+
+    /**
+     * 替换内容中指向某个 uploads 文件的地址
+     *
+     * @param string $content  文章内容
+     * @param string $from     源文件绝对路径
+     * @param string $to       结果文件绝对路径
+     * @return string
+     */
+    private function replace_reference_in_content( string $content, string $from, string $to ): string {
+        $needle = $this->content_path_of( $from );
+
+        if ( '' === $needle || false === strpos( str_replace( '\\', '', $content ), str_replace( '\\', '', $needle ) ) ) {
+            return $content;
+        }
+
+        $separator = '(?:\\\\)?/';
+        $filename  = basename( $needle );
+        $directory = rtrim( dirname( $needle ), '/' );
+        $pattern   = $separator;
+
+        foreach ( explode( '/', $directory ) as $segment ) {
+            if ( '' === $segment ) {
+                continue;
+            }
+
+            $pattern .= preg_quote( $segment, '#' ) . $separator;
+        }
+
+        // 文件名后面必须正好结束，避免把 a.jpg.extra 这类不同的文件一起改掉。
+        $pattern .= '(?P<file>' . preg_quote( $filename, '#' ) . ')(?![\w.\-%~/-])(?![\\\\])';
+
+        $matches = array();
+        // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
+        if ( ! preg_match_all( '#' . $pattern . '#i', $content, $matches, PREG_SET_ORDER | PREG_OFFSET_CAPTURE ) ) {
+            return $content;
+        }
+
+        $new_name = basename( $this->content_path_of( $to ) );
+
+        // 从后往前替换，避免前面的替换让后面的偏移失效。
+        for ( $index = count( $matches ) - 1; $index >= 0; $index-- ) {
+            if ( ! isset( $matches[ $index ][0][1], $matches[ $index ]['file'][1] ) ) {
+                continue;
+            }
+
+            $file_offset = (int) $matches[ $index ]['file'][1];
+
+            // 以整段路径的起点判断宿主，匹配段自身以 / 开头，前面的内容正好是协议和域名。
+            if ( ! $this->content_host_allowed( substr( $content, 0, (int) $matches[ $index ][0][1] ) ) ) {
+                continue;
+            }
+
+            $content = substr_replace( $content, $new_name, $file_offset, strlen( $matches[ $index ]['file'][0] ) );
+        }
+
+        return $content;
+    }
+
+    /**
+     * 把上传目录内的文件路径转换为站点内的 URL 路径
+     *
+     * @param string $file_path 绝对路径
+     * @return string 无法定位时返回空字符串
+     */
+    private function content_path_of( string $file_path ): string {
+        $upload    = wp_get_upload_dir();
+        $base_path = isset( $upload['baseurl'] ) ? wp_parse_url( $upload['baseurl'], PHP_URL_PATH ) : '';
+        $base_dir  = isset( $upload['basedir'] ) ? $upload['basedir'] : '';
+
+        if ( ! is_string( $base_path ) || '' === $base_path || '' === $base_dir ) {
+            return '';
+        }
+
+        $relative = $this->get_relative_upload_path( $file_path );
+
+        if ( $relative === $this->normalized_path( $file_path ) ) {
+            // 不在上传目录内，没有可替换的站点路径。
+            return '';
+        }
+
+        return untrailingslashit( $base_path ) . '/' . ltrim( $relative, '/' );
+    }
+
+    /**
+     * 判断待替换地址的宿主是否属于本站上传目录
+     *
+     * @param string $prefix 匹配位置之前的内容
+     * @return bool
+     */
+    private function content_host_allowed( string $prefix ): bool {
+        $delimiters = "\"'<> \t\n\r(),;=[]{}";
+        $start      = strlen( $prefix );
+
+        while ( $start > 0 && false === strpos( $delimiters, $prefix[ $start - 1 ] ) ) {
+            $start--;
+        }
+
+        $token = str_replace( '\\', '', substr( $prefix, $start ) );
+
+        // 站内相对路径
+        if ( '' === $token ) {
+            return true;
+        }
+
+        if ( ! preg_match( '~^(?:[a-z][a-z0-9+.\-]*:)?(?://(?P<host>[^/?#]*))?$~i', $token, $matched ) ) {
+            return false;
+        }
+
+        if ( empty( $matched['host'] ) ) {
+            return false;
+        }
+
+        $upload    = wp_get_upload_dir();
+        $base_host = isset( $upload['baseurl'] ) ? wp_parse_url( $upload['baseurl'], PHP_URL_HOST ) : '';
+
+        return is_string( $base_host ) && strtolower( $matched['host'] ) === strtolower( $base_host );
     }
 
     /**
@@ -960,7 +1699,7 @@ class Libre_Compress_Output {
             );
         }
 
-        $ffmpeg = $this->find_local_tool( 'ffmpeg' );
+        $ffmpeg  = $this->find_local_tool( 'ffmpeg' );
         $avifenc = $this->find_local_tool( 'avifenc' );
 
         if ( false === $ffmpeg || false === $avifenc ) {
@@ -1058,281 +1797,44 @@ class Libre_Compress_Output {
     }
 
     /**
-     * 恢复目标格式输出前的反向处理
+     * 获取文件的格式标识（jpeg 归一为 jpg）
      *
-     * @param int $attachment_id 附件 ID
-     * @return bool 是否完整恢复路径和元数据
-     */
-    public function handle_after_restore( int $attachment_id ): bool {
-        $records = get_post_meta( $attachment_id, self::OUTPUT_META_KEY, true );
-
-        if ( ! is_array( $records ) || empty( $records ) ) {
-            return true;
-        }
-
-        $success      = true;
-        $metadata     = wp_get_attachment_metadata( $attachment_id );
-        $attached     = get_post_meta( $attachment_id, '_wp_attached_file', true );
-        $full_from    = '';
-        $metadata_new = is_array( $metadata ) ? $metadata : array();
-
-        foreach ( $records as $record ) {
-            if ( empty( $record['from'] ) || empty( $record['to'] )
-                || ! $this->is_safe_destination_path( $record['from'] )
-                || ! $this->is_safe_destination_path( $record['to'] ) ) {
-                $success = false;
-                continue;
-            }
-
-            // 只处理本次确实有备份可恢复的映射，不能因历史记录删除无备份目标文件。
-            $backup = libre_compress()->database->get_backup_by_path( $record['from'] );
-            if ( ! $backup || empty( $backup['backup_path'] ) || ! file_exists( $backup['backup_path'] ) ) {
-                $success = false;
-                continue;
-            }
-
-            if ( file_exists( $record['to'] ) ) {
-                if ( ! $this->is_safe_path( $record['to'] )
-                    || ! unlink( $record['to'] ) ) {
-                    $success = false;
-                    continue;
-                }
-            }
-
-            $from_relative = $this->get_relative_upload_path( $record['from'] );
-            $to_relative   = $this->get_relative_upload_path( $record['to'] );
-            $size_type     = isset( $record['size_type'] ) ? sanitize_text_field( $record['size_type'] ) : '';
-
-            if ( is_string( $attached ) && '' !== $attached
-                && $this->normalized_path( $attached ) === $this->normalized_path( $to_relative ) ) {
-                $attached = $from_relative;
-            }
-
-            if ( ! empty( $metadata_new['file'] )
-                && $this->normalized_path( $metadata_new['file'] ) === $this->normalized_path( $to_relative ) ) {
-                $metadata_new['file']      = $from_relative;
-                $metadata_new['filesize'] = isset( $record['original_size'] ) ? absint( $record['original_size'] ) : 0;
-                $full_from                = $record['from'];
-            } elseif ( 'full' === $size_type ) {
-                $full_from = $record['from'];
-            }
-
-            if ( 'original_image' === $size_type && ! empty( $metadata_new['original_image'] )
-                && in_array(
-                    $this->normalized_path( $metadata_new['original_image'] ),
-                    array(
-                        $this->normalized_path( basename( $record['from'] ) ),
-                        $this->normalized_path( basename( $record['to'] ) ),
-                    ),
-                    true
-                ) ) {
-                $metadata_new['original_image'] = basename( $record['from'] );
-            }
-
-            if ( ! empty( $metadata_new['sizes'] ) && is_array( $metadata_new['sizes'] ) ) {
-                foreach ( $metadata_new['sizes'] as $name => $size_data ) {
-                    if ( empty( $size_data['file'] ) ) {
-                        continue;
-                    }
-
-                    $matches_record = $name === $size_type
-                        || in_array(
-                            $this->normalized_path( $size_data['file'] ),
-                            array(
-                                $this->normalized_path( basename( $record['from'] ) ),
-                                $this->normalized_path( basename( $record['to'] ) ),
-                            ),
-                            true
-                        );
-                    if ( $matches_record ) {
-                        $source_format = strtolower( pathinfo( $record['from'], PATHINFO_EXTENSION ) );
-                        if ( 'jpeg' === $source_format ) {
-                            $source_format = 'jpg';
-                        }
-
-                        $metadata_new['sizes'][ $name ]['file']      = basename( $record['from'] );
-                        $metadata_new['sizes'][ $name ]['mime-type'] = isset( $this->format_mimes[ $source_format ] )
-                            ? $this->format_mimes[ $source_format ]
-                            : 'image/jpeg';
-                    }
-                }
-            }
-        }
-
-        if ( is_string( $attached ) && '' !== $attached
-            && false === update_post_meta( $attachment_id, '_wp_attached_file', $attached ) ) {
-            $success = false;
-        }
-
-        if ( ! empty( $metadata_new ) && false === wp_update_attachment_metadata( $attachment_id, $metadata_new ) ) {
-            $success = false;
-        }
-
-        if ( '' !== $full_from ) {
-            $extension = strtolower( pathinfo( $full_from, PATHINFO_EXTENSION ) );
-            if ( 'jpeg' === $extension ) {
-                $extension = 'jpg';
-            }
-
-            if ( isset( $this->format_mimes[ $extension ] ) ) {
-                $expected_mime = $this->format_mimes[ $extension ];
-                $post_updated  = wp_update_post(
-                    array(
-                        'ID'             => $attachment_id,
-                        'post_mime_type' => $expected_mime,
-                    ),
-                    true
-                );
-                if ( is_wp_error( $post_updated ) || $expected_mime !== get_post_mime_type( $attachment_id ) ) {
-                    $success = false;
-                }
-            }
-        }
-
-        if ( $success && false === delete_post_meta( $attachment_id, self::OUTPUT_META_KEY ) ) {
-            $success = false;
-        }
-
-        return $success;
-    }
-
-    /**
-     * 将 URL 映射到 uploads 目录内的本地路径
-     *
-     * 不要求源文件仍然存在（目标格式输出后源文件可能已移除）
-     *
-     * @param string $url 图片 URL
-     * @return array|null array( local_path, url_path ) 或 null
-     */
-    private function resolve_url_to_local( string $url ) {
-        $upload   = wp_get_upload_dir();
-        $base_url = isset( $upload['baseurl'] ) ? $upload['baseurl'] : '';
-        $base_dir = isset( $upload['basedir'] ) ? $upload['basedir'] : '';
-
-        if ( '' === $base_url || '' === $base_dir ) {
-            return null;
-        }
-
-        $url_path  = wp_parse_url( $url, PHP_URL_PATH );
-        $base_path = wp_parse_url( $base_url, PHP_URL_PATH );
-        $url_host  = wp_parse_url( $url, PHP_URL_HOST );
-        $base_host = wp_parse_url( $base_url, PHP_URL_HOST );
-
-        if ( ! is_string( $url_path ) || '' === $url_path || ! is_string( $base_path ) || '' === $base_path ) {
-            return null;
-        }
-
-        if ( is_string( $url_host ) && '' !== $url_host && $url_host !== $base_host ) {
-            return null;
-        }
-
-        $base_path = untrailingslashit( $base_path );
-        if ( 0 !== strpos( $url_path, $base_path . '/' ) ) {
-            return null;
-        }
-
-        $relative = substr( $url_path, strlen( $base_path ) );
-
-        // 防目录穿越
-        if ( false !== strpos( $relative, '..' ) ) {
-            return null;
-        }
-
-        return array(
-            'local_path' => $base_dir . str_replace( '/', DIRECTORY_SEPARATOR, $relative ),
-            'url_path'   => $url_path,
-        );
-    }
-
-    /**
-     * 文章内容中的旧格式 URL 替换
-     *
-     * URL 指向已产生目标格式输出的源文件时，按实际映射替换 URL。
-     * 源文件移除后不替换会形成死链。
-     *
-     * @param string $content 文章内容
+     * @param string $file_path 文件路径
      * @return string
      */
-    public function filter_content( $content ) {
-        if ( ! is_string( $content ) || '' === $content ) {
-            return $content;
-        }
+    private function format_of( string $file_path ): string {
+        $format = strtolower( pathinfo( $file_path, PATHINFO_EXTENSION ) );
 
-        return preg_replace_callback(
-            '/[^\s"\'<>()]+\.(?:png|jpe?g|gif|svg)(?=[\s"\'<>()]|$)/i',
-            array( $this, 'replace_content_url' ),
-            $content
-        );
+        return 'jpeg' === $format ? 'jpg' : $format;
     }
 
     /**
-     * the_content 回调：命中 URL 时尝试替换为新格式
+     * 获取上传目录内的相对路径
      *
-     * @param array $matches 正则匹配
-     * @return string 原始或替换后的 URL
+     * @param string $path 绝对路径或相对路径
+     * @return string
      */
-    private function replace_content_url( $matches ): string {
-        $url      = $matches[0];
-        $resolved = $this->resolve_url_to_local( $url );
+    private function get_relative_upload_path( string $path ): string {
+        $upload_dir = wp_upload_dir();
+        $normalized = $this->normalized_path( $path );
+        $base_dir   = $this->normalized_path( $upload_dir['basedir'] );
 
-        if ( null === $resolved ) {
-            return $url;
+        if ( 0 === strpos( $normalized, $base_dir . '/' ) ) {
+            return ltrim( substr( $normalized, strlen( $base_dir ) ), '/' );
         }
 
-        $output_path = $this->find_output_path_for_source( $resolved['local_path'] );
-        if ( '' === $output_path ) {
-            return $url;
-        }
-
-        $upload    = wp_upload_dir();
-        $base_path = untrailingslashit( wp_parse_url( $upload['baseurl'], PHP_URL_PATH ) );
-        $relative  = ltrim( $this->get_relative_upload_path( $output_path ), '/' );
-        $new_path  = $base_path . '/' . $relative;
-
-        return str_replace( $resolved['url_path'], $new_path, $url );
+        return ltrim( $normalized, '/' );
     }
 
     /**
-     * 根据持久化输出映射查找源文件对应的压缩结果
+     * 规范化路径用于精确比较
      *
-     * @param string $source_path 源文件绝对路径
-     * @return string 结果绝对路径，找不到时返回空字符串
+     * @param string $path 路径
+     * @return string
      */
-    private function find_output_path_for_source( string $source_path ): string {
-        global $wpdb;
-
-        $normalized = $this->normalized_path( $source_path );
-        $attachment_id = $wpdb->get_var(
-            $wpdb->prepare(
-                "SELECT post_id FROM {$wpdb->postmeta}
-                WHERE meta_key = %s AND meta_value LIKE %s
-                LIMIT 1",
-                self::OUTPUT_META_KEY,
-                '%' . $wpdb->esc_like( $normalized ) . '%'
-            )
-        );
-
-        if ( ! $attachment_id ) {
-            return '';
-        }
-
-        $records = get_post_meta( absint( $attachment_id ), self::OUTPUT_META_KEY, true );
-        if ( ! is_array( $records ) ) {
-            return '';
-        }
-
-        foreach ( $records as $record ) {
-            if ( empty( $record['from'] ) || empty( $record['to'] ) ) {
-                continue;
-            }
-
-            if ( $this->normalized_path( $record['from'] ) === $normalized
-                && file_exists( $record['to'] ) && $this->is_safe_path( $record['to'] ) ) {
-                return $record['to'];
-            }
-        }
-
-        return '';
+    private function normalized_path( string $path ): string {
+        $normalized = wp_normalize_path( $path );
+        return 'WIN' === strtoupper( substr( PHP_OS, 0, 3 ) ) ? strtolower( $normalized ) : $normalized;
     }
 
     /**

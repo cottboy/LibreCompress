@@ -99,6 +99,9 @@ class Libre_Compress_Backup {
     /**
      * 创建备份
      *
+     * 同一原始路径只保留第一次备份：文件压缩后体积必然变小，若按当前大小重建
+     * 备份，最初原图会被压缩结果顶替，之后再也回不到原图。
+     *
      * @param int    $attachment_id 附件 ID
      * @param string $file_path     原文件绝对路径
      * @return bool 是否成功
@@ -114,22 +117,18 @@ class Libre_Compress_Backup {
             return false;
         }
 
-        // 检查是否已有备份
         $database = libre_compress()->database;
         $existing = $database->get_backup_by_path( $file_path );
 
         if ( $existing ) {
-            // 数据库有记录时仍必须确认备份文件真实存在且大小与当前源文件一致。
-            if ( ! empty( $existing['backup_path'] ) && file_exists( $existing['backup_path'] )
-                && filesize( $existing['backup_path'] ) === filesize( $file_path ) ) {
+            $backup_path = isset( $existing['backup_path'] ) ? (string) $existing['backup_path'] : '';
+
+            // 备份文件必须真实存在且位于备份目录内，否则不可信，不能当作原图。
+            if ( '' !== $backup_path && $this->is_backup_file_path( $backup_path ) && file_exists( $backup_path ) ) {
                 return true;
             }
 
-            if ( ! empty( $existing['backup_path'] ) && file_exists( $existing['backup_path'] )
-                && $this->is_safe_path( $existing['backup_path'] ) ) {
-                // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
-                unlink( $existing['backup_path'] );
-            }
+            // 只清理失效索引，指向备份目录之外的文件一律不删。
             $database->delete_backup( $existing['id'] );
         }
 
@@ -138,14 +137,10 @@ class Libre_Compress_Backup {
             return false;
         }
 
-        // 生成备份路径
         $backup_path = $this->generate_backup_path( $attachment_id, $file_path );
 
-        // 复制文件
         // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_copy
-        $result = copy( $file_path, $backup_path );
-
-        if ( ! $result || filesize( $backup_path ) !== filesize( $file_path ) ) {
+        if ( ! copy( $file_path, $backup_path ) || ! $this->files_match( $file_path, $backup_path ) ) {
             if ( file_exists( $backup_path ) ) {
                 // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
                 unlink( $backup_path );
@@ -172,95 +167,57 @@ class Libre_Compress_Backup {
     }
 
     /**
-     * 恢复备份
-     *
-     * @param int    $attachment_id 附件 ID
-     * @param string $file_path     原文件路径（可选，不提供则恢复所有）
-     * @return bool 是否成功
-     */
-    public function restore_backup( int $attachment_id, string $file_path = '' ): bool {
-        $database = libre_compress()->database;
-
-        if ( ! empty( $file_path ) ) {
-            // 恢复单个文件
-            $backup = $database->get_backup_by_path( $file_path );
-
-            if ( ! $backup ) {
-                return false;
-            }
-
-            return $this->restore_single_backup( $backup );
-        }
-
-        // 恢复附件的所有备份
-        $backups = $database->get_backups_by_attachment( $attachment_id );
-
-        if ( empty( $backups ) ) {
-            return false;
-        }
-
-        $success = true;
-        foreach ( $backups as $backup ) {
-            if ( ! $this->restore_single_backup( $backup ) ) {
-                $success = false;
-            }
-        }
-
-        return $success;
-    }
-
-    /**
-     * 清理已成功恢复的备份和统一压缩记录
+     * 获取附件的备份索引
      *
      * @param int $attachment_id 附件 ID
-     * @return bool 是否全部清理成功
+     * @return array
      */
-    public function finalize_restored_backups( int $attachment_id ): bool {
-        $database = libre_compress()->database;
-        $backups  = $database->get_backups_by_attachment( $attachment_id );
-        $success  = true;
-
-        foreach ( $backups as $backup ) {
-            if ( file_exists( $backup['backup_path'] ) ) {
-                if ( ! $this->is_safe_path( $backup['backup_path'] )
-                    || ! unlink( $backup['backup_path'] ) ) {
-                    $success = false;
-                    continue;
-                }
-            }
-
-            if ( ! $database->delete_backup( $backup['id'] ) ) {
-                $success = false;
-            }
-        }
-
-        if ( $success ) {
-            $database->delete_records_by_attachment( $attachment_id );
-        }
-
-        return $success;
+    public function get_backups( int $attachment_id ): array {
+        return libre_compress()->database->get_backups_by_attachment( $attachment_id );
     }
 
     /**
-     * 恢复单个备份
+     * 将备份内容写回原始路径
      *
-     * @param array $backup 备份记录
-     * @return bool 是否成功
+     * 先落到临时文件并校验，再替换目标文件，任何一步失败都不会破坏现用文件。
+     *
+     * @param array $backup         备份索引行
+     * @param bool  $allow_existing 原路径已有文件时是否允许覆盖；该文件不是本附件现用文件时必须为 false
+     * @return bool 原路径内容是否已与备份一致
      */
-    private function restore_single_backup( array $backup ): bool {
-        $backup_path   = $backup['backup_path'];
-        $original_path = $backup['original_path'];
+    public function restore_backup_file( array $backup, bool $allow_existing ): bool {
+        $backup_path   = isset( $backup['backup_path'] ) ? (string) $backup['backup_path'] : '';
+        $original_path = isset( $backup['original_path'] ) ? (string) $backup['original_path'] : '';
 
-        // 备份记录属于不可信持久化数据，删除或覆盖前必须重新验证路径。
-        if ( ! file_exists( $backup_path ) || ! $this->is_safe_path( $backup_path ) || ! $this->is_safe_destination_path( $original_path ) ) {
+        if ( '' === $backup_path || '' === $original_path ) {
             return false;
         }
 
-        $restore_temp  = $original_path . '.lc-restore-' . wp_generate_password( 12, false, false );
-        $is_windows    = 'WIN' === strtoupper( substr( PHP_OS, 0, 3 ) );
+        // 备份记录属于不可信持久化数据，读取和覆盖前都要重新验证路径。
+        if ( ! $this->is_backup_file_path( $backup_path ) || ! file_exists( $backup_path ) ) {
+            return false;
+        }
+
+        if ( ! $this->is_safe_destination_path( $original_path ) ) {
+            return false;
+        }
+
+        if ( file_exists( $original_path ) ) {
+            // 已经一致时直接成功，让中断后的重试可以幂等继续。
+            if ( $this->files_match( $backup_path, $original_path ) ) {
+                return true;
+            }
+
+            if ( ! $allow_existing ) {
+                // 原路径被其他内容占用，覆盖会误删别人的图片。
+                return false;
+            }
+        }
+
+        $restore_temp = $original_path . '.lc-restore-' . wp_generate_password( 12, false, false );
 
         // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_copy
-        if ( ! copy( $backup_path, $restore_temp ) || filesize( $restore_temp ) !== filesize( $backup_path ) ) {
+        if ( ! copy( $backup_path, $restore_temp ) || ! $this->files_match( $backup_path, $restore_temp ) ) {
             if ( file_exists( $restore_temp ) ) {
                 // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
                 unlink( $restore_temp );
@@ -268,61 +225,71 @@ class Libre_Compress_Backup {
             return false;
         }
 
-        if ( $is_windows ) {
-            // Windows 的 rename 不能覆盖现有文件；源文件本来不存在时直接落位。
-            $removed_existing = true;
-            if ( file_exists( $original_path ) ) {
-                // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
-                $removed_existing = unlink( $original_path );
-            }
-
-            if ( ! $removed_existing || ! rename( $restore_temp, $original_path ) ) {
-                // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_copy
-                copy( $backup_path, $original_path );
-                if ( file_exists( $restore_temp ) ) {
-                    // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
-                    unlink( $restore_temp );
-                }
-                return false;
-            }
-        } elseif ( ! rename( $restore_temp, $original_path ) ) {
+        if ( file_exists( $original_path ) && ! unlink( $original_path ) ) {
             // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
             unlink( $restore_temp );
             return false;
         }
 
-        // 备份文件和记录在附件路径/MIME 全部提交成功后再由 finalize_restored_backups() 清理。
-        return true;
+        // 先清空目标再改名落位，兼容 Windows 上 rename 不覆盖已有文件的行为。
+        if ( ! rename( $restore_temp, $original_path ) ) {
+            if ( file_exists( $restore_temp ) ) {
+                // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
+                unlink( $restore_temp );
+            }
+            return false;
+        }
+
+        return $this->files_match( $backup_path, $original_path );
     }
 
     /**
-     * 删除备份
+     * 比较两个文件的内容是否一致
+     *
+     * @param string $left  文件路径
+     * @param string $right 文件路径
+     * @return bool
+     */
+    private function files_match( string $left, string $right ): bool {
+        if ( ! file_exists( $left ) || ! file_exists( $right ) ) {
+            return false;
+        }
+
+        clearstatcache( true, $left );
+        clearstatcache( true, $right );
+
+        if ( filesize( $left ) !== filesize( $right ) ) {
+            return false;
+        }
+
+        return hash_file( 'sha256', $left ) === hash_file( 'sha256', $right );
+    }
+
+    /**
+     * 删除附件的备份文件和索引
+     *
+     * 任一备份删除失败时保留对应索引和后续清理，保证还能重试。
      *
      * @param int $attachment_id 附件 ID
-     * @return bool 是否成功
+     * @return bool 是否全部删除成功
      */
     public function delete_backup( int $attachment_id ): bool {
         $database = libre_compress()->database;
         $backups  = $database->get_backups_by_attachment( $attachment_id );
-
-        if ( empty( $backups ) ) {
-            return true;
-        }
-
-        $success = true;
+        $success  = true;
 
         foreach ( $backups as $backup ) {
-            if ( file_exists( $backup['backup_path'] ) ) {
-                if ( ! $this->is_safe_path( $backup['backup_path'] ) ) {
-                    $success = false;
-                    continue;
-                }
+            $backup_path = isset( $backup['backup_path'] ) ? (string) $backup['backup_path'] : '';
 
-                // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
-                if ( ! unlink( $backup['backup_path'] ) ) {
-                    $success = false;
-                    continue;
-                }
+            if ( ! $this->is_backup_file_path( $backup_path ) ) {
+                // 索引指向备份目录之外，可能是被篡改的记录，绝不删除该文件。
+                $success = false;
+                continue;
+            }
+
+            if ( file_exists( $backup_path ) && ! unlink( $backup_path ) ) {
+                $success = false;
+                continue;
             }
 
             if ( ! $database->delete_backup( $backup['id'] ) ) {
@@ -334,16 +301,16 @@ class Libre_Compress_Backup {
     }
 
     /**
-     * 检查附件是否有备份
+     * 检查附件是否有可用的备份
      *
      * @param int $attachment_id 附件 ID
      * @return bool 是否有备份
      */
     public function has_backup( int $attachment_id ): bool {
-        $backups = libre_compress()->database->get_backups_by_attachment( $attachment_id );
+        foreach ( $this->get_backups( $attachment_id ) as $backup ) {
+            $backup_path = isset( $backup['backup_path'] ) ? (string) $backup['backup_path'] : '';
 
-        foreach ( $backups as $backup ) {
-            if ( ! empty( $backup['backup_path'] ) && file_exists( $backup['backup_path'] ) ) {
+            if ( $this->is_backup_file_path( $backup_path ) && file_exists( $backup_path ) ) {
                 return true;
             }
         }
@@ -358,17 +325,16 @@ class Libre_Compress_Backup {
      * @return array 备份信息列表
      */
     public function get_backup_info( int $attachment_id ): array {
-        $database = libre_compress()->database;
-        $backups  = $database->get_backups_by_attachment( $attachment_id );
-
         $info = array();
-        foreach ( $backups as $backup ) {
-            $backup_size = file_exists( $backup['backup_path'] ) ? filesize( $backup['backup_path'] ) : 0;
+
+        foreach ( $this->get_backups( $attachment_id ) as $backup ) {
+            $backup_path = isset( $backup['backup_path'] ) ? (string) $backup['backup_path'] : '';
+            $usable      = $this->is_backup_file_path( $backup_path ) && file_exists( $backup_path );
 
             $info[] = array(
                 'original_path' => $backup['original_path'],
-                'backup_path'   => $backup['backup_path'],
-                'backup_size'   => $backup_size,
+                'backup_path'   => $backup_path,
+                'backup_size'   => $usable ? (int) filesize( $backup_path ) : 0,
                 'created_at'    => $backup['created_at'],
             );
         }
@@ -379,6 +345,8 @@ class Libre_Compress_Backup {
     /**
      * 删除所有备份
      *
+     * 删除失败或索引异常时保留记录，避免丢失对残留文件的追踪。
+     *
      * @return int 删除的备份数量
      */
     public function delete_all_backups(): int {
@@ -387,17 +355,14 @@ class Libre_Compress_Backup {
         $count    = 0;
 
         foreach ( $backups as $backup ) {
-            $backup_path = $backup['backup_path'];
+            $backup_path = isset( $backup['backup_path'] ) ? (string) $backup['backup_path'] : '';
 
-            if ( file_exists( $backup_path ) ) {
-                if ( ! $this->is_safe_path( $backup_path ) ) {
-                    continue;
-                }
+            if ( ! $this->is_backup_file_path( $backup_path ) ) {
+                continue;
+            }
 
-                // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
-                if ( ! unlink( $backup_path ) ) {
-                    continue;
-                }
+            if ( file_exists( $backup_path ) && ! unlink( $backup_path ) ) {
+                continue;
             }
 
             if ( $database->delete_backup( $backup['id'] ) ) {
@@ -406,6 +371,30 @@ class Libre_Compress_Backup {
         }
 
         return $count;
+    }
+
+    /**
+     * 验证路径是否为本插件备份目录内的备份文件
+     *
+     * @param string $file_path 备份文件路径
+     * @return bool
+     */
+    private function is_backup_file_path( string $file_path ): bool {
+        if ( '' === $file_path || false !== strpos( $file_path, '..' ) || is_link( $file_path ) ) {
+            return false;
+        }
+
+        $backup_dir = realpath( $this->get_backup_dir() );
+
+        if ( false === $backup_dir ) {
+            return false;
+        }
+
+        $backup_dir = untrailingslashit( wp_normalize_path( $backup_dir ) );
+        $real_path  = realpath( $file_path );
+        $normalized = $real_path ? wp_normalize_path( $real_path ) : wp_normalize_path( $file_path );
+
+        return 0 === strpos( untrailingslashit( $normalized ), $backup_dir . '/' );
     }
 
     /**

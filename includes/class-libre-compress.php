@@ -131,7 +131,6 @@ class Libre_Compress {
 
         // 初始化目标格式底层处理器
         $this->output_processor = new Libre_Compress_Output();
-        $this->output_processor->init_hooks();
 
         // 初始化统一图片压缩处理器
         $this->processor = new Libre_Compress_Processor();
@@ -214,7 +213,7 @@ class Libre_Compress {
                 'concurrency' => max( 1, min( 100, absint( isset( $general_settings['tool_concurrency'] ) ? $general_settings['tool_concurrency'] : 5 ) ) ),
                 'i18n'        => array(
                     'error'                   => __( '操作失败', 'libre-compress' ),
-                    'confirmClear'            => __( '确定要清除所有压缩记录吗？此操作不可撤销。', 'libre-compress' ),
+                    'confirmClear'            => __( '确定要清除所有压缩记录和原图备份吗？清除后无法恢复到本轮压缩前的原图。', 'libre-compress' ),
                     'confirmRestoreAll'       => __( '确定要恢复所有原图备份吗？此操作不可撤销。', 'libre-compress' ),
                     'confirmDelete'           => __( '确定要删除所有缩略图吗？此操作不可撤销。', 'libre-compress' ),
                     'confirmRegenerate'       => __( '确定要为缺少缩略图的图片重新生成缩略图吗？这可能需要一些时间。', 'libre-compress' ),
@@ -226,13 +225,20 @@ class Libre_Compress {
                     'batchProgress'           => __( '已处理 %d 个图片', 'libre-compress' ),
                     /* translators: %1$s: 任务名称, %2$d: 成功数, %3$d: 跳过数, %4$d: 失败数 */
                     'batchSummary'            => __( '%1$s - 成功: %2$d, 跳过: %3$d, 失败: %4$d', 'libre-compress' ),
-                    'restoreProgress'          => __( '已恢复 %d 个附件', 'libre-compress' ),
                     /* translators: %1$s: 任务名称, %2$d: 成功数, %3$d: 失败数 */
-                    'restoreSummary'           => __( '%1$s - 成功: %2$d, 失败: %3$d', 'libre-compress' ),
-                    'restoreFinished'          => __( '恢复完成', 'libre-compress' ),
-                    'restoreFailedIds'         => __( '失败附件 ID：%s', 'libre-compress' ),
-                    'restoreFailedMore'        => __( '（共 %d 个，仅显示前 10 个）', 'libre-compress' ),
-                    'restoreInterrupted'       => __( '恢复中断：已完成 %d 个附件，再次执行可继续恢复剩余附件。', 'libre-compress' ),
+                    'operationSummary'        => __( '%1$s - 成功: %2$d, 失败: %3$d', 'libre-compress' ),
+                    /* translators: %s: 附件 ID 列表 */
+                    'failedIds'               => __( '失败附件 ID：%s', 'libre-compress' ),
+                    /* translators: %d: 失败附件总数 */
+                    'failedMore'              => __( '（共 %d 个，仅显示前 10 个）', 'libre-compress' ),
+                    'restoreProgress'         => __( '已恢复 %d 个附件', 'libre-compress' ),
+                    'restoreFinished'         => __( '恢复完成', 'libre-compress' ),
+                    /* translators: %d: 已处理附件数 */
+                    'restoreInterrupted'      => __( '恢复中断：已完成 %d 个附件，再次执行可继续恢复剩余附件。', 'libre-compress' ),
+                    'clearProgress'           => __( '已清除 %d 个图片', 'libre-compress' ),
+                    'clearFinished'           => __( '清除完成', 'libre-compress' ),
+                    /* translators: %d: 已处理附件数 */
+                    'clearInterrupted'        => __( '清除中断：已完成 %d 个附件，再次执行可继续清除剩余附件。', 'libre-compress' ),
                 ),
             )
         );

@@ -53,6 +53,19 @@ class Libre_Compress_Processor {
     const PENDING_SWEEP_HOOK = 'libre_compress_pending_sweep_event';
 
     /**
+     * 恢复中间状态标记
+     *
+     * 引用与文件已退回原图，但转换结果、备份和记录尚未清理完时写入，
+     * 让中断后的恢复可以从清理阶段继续，而不是重复改动引用。
+     */
+    const RESTORE_STATE_META_KEY = '_libre_compress_restore_ready';
+
+    /**
+     * 清除记录时单次处理的附件数量
+     */
+    const HISTORY_PAGE_SIZE = 20;
+
+    /**
      * 是否暂停自动压缩
      *
      * @var bool
@@ -298,20 +311,28 @@ class Libre_Compress_Processor {
                 }
             }
 
-            $metadata_synced = true;
-            if ( ! empty( $output_map )
-                && ! libre_compress()->output_processor->sync_attachment_format( $attachment_id, $output_map, $target ) ) {
-                $metadata_synced = false;
+            // 引用、文章链接与源文件清理必须一起提交成功，否则退回原文件引用等待重试。
+            if ( ! empty( $output_map ) && ! libre_compress()->output_processor->commit_attachment_format( $attachment_id, $output_map ) ) {
+                foreach ( $result['details'] as $index => $detail ) {
+                    if ( empty( $detail['to'] ) || ! isset( $output_map[ $detail['size_type'] ] ) ) {
+                        continue;
+                    }
+
+                    $result['details'][ $index ]['status']  = 'failed';
+                    $result['details'][ $index ]['message'] = __( '附件引用更新失败，已退回原文件', 'libre-compress' );
+                    $result['saved_bytes']                 -= max( 0, (int) $detail['original_size'] - (int) $detail['compressed_size'] );
+                    $result['saved_bytes']                  = max( 0, $result['saved_bytes'] );
+                    $result['success']--;
+                    $result['failed']++;
+                }
+
                 $result['status']  = 'failed';
-                $result['message'] = __( '压缩结果已生成，但附件路径同步失败，请检查数据库状态', 'libre-compress' );
+                $result['message'] = __( '压缩结果已生成，但附件引用或文章链接更新失败，图片仍指向原文件，可重新压缩继续提交', 'libre-compress' );
+
+                return $result;
             }
 
-            if ( $metadata_synced ) {
-                foreach ( $output_map as $entry ) {
-                    libre_compress()->output_processor->remove_source_file( $entry['from'] );
-                }
-                $this->refresh_metadata_file_size( $attachment_id );
-            }
+            $this->refresh_metadata_file_size( $attachment_id );
 
             if ( empty( $result['message'] ) ) {
                 if ( $result['success'] === $result['total'] ) {
@@ -339,6 +360,9 @@ class Libre_Compress_Processor {
     /**
      * 恢复附件原图
      *
+     * 顺序固定为：备份写回原路径 → 还原引用与文章链接 → 记录中间状态 → 删除转换结果、
+     * 备份索引与压缩记录。任一步失败都会保留可重试的线索，绝不会先删掉正在被引用的文件。
+     *
      * @param int $attachment_id 附件 ID
      * @return bool
      */
@@ -358,24 +382,340 @@ class Libre_Compress_Processor {
             return false;
         }
 
-        $was_suppressed              = $this->auto_compress_suppressed;
+        $was_suppressed                 = $this->auto_compress_suppressed;
         $this->auto_compress_suppressed = true;
 
         try {
-            if ( ! libre_compress()->backup->restore_backup( $attachment_id ) ) {
+            if ( ! $this->has_restore_state( $attachment_id ) && ! $this->restore_files_and_refs( $attachment_id ) ) {
                 return false;
             }
 
-            if ( ! libre_compress()->output_processor->handle_after_restore( $attachment_id ) ) {
-                return false;
-            }
-
-            return libre_compress()->backup->finalize_restored_backups( $attachment_id );
+            return $this->finish_restore( $attachment_id );
         } finally {
             $this->auto_compress_suppressed = $was_suppressed;
             $this->release_attachment_lock( $global_lock );
             $this->release_attachment_lock( $lock );
         }
+    }
+
+    /**
+     * 把备份写回原路径并还原附件引用与文章链接
+     *
+     * @param int $attachment_id 附件 ID
+     * @return bool
+     */
+    private function restore_files_and_refs( int $attachment_id ): bool {
+        $entries = libre_compress()->output_processor->get_output_entries( $attachment_id );
+        $backups = libre_compress()->backup->get_backups( $attachment_id );
+
+        if ( empty( $entries ) && empty( $backups ) ) {
+            return false;
+        }
+
+        $live = array();
+        foreach ( libre_compress()->compressor->get_attachment_files( $attachment_id ) as $file ) {
+            $live[] = $this->normalized_path( $file['file_path'] );
+        }
+
+        // 只有源格式确实有备份时才允许退回源格式；此前未开启备份的历史映射必须忽略，
+        // 否则会把当前正在使用的转换结果当成可删除的文件。
+        $revertible = array();
+        foreach ( $entries as $entry ) {
+            if ( $this->backup_of( $backups, $entry['from'] ) ) {
+                $revertible[ $entry['size_type'] ] = $entry;
+            }
+        }
+
+        $targets = array();
+
+        foreach ( $backups as $backup ) {
+            $original  = (string) $backup['original_path'];
+            $mapped    = $this->entry_of_source( $revertible, $original );
+            $is_live   = in_array( $this->normalized_path( $original ), $live, true );
+
+            if ( null === $mapped && ! $is_live ) {
+                // 既不是现用文件也不属于本次要退回的源文件，写回只会凭空多出无引用的图片。
+                continue;
+            }
+
+            if ( ! $this->restore_backup_row( $backup, $is_live ) ) {
+                return false;
+            }
+
+            if ( null !== $mapped ) {
+                $targets[] = $mapped['to_relative'];
+            }
+        }
+
+        if ( ! empty( $revertible ) && ! libre_compress()->output_processor->revert_attachment_format( $attachment_id, array_values( $revertible ) ) ) {
+            return false;
+        }
+
+        return $this->write_restore_state( $attachment_id, $targets );
+    }
+
+    /**
+     * 写回单个备份文件，已还原过的情况视为成功
+     *
+     * @param array $backup       备份索引行
+     * @param bool  $is_live      原路径是否是该附件当前引用的文件
+     * @return bool
+     */
+    private function restore_backup_row( array $backup, bool $is_live ): bool {
+        $original = (string) $backup['original_path'];
+
+        if ( ! file_exists( $backup['backup_path'] ) ) {
+            // 备份文件已不在：原路径仍有文件说明此前已还原，索引交给清理阶段删除。
+            return file_exists( $original );
+        }
+
+        return libre_compress()->backup->restore_backup_file( $backup, $is_live );
+    }
+
+    /**
+     * 清理恢复流程留下的文件与记录
+     *
+     * @param int $attachment_id 附件 ID
+     * @return bool 是否全部清理成功
+     */
+    private function finish_restore( int $attachment_id ): bool {
+        $state = $this->get_restore_state( $attachment_id );
+
+        foreach ( $this->relative_targets( $state ) as $relative ) {
+            $path = wp_upload_dir()['basedir'] . '/' . $relative;
+
+            if ( ! file_exists( $path ) ) {
+                continue;
+            }
+
+            // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
+            if ( ! unlink( $path ) || file_exists( $path ) ) {
+                return false;
+            }
+        }
+
+        if ( ! libre_compress()->backup->delete_backup( $attachment_id ) ) {
+            return false;
+        }
+
+        if ( ! libre_compress()->database->delete_records_by_attachment( $attachment_id ) ) {
+            return false;
+        }
+
+        if ( ! libre_compress()->output_processor->forget_output_entries( $attachment_id ) ) {
+            return false;
+        }
+
+        return $this->delete_restore_state( $attachment_id );
+    }
+
+    /**
+     * 清除单个附件的全部处理痕迹
+     *
+     * 备份文件、备份索引、转换映射和压缩记录必须一起清除：只清记录会让下一轮压缩
+     * 拿压缩结果当作原图备份；只清备份则等于悄悄丢掉用户唯一的恢复依据。
+     *
+     * @param int $attachment_id 附件 ID
+     * @return bool 是否全部清除成功
+     */
+    private function clear_attachment_history( int $attachment_id ): bool {
+        if ( ! libre_compress()->backup->delete_backup( $attachment_id ) ) {
+            return false;
+        }
+
+        if ( ! libre_compress()->database->delete_records_by_attachment( $attachment_id ) ) {
+            return false;
+        }
+
+        if ( ! libre_compress()->output_processor->forget_output_entries( $attachment_id ) ) {
+            return false;
+        }
+
+        return $this->delete_restore_state( $attachment_id );
+    }
+
+    /**
+     * 分页清除压缩记录及其备份、映射
+     *
+     * @param int $after_id 上一批最后处理的附件 ID
+     * @return array cleared_count、failed_ids、next_after、has_more
+     */
+    public function clear_history_page( int $after_id = 0 ): array {
+        $database = libre_compress()->database;
+        $ids      = $database->get_history_attachment_ids_after( $after_id, self::HISTORY_PAGE_SIZE + 1 );
+        $has_more = count( $ids ) > self::HISTORY_PAGE_SIZE;
+
+        if ( $has_more ) {
+            array_pop( $ids );
+        }
+
+        $cleared = 0;
+        $failed  = array();
+
+        foreach ( $ids as $attachment_id ) {
+            $lock = $this->acquire_attachment_lock( $attachment_id );
+            if ( false === $lock ) {
+                $failed[] = $attachment_id;
+                continue;
+            }
+
+            $global_lock = $this->acquire_global_lock( false );
+            if ( false === $global_lock ) {
+                $this->release_attachment_lock( $lock );
+                $failed[] = $attachment_id;
+                continue;
+            }
+
+            try {
+                if ( $this->clear_attachment_history( $attachment_id ) ) {
+                    $cleared++;
+                } else {
+                    $failed[] = $attachment_id;
+                }
+            } finally {
+                $this->release_attachment_lock( $global_lock );
+                $this->release_attachment_lock( $lock );
+            }
+        }
+
+        return array(
+            'cleared_count' => $cleared,
+            'failed_ids'    => $failed,
+            'next_after'    => empty( $ids ) ? $after_id : max( $ids ),
+            'has_more'      => $has_more,
+        );
+    }
+
+    /**
+     * 是否存在引用已还原、但残留文件与记录尚未清理完的附件
+     *
+     * @param int $attachment_id 附件 ID
+     * @return bool
+     */
+    public function has_pending_restore( int $attachment_id ): bool {
+        return $this->has_restore_state( $attachment_id );
+    }
+
+    /**
+     * 读取恢复中间状态
+     *
+     * @param int $attachment_id 附件 ID
+     * @return array
+     */
+    private function get_restore_state( int $attachment_id ): array {
+        $state = get_post_meta( $attachment_id, self::RESTORE_STATE_META_KEY, true );
+
+        return is_array( $state ) ? $state : array();
+    }
+
+    /**
+     * 是否存在待清理的恢复中间状态
+     *
+     * @param int $attachment_id 附件 ID
+     * @return bool
+     */
+    private function has_restore_state( int $attachment_id ): bool {
+        $state = $this->get_restore_state( $attachment_id );
+
+        return isset( $state['targets'] ) && is_array( $state['targets'] );
+    }
+
+    /**
+     * 写入恢复中间状态
+     *
+     * @param int   $attachment_id 附件 ID
+     * @param array $targets       待删除的转换结果相对路径
+     * @return bool
+     */
+    private function write_restore_state( int $attachment_id, array $targets ): bool {
+        $state = array( 'targets' => array_values( $targets ) );
+
+        update_post_meta( $attachment_id, self::RESTORE_STATE_META_KEY, wp_slash( $state ) );
+
+        $saved = $this->get_restore_state( $attachment_id );
+
+        return isset( $saved['targets'] ) && $saved['targets'] === $state['targets'];
+    }
+
+    /**
+     * 删除恢复中间状态
+     *
+     * @param int $attachment_id 附件 ID
+     * @return bool
+     */
+    private function delete_restore_state( int $attachment_id ): bool {
+        if ( ! $this->has_restore_state( $attachment_id ) ) {
+            return true;
+        }
+
+        delete_post_meta( $attachment_id, self::RESTORE_STATE_META_KEY );
+
+        return ! $this->has_restore_state( $attachment_id );
+    }
+
+    /**
+     * 取出状态中待删除的转换结果路径
+     *
+     * @param array $state 恢复中间状态
+     * @return array
+     */
+    private function relative_targets( array $state ): array {
+        if ( empty( $state['targets'] ) || ! is_array( $state['targets'] ) ) {
+            return array();
+        }
+
+        $targets = array();
+
+        foreach ( $state['targets'] as $target ) {
+            $target = ltrim( wp_normalize_path( (string) $target ), '/' );
+
+            // 中间状态属于持久化数据，删除前重新校验路径。
+            if ( '' === $target || false !== strpos( $target, '..' ) || false !== strpos( $target, ':' ) ) {
+                continue;
+            }
+
+            $targets[] = $target;
+        }
+
+        return $targets;
+    }
+
+    /**
+     * 按原始路径查找备份索引
+     *
+     * @param array  $backups 备份索引列表
+     * @param string $path    原始路径
+     * @return array|null
+     */
+    private function backup_of( array $backups, string $path ) {
+        $normalized = $this->normalized_path( $path );
+
+        foreach ( $backups as $backup ) {
+            if ( $this->normalized_path( (string) $backup['original_path'] ) === $normalized ) {
+                return $backup;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * 按源文件路径查找可退回的转换条目
+     *
+     * @param array  $entries 条目集合
+     * @param string $path    源文件绝对路径
+     * @return array|null
+     */
+    private function entry_of_source( array $entries, string $path ) {
+        $normalized = $this->normalized_path( $path );
+
+        foreach ( $entries as $entry ) {
+            if ( $this->normalized_path( $entry['from'] ) === $normalized ) {
+                return $entry;
+            }
+        }
+
+        return null;
     }
 
     /**
@@ -640,8 +980,7 @@ class Libre_Compress_Processor {
         }
 
         try {
-            libre_compress()->database->delete_records_by_attachment( $attachment_id );
-            libre_compress()->backup->delete_backup( $attachment_id );
+            $this->clear_attachment_history( $attachment_id );
         } finally {
             $this->release_attachment_lock( $global_lock );
             $this->release_attachment_lock( $lock );

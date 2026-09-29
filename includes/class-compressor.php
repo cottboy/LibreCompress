@@ -139,15 +139,15 @@ class Libre_Compress_Compressor {
                 $file_dir = dirname( $metadata['file'] );
 
                 foreach ( $metadata['sizes'] as $size_name => $size_data ) {
-                    if ( ! empty( $size_data['file'] ) ) {
-                        $thumb_file = $base_dir . '/' . $file_dir . '/' . $size_data['file'];
-                        if ( file_exists( $thumb_file ) ) {
-                            $files[] = array(
-                                'size_type' => sanitize_text_field( $size_name ),
-                                'file_path' => $thumb_file,
-                            );
-                        }
+                    if ( empty( $size_data['file'] ) ) {
+                        continue;
                     }
+
+                    // 元数据声明的尺寸即使文件缺失也要计入，否则附件会被误报成全部已压缩。
+                    $files[] = array(
+                        'size_type' => sanitize_text_field( $size_name ),
+                        'file_path' => $base_dir . '/' . $file_dir . '/' . $size_data['file'],
+                    );
                 }
             }
         }
@@ -283,28 +283,57 @@ class Libre_Compress_Compressor {
         if ( $compressed_size >= $original_size ) {
             // 压缩后没有变小，使用回滚副本还原原文件。
             $rolled_back = $this->rollback_file( $rollback_path, $file_path );
-            $status      = $rolled_back ? 'skipped' : 'failed';
-            $message     = $rolled_back
-                ? __( '压缩后体积没有变小，已跳过', 'libre-compress' )
-                : __( '压缩结果无效且回滚失败，请保留回滚副本并检查磁盘状态', 'libre-compress' );
 
-            $this->save_compression_record(
+            if ( ! $rolled_back ) {
+                $message = __( '压缩结果无效且回滚失败，请保留回滚副本并检查磁盘状态', 'libre-compress' );
+                $this->save_compression_record(
+                    $attachment_id,
+                    $file_path,
+                    $size_type,
+                    $original_size,
+                    $original_size,
+                    $tool->get_name(),
+                    'failed',
+                    $message
+                );
+
+                return array(
+                    'success'         => false,
+                    'message'         => $message,
+                    'status'          => 'failed',
+                    'original_size'   => $original_size,
+                    'compressed_size' => $original_size,
+                );
+            }
+
+            // 没有压缩收益同样视为已处理：文件已回到原状，重复压缩只会得到相同结果。
+            $message = __( '压缩后体积没有变小，已保留原图', 'libre-compress' );
+
+            if ( ! $this->save_compression_record(
                 $attachment_id,
                 $file_path,
                 $size_type,
                 $original_size,
                 $original_size,
                 $tool->get_name(),
-                $status,
-                $message
-            );
+                'success'
+            ) ) {
+                return array(
+                    'success'         => false,
+                    'message'         => __( '压缩记录保存失败，请重新压缩', 'libre-compress' ),
+                    'status'          => 'failed',
+                    'original_size'   => $original_size,
+                    'compressed_size' => $original_size,
+                );
+            }
 
             return array(
-                'success'         => $rolled_back,
+                'success'         => true,
                 'message'         => $message,
-                'status'          => $status,
+                'status'          => 'success',
                 'original_size'   => $original_size,
                 'compressed_size' => $original_size,
+                'ratio'           => 0.0,
             );
         }
 

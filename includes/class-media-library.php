@@ -87,14 +87,17 @@ class Libre_Compress_Media_Library {
             return;
         }
 
-        $processor = libre_compress()->processor;
-        $state     = $processor->get_attachment_state( $attachment_id );
+        $processor  = libre_compress()->processor;
+        $state      = $processor->get_attachment_state( $attachment_id );
         $has_backup = libre_compress()->backup->has_backup( $attachment_id );
 
+        // 引用已还原但残留尚未清理时，恢复按钮仍要可用，否则用户无法重试收尾。
+        $can_restore = $has_backup || $processor->has_pending_restore( $attachment_id );
+
         if ( 'complete' === $state['status'] ) {
-            $this->render_compressed_status( $attachment_id, $state, $has_backup );
+            $this->render_compressed_status( $attachment_id, $state, $has_backup, $can_restore );
         } elseif ( 'partial' === $state['status'] ) {
-            $this->render_partial_status( $attachment_id, $state, $has_backup );
+            $this->render_partial_status( $attachment_id, $state, $has_backup, $can_restore );
         } elseif ( 'failed' === $state['status'] ) {
             $this->render_failed_status( $attachment_id );
         } else {
@@ -140,8 +143,9 @@ class Libre_Compress_Media_Library {
      * @param int   $attachment_id 附件 ID
      * @param array $state         统一状态
      * @param bool  $has_backup    是否有备份
+     * @param bool  $can_restore   是否可恢复
      */
-    private function render_partial_status( int $attachment_id, array $state, bool $has_backup ) {
+    private function render_partial_status( int $attachment_id, array $state, bool $has_backup, bool $can_restore ) {
         ?>
         <div class="libre-compress-status" data-attachment-id="<?php echo esc_attr( $attachment_id ); ?>">
             <span class="status-text" style="color: #dba617;">
@@ -158,7 +162,7 @@ class Libre_Compress_Media_Library {
             <button type="button" class="button button-small libre-compress-btn" data-action="compress" data-attachment-id="<?php echo esc_attr( $attachment_id ); ?>">
                 <?php esc_html_e( '继续压缩', 'libre-compress' ); ?>
             </button>
-            <?php if ( $has_backup ) : ?>
+            <?php if ( $can_restore ) : ?>
                 <button type="button" class="button button-small libre-compress-btn" data-action="restore" data-attachment-id="<?php echo esc_attr( $attachment_id ); ?>">
                     <?php esc_html_e( '恢复原图', 'libre-compress' ); ?>
                 </button>
@@ -173,8 +177,9 @@ class Libre_Compress_Media_Library {
      * @param int   $attachment_id 附件 ID
      * @param array $stats         压缩统计
      * @param bool  $has_backup    是否有备份
+     * @param bool  $can_restore   是否可恢复
      */
-    private function render_compressed_status( int $attachment_id, array $stats, bool $has_backup ) {
+    private function render_compressed_status( int $attachment_id, array $stats, bool $has_backup, bool $can_restore ) {
         $original_size   = isset( $stats['total_original_size'] ) ? max( 0, absint( $stats['total_original_size'] ) ) : 0;
         $compressed_size = isset( $stats['total_compressed_size'] ) ? max( 0, absint( $stats['total_compressed_size'] ) ) : 0;
         $saved_bytes     = max( 0, $original_size - $compressed_size );
@@ -201,11 +206,13 @@ class Libre_Compress_Media_Library {
                 );
                 ?>
             </small>
-            <?php if ( $has_backup ) : ?>
+            <?php if ( $can_restore ) : ?>
                 <br>
                 <button type="button" class="button button-small libre-compress-btn" data-action="restore" data-attachment-id="<?php echo esc_attr( $attachment_id ); ?>">
                     <?php esc_html_e( '恢复原图', 'libre-compress' ); ?>
                 </button>
+            <?php endif; ?>
+            <?php if ( $has_backup ) : ?>
                 <button type="button" class="button button-small libre-compress-btn" data-action="delete-backup" data-attachment-id="<?php echo esc_attr( $attachment_id ); ?>">
                     <?php esc_html_e( '删除备份', 'libre-compress' ); ?>
                 </button>
@@ -289,8 +296,8 @@ class Libre_Compress_Media_Library {
 
         $backup = libre_compress()->backup;
 
-        // 检查是否有备份
-        if ( ! $backup->has_backup( $attachment_id ) ) {
+        // 检查是否有备份，或是否有恢复做了一半等待收尾的附件
+        if ( ! $backup->has_backup( $attachment_id ) && ! libre_compress()->processor->has_pending_restore( $attachment_id ) ) {
             wp_send_json_error( array( 'message' => __( '没有可用的备份', 'libre-compress' ) ) );
         }
 
@@ -305,7 +312,7 @@ class Libre_Compress_Media_Library {
     }
 
     /**
-     * AJAX: 清除压缩记录
+     * AJAX: 分页清除压缩记录及其原图备份
      */
     public function ajax_clear_records() {
         // 验证 nonce
@@ -316,19 +323,22 @@ class Libre_Compress_Media_Library {
             wp_send_json_error( array( 'message' => __( '权限不足', 'libre-compress' ) ) );
         }
 
-        $lock = libre_compress()->processor->acquire_global_lock( true );
-        if ( false === $lock ) {
-            wp_send_json_error( array( 'message' => __( '当前有图片正在处理，请稍后再试', 'libre-compress' ) ) );
-        }
-
-        $database = libre_compress()->database;
-        $count    = $database->clear_all_records();
-        libre_compress()->processor->release_attachment_lock( $lock );
+        $after_id = isset( $_POST['after'] ) ? absint( $_POST['after'] ) : 0;
+        $page     = libre_compress()->processor->clear_history_page( $after_id );
 
         wp_send_json_success(
             array(
-                'message'       => __( '压缩记录已清除', 'libre-compress' ),
-                'cleared_count' => $count,
+                'message'       => sprintf(
+                    /* translators: 1: 已清除数量, 2: 失败数量 */
+                    __( '本批清除完成，已清除 %1$d 个图片的记录与备份，失败 %2$d 个', 'libre-compress' ),
+                    $page['cleared_count'],
+                    count( $page['failed_ids'] )
+                ),
+                'cleared_count' => $page['cleared_count'],
+                'failed_count'  => count( $page['failed_ids'] ),
+                'failed_ids'    => $page['failed_ids'],
+                'next_after'    => $page['next_after'],
+                'has_more'      => $page['has_more'],
             )
         );
     }
@@ -418,7 +428,7 @@ class Libre_Compress_Media_Library {
         $batch_size     = 20;
         $database       = libre_compress()->database;
         $backup         = libre_compress()->backup;
-        $attachment_ids = $database->get_backup_attachment_ids_after( $after_id, $batch_size + 1 );
+        $attachment_ids = $database->get_restore_attachment_ids_after( $after_id, $batch_size + 1 );
         $has_more       = count( $attachment_ids ) > $batch_size;
         $success_count  = 0;
         $failed_ids     = array();
@@ -428,8 +438,9 @@ class Libre_Compress_Media_Library {
         }
 
         foreach ( $attachment_ids as $attachment_id ) {
-            // 备份文件已丢失时直接清理残留记录，避免每次恢复都重复失败
-            if ( ! $backup->has_backup( $attachment_id ) ) {
+            // 备份文件已丢失且没有待收尾的恢复时，直接清理残留索引，避免每次恢复都重复失败。
+            // 仍有待收尾状态时必须走完整恢复，否则转换结果和压缩记录会留在原地。
+            if ( ! $backup->has_backup( $attachment_id ) && ! libre_compress()->processor->has_pending_restore( $attachment_id ) ) {
                 $backup->delete_backup( $attachment_id );
                 continue;
             }

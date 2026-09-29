@@ -28,9 +28,9 @@ delete_option( 'libre_compress_general' );
 delete_option( 'libre_compress_tools' );
 delete_option( 'libre_compress_db_version' );
 
-// 删除插件写入的附件处理标记和目标格式输出映射；统一压缩记录已随数据表删除。
+// 删除插件写入的附件处理标记、格式转换映射和恢复中间状态；统一压缩记录已随数据表删除。
 // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
-$wpdb->query( "DELETE FROM {$wpdb->postmeta} WHERE meta_key IN ('_libre_compress_output', '_libre_compress_pending')" );
+$wpdb->query( "DELETE FROM {$wpdb->postmeta} WHERE meta_key IN ('_libre_compress_output', '_libre_compress_restore_ready', '_libre_compress_pending')" );
 
 // 停用定时任务并清理限流 transient
 wp_clear_scheduled_hook( 'libre_compress_pending_sweep_event' );

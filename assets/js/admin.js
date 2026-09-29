@@ -171,7 +171,24 @@
         },
 
         /**
-         * 清除压缩记录
+         * 汇总失败附件 ID
+         */
+        formatFailedIds: function(failedIds) {
+            if (!failedIds.length) {
+                return '';
+            }
+
+            var text = this.i18n.failedIds.replace('%s', failedIds.slice(0, 10).join(', '));
+
+            if (failedIds.length > 10) {
+                text += this.i18n.failedMore.replace('%d', failedIds.length);
+            }
+
+            return '\n' + text;
+        },
+
+        /**
+         * 分页清除压缩记录与原图备份
          */
         handleClearRecords: function(e) {
             e.preventDefault();
@@ -182,30 +199,74 @@
 
             var self = this;
             var $btn = $(e.currentTarget);
+            var after = 0;
+            var cleared = 0;
+            var failed = 0;
+            var failedIds = [];
+            var pageErrors = 0;
 
             $btn.prop('disabled', true).text(this.i18n.processing);
 
-            $.ajax({
-                url: this.ajaxUrl,
-                type: 'POST',
-                data: {
-                    action: 'libre_compress_clear_records',
-                    nonce: this.nonce
-                },
-                success: function(response) {
-                    if (response.success) {
-                        alert(response.data.message);
-                        location.reload();
-                    } else {
-                        alert(response.data.message || self.i18n.error);
-                    }
-                    $btn.prop('disabled', false).text($btn.text().replace(self.i18n.processing, ''));
-                },
-                error: function() {
-                    alert(self.i18n.error);
-                    $btn.prop('disabled', false);
+            function finish(interrupted) {
+                var summary = self.i18n.operationSummary
+                    .replace('%1$s', self.i18n.clearFinished)
+                    .replace('%2$d', cleared)
+                    .replace('%3$d', failed);
+
+                summary += self.formatFailedIds(failedIds);
+
+                if (interrupted) {
+                    summary += '\n' + self.i18n.clearInterrupted.replace('%d', cleared + failed);
                 }
-            });
+
+                alert(summary);
+                $btn.prop('disabled', false);
+                location.reload();
+            }
+
+            function loadPage() {
+                $.ajax({
+                    url: self.ajaxUrl,
+                    type: 'POST',
+                    data: {
+                        action: 'libre_compress_clear_records',
+                        nonce: self.nonce,
+                        after: after
+                    },
+                    success: function(response) {
+                        pageErrors = 0;
+
+                        if (!response.success) {
+                            finish(true);
+                            return;
+                        }
+
+                        cleared += parseInt(response.data.cleared_count, 10) || 0;
+                        failed += parseInt(response.data.failed_count, 10) || 0;
+                        failedIds = failedIds.concat(response.data.failed_ids || []);
+                        $btn.text(self.i18n.clearProgress.replace('%d', cleared + failed));
+
+                        if (response.data.has_more && parseInt(response.data.next_after, 10) > after) {
+                            after = parseInt(response.data.next_after, 10);
+                            loadPage();
+                        } else {
+                            finish(false);
+                        }
+                    },
+                    error: function() {
+                        pageErrors++;
+
+                        if (pageErrors <= 3) {
+                            loadPage();
+                            return;
+                        }
+
+                        finish(true);
+                    }
+                });
+            }
+
+            loadPage();
         },
 
         /**
@@ -229,21 +290,12 @@
             $btn.prop('disabled', true).text(this.i18n.processing);
 
             function finish(interrupted) {
-                var summary = self.i18n.restoreSummary
+                var summary = self.i18n.operationSummary
                     .replace('%1$s', self.i18n.restoreFinished)
                     .replace('%2$d', success)
                     .replace('%3$d', failed);
 
-                if (failedIds.length) {
-                    var shownIds = failedIds.slice(0, 10).join(', ');
-                    var idText = self.i18n.restoreFailedIds.replace('%s', shownIds);
-
-                    if (failedIds.length > 10) {
-                        idText += self.i18n.restoreFailedMore.replace('%d', failedIds.length);
-                    }
-
-                    summary += '\n' + idText;
-                }
+                summary += self.formatFailedIds(failedIds);
 
                 if (interrupted) {
                     summary += '\n' + self.i18n.restoreInterrupted.replace('%d', success + failed);

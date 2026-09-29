@@ -354,18 +354,6 @@ class Libre_Compress_Database {
     }
 
     /**
-     * 清空所有压缩记录
-     *
-     * @return int|false
-     */
-    public function clear_all_records() {
-        global $wpdb;
-
-        // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-        return $wpdb->query( "DELETE FROM {$this->records_table}" );
-    }
-
-    /**
      * 按附件 ID 游标获取图片附件
      *
      * @param int $after_id 上一批最后处理的附件 ID
@@ -537,29 +525,84 @@ class Libre_Compress_Database {
     }
 
     /**
-     * 按附件 ID 游标获取有备份的附件
+     * 按附件 ID 游标获取需要执行恢复流程的附件
      *
-     * 只返回附件记录仍然存在的行，避免把备份写回已删除的附件。
+     * 包含仍有备份索引的附件，以及引用已还原但残留文件与记录尚未清理的附件。
      *
      * @param int $after_id 上一批最后处理的附件 ID
      * @param int $limit    本批数量
      * @return int[]
      */
-    public function get_backup_attachment_ids_after( $after_id = 0, $limit = 20 ): array {
+    public function get_restore_attachment_ids_after( $after_id = 0, $limit = 20 ): array {
         global $wpdb;
 
         $after_id = absint( $after_id );
         $limit    = max( 1, min( 100, absint( $limit ) ) );
-        $ids      = $wpdb->get_col(
+
+        // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+        $ids = $wpdb->get_col(
             $wpdb->prepare(
-                "SELECT DISTINCT b.attachment_id
-                 FROM {$this->backups_table} b
-                 INNER JOIN {$wpdb->posts} p ON p.ID = b.attachment_id
-                 WHERE b.attachment_id > %d
-                   AND p.post_type = 'attachment'
-                   AND p.post_status <> 'trash'
-                 ORDER BY b.attachment_id ASC
-                 LIMIT %d",
+                "SELECT attachment_id FROM (
+                    SELECT DISTINCT b.attachment_id
+                    FROM {$this->backups_table} b
+                    INNER JOIN {$wpdb->posts} p ON p.ID = b.attachment_id
+                    WHERE b.attachment_id > %d
+                      AND p.post_type = 'attachment'
+                      AND p.post_status <> 'trash'
+                    UNION
+                    SELECT DISTINCT m.post_id AS attachment_id
+                    FROM {$wpdb->postmeta} m
+                    INNER JOIN {$wpdb->posts} p ON p.ID = m.post_id
+                    WHERE m.meta_key = %s
+                      AND m.post_id > %d
+                      AND p.post_type = 'attachment'
+                      AND p.post_status <> 'trash'
+                ) candidates
+                ORDER BY attachment_id ASC
+                LIMIT %d",
+                $after_id,
+                Libre_Compress_Processor::RESTORE_STATE_META_KEY,
+                $after_id,
+                $limit
+            )
+        );
+
+        return array_map( 'absint', $ids );
+    }
+
+    /**
+     * 按附件 ID 游标获取留有处理痕迹的附件
+     *
+     * 痕迹包括压缩记录、备份索引、格式转换映射和恢复残留状态，
+     * 清除记录时以此为遍历依据，保证不会漏掉任一类的残留。
+     *
+     * @param int $after_id 上一批最后处理的附件 ID
+     * @param int $limit    本批数量
+     * @return int[]
+     */
+    public function get_history_attachment_ids_after( $after_id = 0, $limit = 20 ): array {
+        global $wpdb;
+
+        $after_id = absint( $after_id );
+        $limit    = max( 1, min( 100, absint( $limit ) ) );
+
+        // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+        $ids = $wpdb->get_col(
+            $wpdb->prepare(
+                "SELECT attachment_id FROM (
+                    SELECT DISTINCT attachment_id FROM {$this->records_table} WHERE attachment_id > %d
+                    UNION
+                    SELECT DISTINCT attachment_id FROM {$this->backups_table} WHERE attachment_id > %d
+                    UNION
+                    SELECT DISTINCT post_id AS attachment_id FROM {$wpdb->postmeta}
+                    WHERE meta_key IN (%s, %s) AND post_id > %d
+                ) history
+                ORDER BY attachment_id ASC
+                LIMIT %d",
+                $after_id,
+                $after_id,
+                Libre_Compress_Output::OUTPUT_META_KEY,
+                Libre_Compress_Processor::RESTORE_STATE_META_KEY,
                 $after_id,
                 $limit
             )

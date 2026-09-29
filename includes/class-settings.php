@@ -244,11 +244,11 @@ class Libre_Compress_Settings {
             <tr>
                 <td style="padding: 10px 0;">
                     <button type="button" class="button" id="libre-compress-clear-records">
-                        <?php esc_html_e( '清除所有压缩记录', 'libre-compress' ); ?>
+                        <?php esc_html_e( '清除压缩记录与原图备份', 'libre-compress' ); ?>
                     </button>
                 </td>
                 <td style="padding: 10px 0;">
-                    <span class="description"><?php esc_html_e( '清除后可重新压缩所有图片', 'libre-compress' ); ?></span>
+                    <span class="description"><?php esc_html_e( '同时删除备份文件、备份索引和格式转换映射，之后所有图片都可重新压缩；此操作不可撤销。', 'libre-compress' ); ?></span>
                 </td>
             </tr>
             <tr>
