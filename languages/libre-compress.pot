@@ -461,7 +461,7 @@ msgid ""
 msgstr ""
 
 #: includes\class-settings.php:189
-msgid "压缩输出格式"
+msgid "格式转换"
 msgstr ""
 
 #: includes\class-settings.php:193

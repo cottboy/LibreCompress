@@ -186,7 +186,7 @@ class Libre_Compress_Settings {
                     </td>
                 </tr>
                 <tr>
-                    <th scope="row"><?php esc_html_e( '压缩输出格式', 'libre-compress' ); ?></th>
+                    <th scope="row"><?php esc_html_e( '格式转换', 'libre-compress' ); ?></th>
                     <td>
                         <label>
                             <input type="checkbox" name="libre_compress_general[output_png]" value="1" <?php checked( ! empty( $options['output_png'] ) ); ?>>
