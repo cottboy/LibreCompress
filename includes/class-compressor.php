@@ -97,6 +97,63 @@ class Libre_Compress_Compressor {
     }
 
     /**
+     * 判断 PNG 是否为 APNG 动图
+     *
+     * APNG 向后兼容 PNG，后缀和 MIME 都是 png / image/png，只能靠 acTL 块识别。
+     * pngquant、cwebp、avifenc 都只读第一帧，当成普通 PNG 处理就会把动图压成静图。
+     *
+     * @param string $file_path 文件绝对路径
+     * @return bool
+     */
+    public static function is_apng( string $file_path ): bool {
+        $handle = @fopen( $file_path, 'rb' );
+
+        if ( false === $handle ) {
+            return false;
+        }
+
+        // PNG 签名：89 50 4E 47 0D 0A 1A 0A
+        $signature = fread( $handle, 8 );
+
+        if ( chr( 137 ) . 'PNG' . chr( 13 ) . chr( 10 ) . chr( 26 ) . chr( 10 ) !== $signature ) {
+            fclose( $handle );
+            return false;
+        }
+
+        // acTL 一定在首帧 IDAT 之前；读到 IDAT/IEND 或块长度离谱就停止，不整文件扫描。
+        for ( $round = 0; $round < 100; $round++ ) {
+            $header = fread( $handle, 8 );
+
+            if ( 8 !== strlen( $header ) ) {
+                fclose( $handle );
+                return false;
+            }
+
+            $chunk  = unpack( 'Nlen', substr( $header, 0, 4 ) );
+            $length = (int) $chunk['len'];
+            $type   = substr( $header, 4, 4 );
+
+            if ( 'acTL' === $type ) {
+                fclose( $handle );
+                return true;
+            }
+
+            if ( 'IDAT' === $type || 'IEND' === $type || $length > 2 * 1024 * 1024 ) {
+                fclose( $handle );
+                return false;
+            }
+
+            if ( $length > 0 && false === fseek( $handle, $length + 4, SEEK_CUR ) ) {
+                fclose( $handle );
+                return false;
+            }
+        }
+
+        fclose( $handle );
+        return false;
+    }
+
+    /**
      * 获取附件对应的原图和缩略图文件
      *
      * @param int $attachment_id 附件 ID
@@ -197,6 +254,16 @@ class Libre_Compress_Compressor {
         }
 
         $extension      = strtolower( pathinfo( $file_path, PATHINFO_EXTENSION ) );
+
+        // APNG 的后缀与 MIME 都是 png，但 pngquant 只会留下第一帧，动图就毁了。
+        if ( 'png' === $extension && self::is_apng( $file_path ) ) {
+            return array(
+                'success' => false,
+                'message' => __( 'APNG 动图不压缩', 'libre-compress' ),
+                'status'  => 'skipped',
+            );
+        }
+
         $settings       = get_option( 'libre_compress_general', array() );
         $backup_enabled = isset( $settings['backup_enabled'] ) ? (bool) $settings['backup_enabled'] : true;
         $tool           = $this->get_tool_for_format( $extension );

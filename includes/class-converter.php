@@ -121,6 +121,11 @@ class Libre_Compress_Output {
             return false;
         }
 
+        // APNG 转 WebP/AVIF 同样只剩第一帧，统一不转换。
+        if ( 'png' === $format && Libre_Compress_Compressor::is_apng( $file_path ) ) {
+            return false;
+        }
+
         return in_array( $format, $settings['formats'], true );
     }
 

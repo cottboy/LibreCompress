@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: LibreCompress 1.2.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-06 18:53+0800\n"
+"POT-Creation-Date: 2026-10-06 19:12+0800\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -90,7 +90,7 @@ msgstr ""
 msgid "%s 不可用"
 msgstr ""
 
-#: compression\class-tool-base.php:376 includes\class-compressor.php:186 includes\class-converter.php:151
+#: compression\class-tool-base.php:376 includes\class-compressor.php:243 includes\class-converter.php:156
 msgid "文件不存在"
 msgstr ""
 
@@ -98,119 +98,123 @@ msgstr ""
 msgid "不支持的文件格式"
 msgstr ""
 
-#: compression\class-tool-base.php:415 includes\class-compressor.php:372 includes\class-converter.php:363 includes\class-converter.php:403
+#: compression\class-tool-base.php:415 includes\class-compressor.php:439 includes\class-converter.php:368 includes\class-converter.php:408
 msgid "压缩成功"
 msgstr ""
 
-#: includes\class-compressor.php:194 includes\class-converter.php:156
+#: includes\class-compressor.php:251 includes\class-converter.php:161
 msgid "文件路径不安全"
 msgstr ""
 
-#: includes\class-compressor.php:207 includes\class-converter.php:260
+#: includes\class-compressor.php:262
+msgid "APNG 动图不压缩"
+msgstr ""
+
+#: includes\class-compressor.php:274 includes\class-converter.php:265
 msgid "没有可用的压缩工具"
 msgstr ""
 
-#: includes\class-compressor.php:220
+#: includes\class-compressor.php:287
 msgid "文件大小超过限制（最大 %d MB）"
 msgstr ""
 
-#: includes\class-compressor.php:232 includes\class-converter.php:318
+#: includes\class-compressor.php:299 includes\class-converter.php:323
 msgid "无法创建原图备份，已停止压缩"
 msgstr ""
 
-#: includes\class-compressor.php:245
+#: includes\class-compressor.php:312
 msgid "无法创建回滚副本，已跳过压缩"
 msgstr ""
 
-#: includes\class-compressor.php:258
+#: includes\class-compressor.php:325
 msgid "压缩失败且回滚失败，请保留回滚副本并检查磁盘状态"
 msgstr ""
 
-#: includes\class-compressor.php:288
+#: includes\class-compressor.php:355
 msgid "压缩结果无效且回滚失败，请保留回滚副本并检查磁盘状态"
 msgstr ""
 
-#: includes\class-compressor.php:310
+#: includes\class-compressor.php:377
 msgid "压缩后体积没有变小，已保留原图"
 msgstr ""
 
-#: includes\class-compressor.php:323 includes\class-converter.php:298
+#: includes\class-compressor.php:390 includes\class-converter.php:303
 msgid "压缩记录保存失败，请重新压缩"
 msgstr ""
 
-#: includes\class-compressor.php:356
+#: includes\class-compressor.php:423
 msgid "压缩记录保存失败，已恢复原文件"
 msgstr ""
 
-#: includes\class-compressor.php:357
+#: includes\class-compressor.php:424
 msgid "压缩记录保存失败且回滚失败，请保留回滚副本并检查数据库状态"
 msgstr ""
 
-#: includes\class-converter.php:166
+#: includes\class-converter.php:171
 msgid "该格式未配置格式转换"
 msgstr ""
 
-#: includes\class-converter.php:190
+#: includes\class-converter.php:195
 msgid "同名目标文件过多，无法分配新文件名"
 msgstr ""
 
-#: includes\class-converter.php:211
+#: includes\class-converter.php:216
 msgid "动画 GIF 压缩为 WebP 需要 gif2webp 工具（libwebp 套件）"
 msgstr ""
 
-#: includes\class-converter.php:212
+#: includes\class-converter.php:217
 msgid "动画 GIF 压缩为 AVIF 需要 ffmpeg"
 msgstr ""
 
-#: includes\class-converter.php:223
+#: includes\class-converter.php:228
 msgid "静态 GIF 压缩需要 GD 扩展"
 msgstr ""
 
-#: includes\class-converter.php:231
+#: includes\class-converter.php:236
 msgid "GIF 压缩预处理失败"
 msgstr ""
 
-#: includes\class-converter.php:241
+#: includes\class-converter.php:246
 msgid "SVG 压缩需要 resvg 工具"
 msgstr ""
 
-#: includes\class-converter.php:249
+#: includes\class-converter.php:254
 msgid "SVG 压缩预处理失败"
 msgstr ""
 
-#: includes\class-converter.php:267 includes\class-media-library.php:132
+#: includes\class-converter.php:272 includes\class-media-library.php:132
 msgid "压缩失败"
 msgstr ""
 
-#: includes\class-converter.php:305
+#: includes\class-converter.php:310
 msgid "转换结果没有变小，已保留原图"
 msgstr ""
 
-#: includes\class-converter.php:331
+#: includes\class-converter.php:336
 msgid "压缩结果文件写入失败"
 msgstr ""
 
-#: includes\class-converter.php:340 includes\class-converter.php:390
+#: includes\class-converter.php:345 includes\class-converter.php:395
 msgid "压缩记录保存失败，已保留原文件"
 msgstr ""
 
-#: includes\class-converter.php:347 includes\class-converter.php:350
+#: includes\class-converter.php:352 includes\class-converter.php:355
 msgid "恢复映射保存失败，已保留原文件"
 msgstr ""
 
-#: includes\class-converter.php:432
+#: includes\class-converter.php:437
 msgid "附件路径同步失败，已保留原文件"
 msgstr ""
 
-#: includes\class-converter.php:436
+#: includes\class-converter.php:441
 msgid "附件 MIME 类型同步失败，已保留原文件"
 msgstr ""
 
-#: includes\class-converter.php:440
+#: includes\class-converter.php:445
 msgid "文章图片链接替换失败，已保留原文件"
 msgstr ""
 
-#: includes\class-converter.php:444
+#: includes\class-converter.php:449
 msgid "原文件删除失败，已退回原文件引用"
 msgstr ""
 
