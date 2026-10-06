@@ -18,6 +18,11 @@ if ( ! defined( 'ABSPATH' ) ) {
 class Libre_Compress_Thumbnail_Manager {
 
     /**
+     * 缩略图清理待改写的正文引用
+     */
+    const CLEANUP_META_KEY = '_libre_compress_thumbnail_cleanup';
+
+    /**
      * 遍历附件时的游标分页数量
      */
     const BATCH_SIZE = 100;
@@ -120,6 +125,7 @@ class Libre_Compress_Thumbnail_Manager {
         }
 
         $pairs    = array();
+        $pending_ids = array();
         $after_id = 0;
 
         do {
@@ -142,6 +148,10 @@ class Libre_Compress_Thumbnail_Manager {
                 foreach ( $outcome['pairs'] as $from => $to ) {
                     $pairs[ $from ] = $to;
                 }
+
+                if ( ! empty( $outcome['pending'] ) ) {
+                    $pending_ids[] = (int) $attachment_id;
+                }
             }
 
             if ( ! empty( $attachments ) ) {
@@ -152,6 +162,12 @@ class Libre_Compress_Thumbnail_Manager {
         $rewrite                   = $this->update_content_in_chunks( $pairs );
         $result['replaced_links']  = $rewrite['replaced'];
         $result['content_failed']  = $rewrite['failed'];
+
+        if ( ! $rewrite['failed'] ) {
+            foreach ( array_unique( $pending_ids ) as $attachment_id ) {
+                delete_post_meta( $attachment_id, self::CLEANUP_META_KEY );
+            }
+        }
 
         return $result;
     }
@@ -178,12 +194,23 @@ class Libre_Compress_Thumbnail_Manager {
         }
 
         try {
+            $pending = get_post_meta( $attachment_id, self::CLEANUP_META_KEY, true );
+
+            if ( is_array( $pending ) && ! empty( $pending ) ) {
+                return array(
+                    'deleted' => 0,
+                    'pairs'   => $this->sanitize_cleanup_pairs( $pending ),
+                    'pending' => true,
+                );
+            }
+
             $metadata = wp_get_attachment_metadata( $attachment_id );
 
             if ( empty( $metadata ) || empty( $metadata['file'] ) || empty( $metadata['sizes'] ) ) {
                 return array(
                     'deleted' => 0,
                     'pairs'   => array(),
+                    'pending' => false,
                 );
             }
 
@@ -222,6 +249,7 @@ class Libre_Compress_Thumbnail_Manager {
                 return array(
                     'deleted' => 0,
                     'pairs'   => array(),
+                    'pending' => false,
                 );
             }
 
@@ -252,7 +280,17 @@ class Libre_Compress_Thumbnail_Manager {
                 return array(
                     'deleted' => 0,
                     'pairs'   => array(),
+                    'pending' => false,
                 );
+            }
+
+            $cleanup_pairs = array();
+            foreach ( $targets as $size_name => $target_path ) {
+                $cleanup_pairs[ $victims[ $size_name ]['file'] ] = $target_path;
+            }
+
+            if ( ! $this->store_cleanup_pairs( $attachment_id, $cleanup_pairs ) ) {
+                return null;
             }
 
             foreach ( array_keys( $targets ) as $size_name ) {
@@ -260,6 +298,7 @@ class Libre_Compress_Thumbnail_Manager {
             }
 
             if ( ! $this->write_metadata( $attachment_id, $metadata ) ) {
+                delete_post_meta( $attachment_id, self::CLEANUP_META_KEY );
                 return null;
             }
 
@@ -296,11 +335,41 @@ class Libre_Compress_Thumbnail_Manager {
             return array(
                 'deleted' => $deleted,
                 'pairs'   => $pairs,
+                'pending' => true,
             );
         } finally {
             libre_compress()->processor->release_attachment_lock( $global_lock );
             libre_compress()->processor->release_attachment_lock( $lock );
         }
+    }
+
+    /**
+     * 保存待改写映射并读回校验
+     */
+    private function store_cleanup_pairs( int $attachment_id, array $pairs ): bool {
+        update_post_meta( $attachment_id, self::CLEANUP_META_KEY, wp_slash( $pairs ) );
+        $stored = get_post_meta( $attachment_id, self::CLEANUP_META_KEY, true );
+
+        return is_array( $stored ) && count( $stored ) === count( $pairs );
+    }
+
+    /**
+     * 过滤持久化映射，避免不可信元数据进入正文替换流程
+     */
+    private function sanitize_cleanup_pairs( array $pairs ): array {
+        $clean = array();
+
+        foreach ( $pairs as $from => $to ) {
+            if ( ! is_string( $from ) || ! is_string( $to ) || '' === $from || '' === $to ) {
+                continue;
+            }
+
+            if ( $this->is_safe_upload_path( $from ) && $this->is_safe_upload_path( $to ) ) {
+                $clean[ $from ] = $to;
+            }
+        }
+
+        return $clean;
     }
 
     /**

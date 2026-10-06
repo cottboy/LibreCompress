@@ -120,8 +120,11 @@ class Libre_Compress_Compressor {
             return false;
         }
 
-        // acTL 一定在首帧 IDAT 之前；读到 IDAT/IEND 或块长度离谱就停止，不整文件扫描。
-        for ( $round = 0; $round < 100; $round++ ) {
+        // acTL 一定在首帧 IDAT 之前；按 chunk 长度逐个扫描，避免固定块数或大小上限误判。
+        $file_size = filesize( $file_path );
+        $offset    = 8;
+
+        while ( $offset + 8 <= $file_size ) {
             $header = fread( $handle, 8 );
 
             if ( 8 !== strlen( $header ) ) {
@@ -133,20 +136,27 @@ class Libre_Compress_Compressor {
             $length = (int) $chunk['len'];
             $type   = substr( $header, 4, 4 );
 
+            if ( $length > $file_size - $offset - 12 ) {
+                fclose( $handle );
+                return false;
+            }
+
             if ( 'acTL' === $type ) {
                 fclose( $handle );
                 return true;
             }
 
-            if ( 'IDAT' === $type || 'IEND' === $type || $length > 2 * 1024 * 1024 ) {
+            if ( 'IDAT' === $type || 'IEND' === $type ) {
                 fclose( $handle );
                 return false;
             }
 
-            if ( $length > 0 && false === fseek( $handle, $length + 4, SEEK_CUR ) ) {
+            if ( false === fseek( $handle, $length + 4, SEEK_CUR ) ) {
                 fclose( $handle );
                 return false;
             }
+
+            $offset += 12 + $length;
         }
 
         fclose( $handle );

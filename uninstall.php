@@ -30,7 +30,7 @@ delete_option( 'libre_compress_db_version' );
 
 // 删除插件写入的附件处理标记、格式转换映射和恢复中间状态；统一压缩记录已随数据表删除。
 // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
-$wpdb->query( "DELETE FROM {$wpdb->postmeta} WHERE meta_key IN ('_libre_compress_output', '_libre_compress_restore_ready', '_libre_compress_pending')" );
+$wpdb->query( "DELETE FROM {$wpdb->postmeta} WHERE meta_key IN ('_libre_compress_output', '_libre_compress_restore_ready', '_libre_compress_pending', '_libre_compress_thumbnail_cleanup')" );
 
 // 停用定时任务并清理限流 transient（钩子名需与 Libre_Compress_Processor 常量保持一致）
 wp_clear_scheduled_hook( 'libre_compress_pending_sweep_event' );
