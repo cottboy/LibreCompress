@@ -92,9 +92,23 @@ class Libre_Compress_Settings {
         $sanitized['backup_retention_days'] = self::normalize_retention_days( isset( $input['backup_retention_days'] ) ? $input['backup_retention_days'] : null );
         $sanitized['strip_metadata']        = ! empty( $input['strip_metadata'] );
         $sanitized['tool_concurrency']   = isset( $input['tool_concurrency'] ) ? absint( $input['tool_concurrency'] ) : 5;
-        $sanitized['disable_thumbnails'] = array_key_exists( 'disable_thumbnails', $input )
-            ? ! empty( $input['disable_thumbnails'] )
-            : ! empty( $current_general['disable_thumbnails'] );
+        // 缩略图尺寸：每个尺寸都有隐藏域 0 和复选框 1 两个同名输入，后提交的复选框生效，
+        // 所以未勾选时也会带上 0；表单里没有这组字段时保留原状态。
+        if ( array_key_exists( 'thumbnail_state', $input ) ) {
+            $state    = (array) $input['thumbnail_state'];
+            $disabled = array();
+
+            foreach ( array_keys( wp_get_registered_image_subsizes() ) as $size_name ) {
+                if ( ! isset( $state[ $size_name ] ) || '1' !== (string) $state[ $size_name ] ) {
+                    $disabled[] = $size_name;
+                }
+            }
+
+            $sanitized['disabled_thumbnail_sizes'] = $disabled;
+        } else {
+            $stored                                = isset( $current_general['disabled_thumbnail_sizes'] ) ? (array) $current_general['disabled_thumbnail_sizes'] : array();
+            $sanitized['disabled_thumbnail_sizes'] = array_values( array_filter( array_map( 'sanitize_key', $stored ) ) );
+        }
 
         $sanitized['tool_concurrency'] = max( 1, min( 100, $sanitized['tool_concurrency'] ) );
 
@@ -182,6 +196,8 @@ class Libre_Compress_Settings {
     private function render_general_tab() {
         $options = get_option( 'libre_compress_general', array() );
         $retention_days = Libre_Compress_Settings::normalize_retention_days( isset( $options['backup_retention_days'] ) ? $options['backup_retention_days'] : null );
+        $registered_sizes = wp_get_registered_image_subsizes();
+        $disabled_sizes   = Libre_Compress_Thumbnail_Manager::disabled_sizes();
         ?>
         <style>
             .libre-compress-seg { position: relative; display: inline-flex; background: #dcdcde; border-radius: 8px; padding: 3px; vertical-align: middle; }
@@ -286,6 +302,37 @@ class Libre_Compress_Settings {
                         <p class="description"><?php esc_html_e( '选择目标格式：AVIF 压缩率更高但压缩更慢，WebP 兼容性更好。', 'libre-compress' ); ?></p>
                     </td>
                 </tr>
+                <tr>
+                    <th scope="row"><?php esc_html_e( '缩略图尺寸', 'libre-compress' ); ?></th>
+                    <td>
+                        <?php if ( empty( $registered_sizes ) ) : ?>
+                            <p class="description"><?php esc_html_e( '当前没有注册额外的缩略图尺寸。', 'libre-compress' ); ?></p>
+                        <?php else : ?>
+                            <?php foreach ( $registered_sizes as $size_name => $size_config ) : ?>
+                                <?php
+                                $width     = (int) $size_config['width'];
+                                $height    = (int) $size_config['height'];
+                                $dimension = $height > 0 ? $width . '×' . $height : $width . '×' . __( '自动', 'libre-compress' );
+                                $crop      = empty( $size_config['crop'] ) ? __( '等比', 'libre-compress' ) : __( '裁剪', 'libre-compress' );
+                                ?>
+                                <label style="display:block;">
+                                    <input type="hidden" name="libre_compress_general[thumbnail_state][<?php echo esc_attr( $size_name ); ?>]" value="0">
+                                    <input type="checkbox" name="libre_compress_general[thumbnail_state][<?php echo esc_attr( $size_name ); ?>]" value="1" <?php checked( ! in_array( $size_name, $disabled_sizes, true ) ); ?>>
+                                    <?php
+                                    printf(
+                                        /* translators: 1: 尺寸名, 2: 目标像素, 3: 裁剪方式 */
+                                        esc_html__( '%1$s（%2$s，%3$s）', 'libre-compress' ),
+                                        esc_html( $size_name ),
+                                        esc_html( $dimension ),
+                                        esc_html( $crop )
+                                    );
+                                    ?>
+                                </label>
+                            <?php endforeach; ?>
+                            <p class="description"><?php esc_html_e( '取消勾选的尺寸在上传图片时不再生成；已经存在的文件用下方“删除未勾选尺寸的缩略图”清理。以后新注册的尺寸默认勾选。', 'libre-compress' ); ?></p>
+                        <?php endif; ?>
+                    </td>
+                </tr>
             </table>
 
             <?php submit_button(); ?>
@@ -336,42 +383,22 @@ class Libre_Compress_Settings {
             </tr>
             <tr>
                 <td style="padding: 10px 0;">
-                    <button type="button" class="button" id="libre-compress-disable-thumbnails">
-                        <?php esc_html_e( '禁止生成缩略图', 'libre-compress' ); ?>
-                    </button>
-                </td>
-                <td style="padding: 10px 0;">
-                    <span class="description"><?php esc_html_e( '后续上传的图片将不再生成缩略图', 'libre-compress' ); ?></span>
-                </td>
-            </tr>
-            <tr>
-                <td style="padding: 10px 0;">
-                    <button type="button" class="button" id="libre-compress-enable-thumbnails">
-                        <?php esc_html_e( '重新启用缩略图', 'libre-compress' ); ?>
-                    </button>
-                </td>
-                <td style="padding: 10px 0;">
-                    <span class="description"><?php esc_html_e( '后续上传的图片将重新生成缩略图', 'libre-compress' ); ?></span>
-                </td>
-            </tr>
-            <tr>
-                <td style="padding: 10px 0;">
                     <button type="button" class="button" id="libre-compress-delete-thumbnails">
-                        <?php esc_html_e( '删除已有缩略图', 'libre-compress' ); ?>
+                        <?php esc_html_e( '删除未勾选尺寸的缩略图', 'libre-compress' ); ?>
                     </button>
                 </td>
                 <td style="padding: 10px 0;">
-                    <span class="description"><?php esc_html_e( '删除所有缩略图并将文章中的图片链接替换为原图', 'libre-compress' ); ?></span>
+                    <span class="description"><?php esc_html_e( '删除上方未勾选尺寸已存在的缩略图文件，并把文章里指向它们的图片链接改到最相邻的尺寸', 'libre-compress' ); ?></span>
                 </td>
             </tr>
             <tr>
                 <td style="padding: 10px 0;">
-                    <button type="button" class="button" id="libre-compress-regenerate-thumbnails">
-                        <?php esc_html_e( '重新生成缩略图', 'libre-compress' ); ?>
+                    <button type="button" class="button" id="libre-compress-generate-thumbnails">
+                        <?php esc_html_e( '补生成缺失尺寸的缩略图', 'libre-compress' ); ?>
                     </button>
                 </td>
                 <td style="padding: 10px 0;">
-                    <span class="description"><?php esc_html_e( '为缺少缩略图的图片生成缩略图，并将文章中的图片链接替换为"大"尺寸', 'libre-compress' ); ?></span>
+                    <span class="description"><?php esc_html_e( '只为上方已勾选但文件缺失的尺寸生成缩略图，不会重建已存在的文件，也不改动任何文章链接', 'libre-compress' ); ?></span>
                 </td>
             </tr>
         </table>

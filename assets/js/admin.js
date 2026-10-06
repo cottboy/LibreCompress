@@ -34,10 +34,8 @@
             // 设置页面按钮
             $('#libre-compress-clear-records').on('click', this.handleClearRecords.bind(this));
             $('#libre-compress-restore-all').on('click', this.handleRestoreAll.bind(this));
-            $('#libre-compress-disable-thumbnails').on('click', this.handleDisableThumbnails.bind(this));
-            $('#libre-compress-enable-thumbnails').on('click', this.handleEnableThumbnails.bind(this));
             $('#libre-compress-delete-thumbnails').on('click', this.handleDeleteThumbnails.bind(this));
-            $('#libre-compress-regenerate-thumbnails').on('click', this.handleRegenerateThumbnails.bind(this));
+            $('#libre-compress-generate-thumbnails').on('click', this.handleGenerateMissingThumbnails.bind(this));
             $('#libre-compress-bulk-compress').on('click', this.handleBulkCompress.bind(this));
             $('#libre-compress-delete-all-backups').on('click', this.handleDeleteAllBackups.bind(this));
 
@@ -377,124 +375,35 @@
         },
 
         /**
-         * 禁止生成缩略图
-         */
-        handleDisableThumbnails: function(e) {
-            e.preventDefault();
-
-            var self = this;
-            var $btn = $(e.currentTarget);
-
-            $btn.prop('disabled', true).text(this.i18n.processing);
-
-            $.ajax({
-                url: this.ajaxUrl,
-                type: 'POST',
-                data: {
-                    action: 'libre_compress_thumbnail_action',
-                    action_type: 'disable',
-                    nonce: this.nonce
-                },
-                success: function(response) {
-                    if (response.success) {
-                        alert(response.data.message);
-                    } else {
-                        alert(response.data.message || self.i18n.error);
-                    }
-                    $btn.prop('disabled', false).text($btn.text().replace(self.i18n.processing, ''));
-                    location.reload();
-                },
-                error: function() {
-                    alert(self.i18n.error);
-                    $btn.prop('disabled', false);
-                }
-            });
-        },
-
-        /**
-         * 重新启用缩略图
-         */
-        handleEnableThumbnails: function(e) {
-            e.preventDefault();
-
-            var self = this;
-            var $btn = $(e.currentTarget);
-
-            $btn.prop('disabled', true).text(this.i18n.processing);
-
-            $.ajax({
-                url: this.ajaxUrl,
-                type: 'POST',
-                data: {
-                    action: 'libre_compress_thumbnail_action',
-                    action_type: 'enable',
-                    nonce: this.nonce
-                },
-                success: function(response) {
-                    if (response.success) {
-                        alert(response.data.message);
-                    } else {
-                        alert(response.data.message || self.i18n.error);
-                    }
-                    $btn.prop('disabled', false).text($btn.text().replace(self.i18n.processing, ''));
-                    location.reload();
-                },
-                error: function() {
-                    alert(self.i18n.error);
-                    $btn.prop('disabled', false);
-                }
-            });
-        },
-
-        /**
-         * 删除缩略图
+         * 删除未勾选尺寸的缩略图
          */
         handleDeleteThumbnails: function(e) {
             e.preventDefault();
 
-            if (!confirm(this.i18n.confirmDelete)) {
+            if (!confirm(this.i18n.confirmDeleteThumbnails)) {
                 return;
             }
 
-            var self = this;
-            var $btn = $(e.currentTarget);
-
-            $btn.prop('disabled', true).text(this.i18n.processing);
-
-            $.ajax({
-                url: this.ajaxUrl,
-                type: 'POST',
-                data: {
-                    action: 'libre_compress_thumbnail_action',
-                    action_type: 'delete',
-                    nonce: this.nonce
-                },
-                success: function(response) {
-                    if (response.success) {
-                        alert(response.data.message);
-                    } else {
-                        alert(response.data.message || self.i18n.error);
-                    }
-                    $btn.prop('disabled', false);
-                    location.reload();
-                },
-                error: function() {
-                    alert(self.i18n.error);
-                    $btn.prop('disabled', false);
-                }
-            });
+            this.runThumbnailAction(e, 'delete');
         },
 
         /**
-         * 重新生成缩略图
+         * 补生成缺失尺寸的缩略图
          */
-        handleRegenerateThumbnails: function(e) {
+        handleGenerateMissingThumbnails: function(e) {
             e.preventDefault();
 
-            if (!confirm(this.i18n.confirmRegenerate)) {
+            if (!confirm(this.i18n.confirmGenerateThumbnails)) {
                 return;
             }
 
+            this.runThumbnailAction(e, 'generate');
+        },
+
+        /**
+         * 发送缩略图管理请求
+         */
+        runThumbnailAction: function(e, actionType) {
             var self = this;
             var $btn = $(e.currentTarget);
 
@@ -505,14 +414,14 @@
                 type: 'POST',
                 data: {
                     action: 'libre_compress_thumbnail_action',
-                    action_type: 'regenerate',
+                    action_type: actionType,
                     nonce: this.nonce
                 },
                 success: function(response) {
                     if (response.success) {
-                        alert(response.data.message);
+                        alert(response.data.message + self.formatFailedIds(response.data.failed_ids || []));
                     } else {
-                        alert(response.data.message || self.i18n.error);
+                        alert(response.data && response.data.message ? response.data.message : self.i18n.error);
                     }
                     $btn.prop('disabled', false);
                     location.reload();

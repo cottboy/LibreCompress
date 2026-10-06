@@ -1210,10 +1210,13 @@ class Libre_Compress_Output {
      * 避免覆盖用户在编辑器和别处同时做出的修改。
      *
      * @param array $replacements 每项包含 from 和 to 绝对路径
+     * @param int   $replaced     输出参数：实际替换掉的引用数量
      * @return bool 是否全部更新成功
      */
-    private function update_content_references( array $replacements ): bool {
+    public function update_content_references( array $replacements, &$replaced = 0 ): bool {
         global $wpdb;
+
+        $replaced = 0;
 
         if ( empty( $replacements ) ) {
             return true;
@@ -1273,6 +1276,7 @@ class Libre_Compress_Output {
                 }
 
                 if ( $this->write_post_content( $post_id, $content, $updated ) ) {
+                    $replaced += $this->count_missing_references( $content, $updated, $replacements );
                     continue;
                 }
 
@@ -1286,13 +1290,45 @@ class Libre_Compress_Output {
 
                 $retry = $this->replace_content_references( $current, $replacements );
 
-                if ( $retry !== $current && ! $this->write_post_content( $post_id, $current, $retry ) ) {
+                if ( $retry === $current ) {
+                    continue;
+                }
+
+                if ( $this->write_post_content( $post_id, $current, $retry ) ) {
+                    $replaced += $this->count_missing_references( $current, $retry, $replacements );
+                } else {
                     $success = false;
                 }
             }
         } while ( $page_size >= self::REFERENCE_BATCH_SIZE );
 
         return $success;
+    }
+
+    /**
+     * 统计一次改写实际消除了多少处引用
+     *
+     * 同一个文件在 srcset 里可能出现多次，按出现次数计更接近用户看到的“替换了多少链接”。
+     *
+     * @param string $before       改写前的正文
+     * @param string $after        改写后的正文
+     * @param array  $replacements 每项包含 from 绝对路径
+     * @return int
+     */
+    private function count_missing_references( string $before, string $after, array $replacements ): int {
+        $count = 0;
+
+        foreach ( $replacements as $replacement ) {
+            $needle = $this->content_path_of( $replacement['from'] );
+
+            if ( '' === $needle ) {
+                continue;
+            }
+
+            $count += max( 0, substr_count( $before, $needle ) - substr_count( $after, $needle ) );
+        }
+
+        return $count;
     }
 
     /**

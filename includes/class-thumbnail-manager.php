@@ -13,9 +13,19 @@ if ( ! defined( 'ABSPATH' ) ) {
 /**
  * 缩略图管理类
  *
- * 负责管理 WordPress 缩略图的生成、删除和重新生成
+ * 按设置决定生成哪些尺寸的缩略图，并负责清理未勾选尺寸的旧文件、补生成缺失的尺寸
  */
 class Libre_Compress_Thumbnail_Manager {
+
+    /**
+     * 遍历附件时的游标分页数量
+     */
+    const BATCH_SIZE = 100;
+
+    /**
+     * 一次正文改写携带的替换对数量，避免 SQL 条件过长
+     */
+    const REFERENCE_CHUNK_SIZE = 50;
 
     /**
      * 构造函数
@@ -28,120 +38,265 @@ class Libre_Compress_Thumbnail_Manager {
      * 初始化钩子
      */
     private function init_hooks() {
-        // 禁止生成缩略图
-        add_filter( 'intermediate_image_sizes_advanced', array( $this, 'maybe_disable_thumbnails' ), 10, 3 );
+        // 按设置跳过未勾选的缩略图尺寸
+        add_filter( 'intermediate_image_sizes_advanced', array( $this, 'filter_sizes_for_generation' ), 10, 3 );
 
         // 注册 AJAX 接口
         add_action( 'wp_ajax_libre_compress_thumbnail_action', array( $this, 'ajax_thumbnail_action' ) );
     }
 
     /**
-     * 根据设置决定是否禁止生成缩略图
+     * 未勾选、即不再生成的缩略图尺寸
      *
-     * @param array  $sizes    缩略图尺寸
-     * @param array  $metadata 图片元数据
-     * @param int    $attachment_id 附件 ID
-     * @return array 修改后的尺寸
+     * 存黑名单而不是白名单：以后主题或插件新注册的尺寸默认会生成，
+     * 与设置页“默认全部勾选”的说法一致。
+     *
+     * @return string[]
      */
-    public function maybe_disable_thumbnails( $sizes, $metadata = array(), $attachment_id = 0 ) {
+    public static function disabled_sizes(): array {
         $settings = get_option( 'libre_compress_general', array() );
-        $disabled = isset( $settings['disable_thumbnails'] ) ? (bool) $settings['disable_thumbnails'] : false;
+        $disabled = isset( $settings['disabled_thumbnail_sizes'] ) ? (array) $settings['disabled_thumbnail_sizes'] : array();
 
-        if ( $disabled ) {
-            return array();
+        return array_values( array_filter( array_map( 'sanitize_key', $disabled ) ) );
+    }
+
+    /**
+     * 判断某个缩略图尺寸是否已勾选生成
+     *
+     * @param string $size_name 尺寸名
+     * @return bool
+     */
+    public static function is_size_enabled( string $size_name ): bool {
+        return ! in_array( $size_name, self::disabled_sizes(), true );
+    }
+
+    /**
+     * 当前已注册且已勾选的尺寸
+     *
+     * @return string[]
+     */
+    public static function enabled_sizes(): array {
+        $registered = array_keys( wp_get_registered_image_subsizes() );
+
+        return array_values( array_diff( $registered, self::disabled_sizes() ) );
+    }
+
+    /**
+     * 生成缩略图时剔除未勾选的尺寸
+     *
+     * @param array $sizes         待生成的尺寸
+     * @param array $metadata      图片元数据
+     * @param int   $attachment_id 附件 ID
+     * @return array
+     */
+    public function filter_sizes_for_generation( $sizes, $metadata = array(), $attachment_id = 0 ) {
+        if ( ! is_array( $sizes ) || empty( $sizes ) ) {
+            return $sizes;
+        }
+
+        foreach ( self::disabled_sizes() as $size_name ) {
+            unset( $sizes[ $size_name ] );
         }
 
         return $sizes;
     }
 
     /**
-     * 禁止生成缩略图
+     * 删除所有附件中未勾选尺寸的缩略图
      *
-     * @return bool 是否成功
+     * @return array deleted_files、affected_attachments、replaced_links、failed_ids
      */
-    public function disable_thumbnails(): bool {
-        $settings = get_option( 'libre_compress_general', array() );
-        $settings['disable_thumbnails'] = true;
-        return update_option( 'libre_compress_general', $settings );
+    public function delete_disabled_thumbnails(): array {
+        $result = array(
+            'deleted_files'        => 0,
+            'affected_attachments' => 0,
+            'replaced_links'       => 0,
+            'failed_ids'           => array(),
+            'content_failed'       => false,
+        );
+
+        if ( empty( self::disabled_sizes() ) ) {
+            return $result;
+        }
+
+        $pairs    = array();
+        $after_id = 0;
+
+        do {
+            $attachments = libre_compress()->database->get_image_attachment_ids_after( $after_id, self::BATCH_SIZE );
+
+            foreach ( $attachments as $attachment_id ) {
+                $outcome = $this->delete_disabled_for_attachment( (int) $attachment_id );
+
+                if ( null === $outcome ) {
+                    $result['failed_ids'][] = (int) $attachment_id;
+                    continue;
+                }
+
+                $result['deleted_files'] += $outcome['deleted'];
+
+                if ( $outcome['deleted'] > 0 ) {
+                    $result['affected_attachments']++;
+                }
+
+                foreach ( $outcome['pairs'] as $from => $to ) {
+                    $pairs[ $from ] = $to;
+                }
+            }
+
+            if ( ! empty( $attachments ) ) {
+                $after_id = max( array_map( 'absint', $attachments ) );
+            }
+        } while ( count( $attachments ) === self::BATCH_SIZE );
+
+        $rewrite                   = $this->update_content_in_chunks( $pairs );
+        $result['replaced_links']  = $rewrite['replaced'];
+        $result['content_failed']  = $rewrite['failed'];
+
+        return $result;
     }
 
     /**
-     * 启用生成缩略图
+     * 删除单个附件中未勾选尺寸的缩略图
      *
-     * @return bool 是否成功
-     */
-    public function enable_thumbnails(): bool {
-        $settings = get_option( 'libre_compress_general', array() );
-        $settings['disable_thumbnails'] = false;
-        return update_option( 'libre_compress_general', $settings );
-    }
-
-    /**
-     * 删除附件的所有缩略图
+     * 先改元数据再删文件：即使删文件失败，也只会留下没人引用的多余文件，
+     * 不会出现指向已删文件的死链接。找不到替代尺寸的不删。
      *
      * @param int $attachment_id 附件 ID
-     * @return int 删除的文件数量
+     * @return array|null 计划结果；锁被占用或元数据写入失败时返回 null
      */
-    public function delete_attachment_thumbnails( int $attachment_id ): int {
+    private function delete_disabled_for_attachment( int $attachment_id ): ?array {
         $lock = libre_compress()->processor->acquire_attachment_lock( $attachment_id );
         if ( false === $lock ) {
-            return 0;
+            return null;
         }
 
         $global_lock = libre_compress()->processor->acquire_global_lock( false );
         if ( false === $global_lock ) {
             libre_compress()->processor->release_attachment_lock( $lock );
-            return 0;
+            return null;
         }
 
         try {
             $metadata = wp_get_attachment_metadata( $attachment_id );
 
             if ( empty( $metadata ) || empty( $metadata['file'] ) || empty( $metadata['sizes'] ) ) {
-                return 0;
+                return array(
+                    'deleted' => 0,
+                    'pairs'   => array(),
+                );
             }
 
-            $upload_dir = wp_upload_dir();
-            $base_dir   = $upload_dir['basedir'];
-            $file_dir   = dirname( $metadata['file'] );
-            $deleted    = 0;
-            $removed    = array();
+            $upload   = wp_upload_dir();
+            $base_dir = untrailingslashit( $upload['basedir'] );
+            $file_dir = dirname( $metadata['file'] );
+
+            $victims = array();
+            $kept    = array();
 
             foreach ( $metadata['sizes'] as $size_name => $size_data ) {
                 if ( empty( $size_data['file'] ) ) {
                     continue;
                 }
 
-                $thumb_path = $base_dir . '/' . $file_dir . '/' . $size_data['file'];
-                if ( file_exists( $thumb_path ) && $this->is_safe_upload_path( $thumb_path ) ) {
-                    // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
-                    if ( unlink( $thumb_path ) ) {
-                        $deleted++;
-                        $removed[ $size_name ] = true;
-                    }
+                $path = $base_dir . '/' . $file_dir . '/' . $size_data['file'];
+
+                if ( ! file_exists( $path ) ) {
+                    continue;
+                }
+
+                $entry = array(
+                    'file'   => $path,
+                    'width'  => isset( $size_data['width'] ) ? (int) $size_data['width'] : 0,
+                    'height' => isset( $size_data['height'] ) ? (int) $size_data['height'] : 0,
+                );
+
+                if ( self::is_size_enabled( $size_name ) ) {
+                    $kept[ $size_name ] = $entry;
+                } else {
+                    $victims[ $size_name ] = $entry;
                 }
             }
 
-            foreach ( array_keys( $removed ) as $size_name ) {
+            if ( empty( $victims ) ) {
+                return array(
+                    'deleted' => 0,
+                    'pairs'   => array(),
+                );
+            }
+
+            // 原图永远在，作为最后兜底的替代尺寸
+            $full_path = $base_dir . '/' . $metadata['file'];
+
+            if ( file_exists( $full_path ) ) {
+                $kept['full'] = array(
+                    'file'   => $full_path,
+                    'width'  => isset( $metadata['width'] ) ? (int) $metadata['width'] : 0,
+                    'height' => isset( $metadata['height'] ) ? (int) $metadata['height'] : 0,
+                );
+            }
+
+            $targets = array();
+
+            foreach ( $victims as $size_name => $size_data ) {
+                $replacement = $this->nearest_replacement( $size_data, $kept );
+
+                if ( null === $replacement ) {
+                    continue;
+                }
+
+                $targets[ $size_name ] = $replacement['file'];
+            }
+
+            if ( empty( $targets ) ) {
+                return array(
+                    'deleted' => 0,
+                    'pairs'   => array(),
+                );
+            }
+
+            foreach ( array_keys( $targets ) as $size_name ) {
                 unset( $metadata['sizes'][ $size_name ] );
             }
 
-            if ( ! empty( $removed ) ) {
-                $metadata_updated = false !== wp_update_attachment_metadata( $attachment_id, $metadata );
-                if ( ! $metadata_updated ) {
-                    return $deleted;
+            if ( ! $this->write_metadata( $attachment_id, $metadata ) ) {
+                return null;
+            }
+
+            $deleted = 0;
+            $pairs   = array();
+
+            foreach ( $targets as $size_name => $target_path ) {
+                $path = $victims[ $size_name ]['file'];
+
+                if ( ! $this->is_safe_upload_path( $path ) ) {
+                    continue;
                 }
 
+                if ( file_exists( $path ) ) {
+                    // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
+                    unlink( $path );
+                }
+
+                if ( file_exists( $path ) ) {
+                    continue;
+                }
+
+                $deleted++;
+                $pairs[ $path ] = $target_path;
+
                 $database = libre_compress()->database;
-                foreach ( array_keys( $removed ) as $size_name ) {
-                    $record = $database->get_record( $attachment_id, $size_name );
-                    if ( $record ) {
-                        $database->delete_record( $record['id'] );
-                    }
+                $record   = $database->get_record( $attachment_id, $size_name );
+
+                if ( $record ) {
+                    $database->delete_record( $record['id'] );
                 }
             }
 
-            return $deleted;
+            return array(
+                'deleted' => $deleted,
+                'pairs'   => $pairs,
+            );
         } finally {
             libre_compress()->processor->release_attachment_lock( $global_lock );
             libre_compress()->processor->release_attachment_lock( $lock );
@@ -149,132 +304,233 @@ class Libre_Compress_Thumbnail_Manager {
     }
 
     /**
-     * 删除所有附件的缩略图
+     * 为被删尺寸挑一个像素面积最接近的替代尺寸，平手时选更大的
      *
-     * @return array 操作结果
+     * @param array $victim     被删尺寸的文件与宽高
+     * @param array $candidates 仍然存在的候选尺寸
+     * @return array|null
      */
-    public function delete_all_thumbnails(): array {
-        $database            = libre_compress()->database;
-        $after_id            = 0;
-        $total_deleted       = 0;
-        $affected_attachments = 0;
+    private function nearest_replacement( array $victim, array $candidates ) {
+        $victim_area = max( 1, $victim['width'] * $victim['height'] );
+        $best        = null;
+        $best_score  = null;
 
-        do {
-            $attachments = $database->get_image_attachment_ids_after( $after_id, 100 );
-            foreach ( $attachments as $attachment_id ) {
-                $deleted = $this->delete_attachment_thumbnails( absint( $attachment_id ) );
-                if ( $deleted > 0 ) {
-                    $total_deleted += $deleted;
-                    $affected_attachments++;
-                }
+        foreach ( $candidates as $candidate ) {
+            $area  = max( 1, $candidate['width'] * $candidate['height'] );
+            $score = abs( $area - $victim_area );
+
+            if ( null === $best_score || $score < $best_score || ( $score === $best_score && $area > $best['area'] ) ) {
+                $best       = array(
+                    'file' => $candidate['file'],
+                    'area' => $area,
+                );
+                $best_score = $score;
             }
-            if ( ! empty( $attachments ) ) {
-                $after_id = max( array_map( 'absint', $attachments ) );
+        }
+
+        return $best;
+    }
+
+    /**
+     * 分批改写正文里指向被删缩略图的链接
+     *
+     * @param array $pairs 被删文件绝对路径 => 替代文件绝对路径
+     * @return array replaced、failed
+     */
+    private function update_content_in_chunks( array $pairs ): array {
+        $replaced = 0;
+        $failed   = false;
+
+        foreach ( array_chunk( $pairs, self::REFERENCE_CHUNK_SIZE, true ) as $chunk ) {
+            $replacements = array();
+
+            foreach ( $chunk as $from => $to ) {
+                $replacements[] = array(
+                    'from' => $from,
+                    'to'   => $to,
+                );
             }
-        } while ( count( $attachments ) === 100 );
+
+            $count = 0;
+
+            if ( ! libre_compress()->output_processor->update_content_references( $replacements, $count ) ) {
+                $failed = true;
+            }
+
+            $replaced += $count;
+        }
 
         return array(
-            'deleted_files'        => $total_deleted,
-            'affected_attachments' => $affected_attachments,
+            'replaced' => $replaced,
+            'failed'   => $failed,
         );
     }
 
     /**
-     * 替换文章中的图片链接为原图
+     * 为勾选了但缺失的尺寸补生成缩略图
      *
-     * @return int 替换的数量
+     * @return array generated_attachments、generated_files、skipped_attachments、failed_ids
      */
-    public function replace_thumbnails_with_original(): int {
-        global $wpdb;
+    public function generate_missing_thumbnails(): array {
+        $result = array(
+            'generated_attachments' => 0,
+            'generated_files'       => 0,
+            'skipped_attachments'   => 0,
+            'failed_ids'            => array(),
+        );
 
-        $replaced  = 0;
-        $after_id  = 0;
+        $enabled    = self::enabled_sizes();
+        $registered = wp_get_registered_image_subsizes();
+
+        if ( empty( $enabled ) ) {
+            return $result;
+        }
+
+        $after_id = 0;
 
         do {
-            $posts = $wpdb->get_results(
-                $wpdb->prepare(
-                    "SELECT ID, post_content FROM {$wpdb->posts}
-                    WHERE ID > %d
-                    AND post_content LIKE '%<img%'
-                    AND post_status != 'trash'
-                    ORDER BY ID ASC
-                    LIMIT 100",
-                    $after_id
-                )
-            );
+            $attachments = libre_compress()->database->get_image_attachment_ids_after( $after_id, self::BATCH_SIZE );
 
-            foreach ( $posts as $post ) {
-                $content     = $post->post_content;
-                $new_content = $content;
+            foreach ( $attachments as $attachment_id ) {
+                $outcome = $this->generate_missing_for_attachment( (int) $attachment_id, $enabled, $registered );
 
-                preg_match_all( '/<img[^>]+src=["\']([^"\']+)["\'][^>]*>/i', $content, $matches );
-                foreach ( $matches[1] as $img_url ) {
-                    if ( preg_match( '/-\d+x\d+\.(jpg|jpeg|png|gif|webp|avif|svg)$/i', $img_url ) ) {
-                        $original_url = preg_replace( '/-\d+x\d+\./', '.', $img_url );
-                        $new_content  = str_replace( $img_url, $original_url, $new_content );
-                        $replaced++;
-                    }
-                }
-
-                if ( $new_content !== $content ) {
-                    $wpdb->update(
-                        $wpdb->posts,
-                        array( 'post_content' => $new_content ),
-                        array( 'ID' => $post->ID ),
-                        array( '%s' ),
-                        array( '%d' )
-                    );
+                if ( null === $outcome ) {
+                    $result['failed_ids'][] = (int) $attachment_id;
+                } elseif ( is_int( $outcome ) ) {
+                    $result['generated_attachments']++;
+                    $result['generated_files'] += $outcome;
+                } else {
+                    $result['skipped_attachments']++;
                 }
             }
 
-            if ( ! empty( $posts ) ) {
-                $after_id = max( array_map( 'absint', wp_list_pluck( $posts, 'ID' ) ) );
+            if ( ! empty( $attachments ) ) {
+                $after_id = max( array_map( 'absint', $attachments ) );
             }
-        } while ( count( $posts ) === 100 );
+        } while ( count( $attachments ) === self::BATCH_SIZE );
 
-        return $replaced;
+        return $result;
     }
 
     /**
-     * 重新生成附件的缩略图
+     * 给单个附件补齐缺失尺寸
      *
-     * @param int $attachment_id 附件 ID
-     * @return bool 是否成功
+     * 只生成缺失的尺寸：核心生成完会整体覆盖元数据，所以事后把原有尺寸并回去，
+     * 已存在的缩略图文件不会被重建。
+     *
+     * @param int   $attachment_id 附件 ID
+     * @param array $enabled       已勾选的尺寸名
+     * @param array $registered    注册尺寸配置
+     * @return int|string|null 新增文件数；无需处理时返回原因字符串；失败返回 null
      */
-    public function regenerate_attachment_thumbnails( int $attachment_id ): bool {
+    private function generate_missing_for_attachment( int $attachment_id, array $enabled, array $registered ) {
         $lock = libre_compress()->processor->acquire_attachment_lock( $attachment_id );
         if ( false === $lock ) {
-            return false;
+            return null;
         }
 
         $global_lock = libre_compress()->processor->acquire_global_lock( false );
         if ( false === $global_lock ) {
             libre_compress()->processor->release_attachment_lock( $lock );
-            return false;
+            return null;
         }
 
         try {
+            $file = get_attached_file( $attachment_id );
+
+            if ( ! $file || ! file_exists( $file ) ) {
+                return null;
+            }
+
+            // APNG 生成缩略图只会取第一帧，与“APNG 不处理”保持一致
+            if ( Libre_Compress_Compressor::is_apng( $file ) ) {
+                return 'apng';
+            }
+
+            $metadata = wp_get_attachment_metadata( $attachment_id );
+
+            if ( empty( $metadata ) || empty( $metadata['file'] ) ) {
+                return 'no_metadata';
+            }
+
+            $upload   = wp_upload_dir();
+            $base_dir = untrailingslashit( $upload['basedir'] );
+            $file_dir = dirname( $metadata['file'] );
+            $width    = isset( $metadata['width'] ) ? (int) $metadata['width'] : 0;
+            $height   = isset( $metadata['height'] ) ? (int) $metadata['height'] : 0;
+
+            $missing = array();
+
+            foreach ( $enabled as $size_name ) {
+                if ( ! isset( $registered[ $size_name ] ) ) {
+                    continue;
+                }
+
+                if ( ! empty( $metadata['sizes'][ $size_name ]['file'] ) ) {
+                    $existing = $base_dir . '/' . $file_dir . '/' . $metadata['sizes'][ $size_name ]['file'];
+
+                    if ( file_exists( $existing ) ) {
+                        continue;
+                    }
+                }
+
+                if ( ! $this->size_applies_to_image( $registered[ $size_name ], $width, $height ) ) {
+                    continue;
+                }
+
+                $missing[] = $size_name;
+            }
+
+            if ( empty( $missing ) ) {
+                return 'nothing';
+            }
+
+            $filter = function ( $sizes ) use ( $missing ) {
+                return array_intersect_key( is_array( $sizes ) ? $sizes : array(), array_flip( $missing ) );
+            };
+
+            add_filter( 'intermediate_image_sizes_advanced', $filter, 20 );
+
             $processor = libre_compress()->processor;
-            $file_path = get_attached_file( $attachment_id );
-
-            if ( ! $file_path || ! file_exists( $file_path ) ) {
-                return false;
-            }
-
-            // 元数据重建期间明确暂停自动压缩，避免插件自己处理刚生成的尺寸。
-            $was_suppressed = $processor->is_auto_compress_suppressed();
+            $was       = $processor->is_auto_compress_suppressed();
             $processor->set_auto_compress_suppressed( true );
+
             try {
-                $metadata = wp_generate_attachment_metadata( $attachment_id, $file_path );
+                $fresh = wp_generate_attachment_metadata( $attachment_id, $file );
             } finally {
-                $processor->set_auto_compress_suppressed( $was_suppressed );
+                $processor->set_auto_compress_suppressed( $was );
+                remove_filter( 'intermediate_image_sizes_advanced', $filter, 20 );
             }
 
-            if ( empty( $metadata ) ) {
-                return false;
+            if ( empty( $fresh['sizes'] ) || ! is_array( $fresh['sizes'] ) ) {
+                return 'nothing';
             }
 
-            return false !== wp_update_attachment_metadata( $attachment_id, $metadata );
+            $merged          = $metadata;
+            $merged['sizes'] = isset( $metadata['sizes'] ) && is_array( $metadata['sizes'] ) ? $metadata['sizes'] : array();
+            $generated       = 0;
+
+            foreach ( $fresh['sizes'] as $size_name => $size_data ) {
+                if ( ! in_array( $size_name, $missing, true ) ) {
+                    continue;
+                }
+
+                $merged['sizes'][ $size_name ] = $size_data;
+                $generated++;
+            }
+
+            if ( 0 === $generated ) {
+                return 'nothing';
+            }
+
+            if ( ! $this->write_metadata( $attachment_id, $merged ) ) {
+                // 核心已把元数据覆盖成只含新尺寸，写回失败时先还原，别让已有尺寸的记录丢失
+                $this->write_metadata( $attachment_id, $metadata );
+
+                return null;
+            }
+
+            return $generated;
         } finally {
             libre_compress()->processor->release_attachment_lock( $global_lock );
             libre_compress()->processor->release_attachment_lock( $lock );
@@ -282,103 +538,56 @@ class Libre_Compress_Thumbnail_Manager {
     }
 
     /**
-     * 重新生成缺少缩略图的附件
+     * 判断某个尺寸对这张图是否适用
      *
-     * @return array 操作结果
+     * 等比缩放是按最长边缩的：只要原图在任一维度大于目标就会产出（2000x1500 对
+     * 1536x1536 会得到 1536x1152）。核心不产出的尺寸不能算“缺失”，否则每次点击都会
+     * 白跑一遍，永远补不齐。
+     *
+     * @param array $config 尺寸配置
+     * @param int   $width  原图宽
+     * @param int   $height 原图高
+     * @return bool
      */
-    public function regenerate_missing_thumbnails(): array {
-        $database = libre_compress()->database;
-        $after_id = 0;
-        $success  = 0;
-        $failed   = 0;
+    private function size_applies_to_image( array $config, int $width, int $height ): bool {
+        $target_width  = isset( $config['width'] ) ? (int) $config['width'] : 0;
+        $target_height = isset( $config['height'] ) ? (int) $config['height'] : 0;
 
-        do {
-            $attachments = $database->get_image_attachment_ids_after( $after_id, 100 );
-            foreach ( $attachments as $attachment_id ) {
-                $metadata = wp_get_attachment_metadata( $attachment_id );
-                if ( ! empty( $metadata['sizes'] ) ) {
-                    continue;
-                }
+        if ( 0 === $target_width && 0 === $target_height ) {
+            return false;
+        }
 
-                if ( $this->regenerate_attachment_thumbnails( $attachment_id ) ) {
-                    $success++;
-                } else {
-                    $failed++;
-                }
-            }
+        if ( ! empty( $config['crop'] ) ) {
+            return true;
+        }
 
-            if ( ! empty( $attachments ) ) {
-                $after_id = max( $attachments );
-            }
-        } while ( count( $attachments ) === 100 );
+        if ( $width <= 0 || $height <= 0 ) {
+            return false;
+        }
 
-        return array(
-            'success' => $success,
-            'failed'  => $failed,
-        );
+        return ( $target_width > 0 && $width > $target_width ) || ( $target_height > 0 && $height > $target_height );
     }
 
     /**
-     * 替换文章中的图片链接为"大"尺寸
+     * 写入元数据并读回校验
      *
-     * @return int 替换的数量
+     * @param int   $attachment_id 附件 ID
+     * @param array $metadata      待写入的元数据
+     * @return bool
      */
-    public function replace_original_with_large(): int {
-        global $wpdb;
+    private function write_metadata( int $attachment_id, array $metadata ): bool {
+        wp_update_attachment_metadata( $attachment_id, $metadata );
 
-        $replaced = 0;
-        $after_id = 0;
+        $stored  = wp_get_attachment_metadata( $attachment_id );
+        $current = isset( $metadata['sizes'] ) && is_array( $metadata['sizes'] ) ? array_keys( $metadata['sizes'] ) : array();
 
-        do {
-            $posts = $wpdb->get_results(
-                $wpdb->prepare(
-                    "SELECT ID, post_content FROM {$wpdb->posts}
-                    WHERE ID > %d
-                    AND post_content LIKE '%<img%'
-                    AND post_status != 'trash'
-                    ORDER BY ID ASC
-                    LIMIT 100",
-                    $after_id
-                )
-            );
+        if ( ! is_array( $stored ) ) {
+            return false;
+        }
 
-            foreach ( $posts as $post ) {
-                $content     = $post->post_content;
-                $new_content = $content;
-                preg_match_all( '/<img[^>]+src=["\']([^"\']+)["\'][^>]*>/i', $content, $matches );
+        $stored_sizes = isset( $stored['sizes'] ) && is_array( $stored['sizes'] ) ? array_keys( $stored['sizes'] ) : array();
 
-                foreach ( $matches[1] as $img_url ) {
-                    if ( preg_match( '/-\d+x\d+\.(jpg|jpeg|png|gif|webp|avif|svg)$/i', $img_url ) ) {
-                        continue;
-                    }
-
-                    $attachment_id = attachment_url_to_postid( $img_url );
-                    if ( $attachment_id ) {
-                        $large_url = wp_get_attachment_image_url( $attachment_id, 'large' );
-                        if ( $large_url && $large_url !== $img_url ) {
-                            $new_content = str_replace( $img_url, $large_url, $new_content );
-                            $replaced++;
-                        }
-                    }
-                }
-
-                if ( $new_content !== $content ) {
-                    $wpdb->update(
-                        $wpdb->posts,
-                        array( 'post_content' => $new_content ),
-                        array( 'ID' => $post->ID ),
-                        array( '%s' ),
-                        array( '%d' )
-                    );
-                }
-            }
-
-            if ( ! empty( $posts ) ) {
-                $after_id = max( array_map( 'absint', wp_list_pluck( $posts, 'ID' ) ) );
-            }
-        } while ( count( $posts ) === 100 );
-
-        return $replaced;
+        return $stored_sizes === $current;
     }
 
     /**
@@ -388,18 +597,29 @@ class Libre_Compress_Thumbnail_Manager {
      * @return bool
      */
     private function is_safe_upload_path( string $file_path ): bool {
-        $upload_dir = wp_upload_dir();
-        $base_dir   = realpath( $upload_dir['basedir'] );
-        $real_path  = realpath( $file_path );
-
-        if ( false === $base_dir || false === $real_path || false !== strpos( $file_path, '..' ) ) {
+        if ( false !== strpos( $file_path, '..' ) ) {
             return false;
         }
 
-        $base_dir  = untrailingslashit( wp_normalize_path( $base_dir ) );
-        $real_path = untrailingslashit( wp_normalize_path( $real_path ) );
+        $upload_dir = wp_upload_dir();
+        $base_dir   = realpath( $upload_dir['basedir'] );
 
-        return 0 === strpos( $real_path, $base_dir . '/' );
+        if ( false === $base_dir ) {
+            return false;
+        }
+
+        $real_path = realpath( $file_path );
+
+        if ( false !== $real_path && is_link( $real_path ) ) {
+            return false;
+        }
+
+        // 文件已不存在时按规范化后的字面路径判断，保证删除动作只落在 uploads 内
+        $candidate = false === $real_path ? $file_path : $real_path;
+        $base_dir  = untrailingslashit( wp_normalize_path( $base_dir ) );
+        $candidate = untrailingslashit( wp_normalize_path( $candidate ) );
+
+        return 0 === strpos( $candidate, $base_dir . '/' );
     }
 
     /**
@@ -418,68 +638,48 @@ class Libre_Compress_Thumbnail_Manager {
         $action_type = isset( $_POST['action_type'] ) ? sanitize_text_field( wp_unslash( $_POST['action_type'] ) ) : '';
 
         switch ( $action_type ) {
-            case 'disable':
-                // 禁止生成缩略图
-                $this->disable_thumbnails();
-                wp_send_json_success(
-                    array(
-                        'message' => __( '已禁止生成缩略图', 'libre-compress' ),
-                    )
-                );
-                break;
-
             case 'delete':
-                // 删除已有缩略图
-                $result = $this->delete_all_thumbnails();
+                $result  = $this->delete_disabled_thumbnails();
+                $message = sprintf(
+                    /* translators: 1: 删除的文件数, 2: 影响的附件数, 3: 替换的链接数 */
+                    __( '已删除 %1$d 个未勾选尺寸的缩略图（涉及 %2$d 个附件），替换了 %3$d 个图片链接', 'libre-compress' ),
+                    $result['deleted_files'],
+                    $result['affected_attachments'],
+                    $result['replaced_links']
+                );
 
-                // 替换文章中的图片链接
-                $replaced = $this->replace_thumbnails_with_original();
+                if ( $result['content_failed'] ) {
+                    $message .= ' ' . __( '部分正文链接未更新成功，可再次执行本操作继续处理。', 'libre-compress' );
+                }
 
                 wp_send_json_success(
                     array(
-                        'message'        => sprintf(
-                            /* translators: 1: 删除的文件数, 2: 影响的附件数, 3: 替换的链接数 */
-                            __( '已删除 %1$d 个缩略图文件（%2$d 个附件），替换了 %3$d 个图片链接', 'libre-compress' ),
-                            $result['deleted_files'],
-                            $result['affected_attachments'],
-                            $replaced
-                        ),
+                        'message'        => $message,
                         'deleted_files'  => $result['deleted_files'],
                         'affected_count' => $result['affected_attachments'],
-                        'replaced_links' => $replaced,
+                        'replaced_links' => $result['replaced_links'],
+                        'failed_ids'     => $result['failed_ids'],
                     )
                 );
                 break;
 
-            case 'enable':
-                // 仅启用缩略图生成
-                $this->enable_thumbnails();
-                wp_send_json_success(
-                    array(
-                        'message' => __( '已启用缩略图生成', 'libre-compress' ),
-                    )
-                );
-                break;
-
-            case 'regenerate':
-                // 重新生成缩略图（不改变启用状态）
-                $result = $this->regenerate_missing_thumbnails();
-
-                // 替换文章中的图片链接
-                $replaced = $this->replace_original_with_large();
+            case 'generate':
+                $result = $this->generate_missing_thumbnails();
 
                 wp_send_json_success(
                     array(
                         'message'        => sprintf(
-                            /* translators: 1: 成功数, 2: 失败数, 3: 替换的链接数 */
-                            __( '已重新生成 %1$d 个附件的缩略图（%2$d 个失败），替换了 %3$d 个图片链接', 'libre-compress' ),
-                            $result['success'],
-                            $result['failed'],
-                            $replaced
+                            /* translators: 1: 补生成的附件数, 2: 新增文件数, 3: 跳过的附件数, 4: 失败的附件数 */
+                            __( '已为 %1$d 个附件补生成 %2$d 个缩略图（%3$d 个无需处理或已跳过，%4$d 个失败）', 'libre-compress' ),
+                            $result['generated_attachments'],
+                            $result['generated_files'],
+                            $result['skipped_attachments'],
+                            count( $result['failed_ids'] )
                         ),
-                        'success_count'  => $result['success'],
-                        'failed_count'   => $result['failed'],
-                        'replaced_links' => $replaced,
+                        'generated_attachments' => $result['generated_attachments'],
+                        'generated_files'       => $result['generated_files'],
+                        'skipped_attachments'   => $result['skipped_attachments'],
+                        'failed_ids'            => $result['failed_ids'],
                     )
                 );
                 break;
