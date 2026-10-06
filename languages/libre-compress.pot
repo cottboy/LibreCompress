@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: LibreCompress 1.2.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-06 17:46+0800\n"
+"POT-Creation-Date: 2026-10-06 18:12+0800\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -418,15 +418,15 @@ msgstr ""
 msgid "没有可用的压缩结果"
 msgstr ""
 
-#: includes\class-processor.php:1314
+#: includes\class-processor.php:1316
 msgid "插件正在执行维护操作，请稍后重试"
 msgstr ""
 
-#: includes\class-processor.php:1315
+#: includes\class-processor.php:1317
 msgid "该图片正在处理中，请稍后重试"
 msgstr ""
 
-#: includes\class-processor.php:1318
+#: includes\class-processor.php:1320
 msgid "无法创建锁文件，请检查上传目录的写入权限"
 msgstr ""
 
@@ -451,27 +451,27 @@ msgid "上传图片时自动压缩"
 msgstr ""
 
 #: includes\class-settings.php:194
+msgid "压缩并发数"
+msgstr ""
+
+#: includes\class-settings.php:200
 msgid "备份原图"
 msgstr ""
 
-#: includes\class-settings.php:198
+#: includes\class-settings.php:204
 msgid "压缩前备份原图"
 msgstr ""
 
-#: includes\class-settings.php:203
+#: includes\class-settings.php:209
 msgid "原图备份保留时长"
 msgstr ""
 
-#: includes\class-settings.php:206
+#: includes\class-settings.php:212
 msgid "天"
 msgstr ""
 
-#: includes\class-settings.php:207
+#: includes\class-settings.php:213
 msgid "填 -1 表示永久保留；填天数则备份到期后自动删除，届时这张图将无法再恢复原图。0 无效，步进时会自动跳过 0。"
-msgstr ""
-
-#: includes\class-settings.php:211
-msgid "压缩并发数"
 msgstr ""
 
 #: includes\class-settings.php:217

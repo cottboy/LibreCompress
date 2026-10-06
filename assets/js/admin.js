@@ -48,7 +48,8 @@
         /**
          * 归一化备份保留时长输入，跳过无效值 0
          */
-        skipRetentionZero: function($input) {
+        skipRetentionZero: function(e) {
+            var $input = $(e.currentTarget);
             var days = parseInt($input.val(), 10);
 
             if (isNaN(days)) {

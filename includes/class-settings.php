@@ -191,6 +191,12 @@ class Libre_Compress_Settings {
                     </td>
                 </tr>
                 <tr>
+                    <th scope="row"><?php esc_html_e( '压缩并发数', 'libre-compress' ); ?></th>
+                    <td>
+                        <input type="number" name="libre_compress_general[tool_concurrency]" value="<?php echo esc_attr( $options['tool_concurrency'] ?? 5 ); ?>" min="1" max="100" class="small-text">
+                    </td>
+                </tr>
+                <tr>
                     <th scope="row"><?php esc_html_e( '备份原图', 'libre-compress' ); ?></th>
                     <td>
                         <label>
@@ -205,12 +211,6 @@ class Libre_Compress_Settings {
                         <input type="number" id="libre-compress-retention-days" name="libre_compress_general[backup_retention_days]" value="<?php echo esc_attr( $retention_days ); ?>" min="-1" step="1" class="small-text">
                         <?php esc_html_e( '天', 'libre-compress' ); ?>
                         <p class="description"><?php esc_html_e( '填 -1 表示永久保留；填天数则备份到期后自动删除，届时这张图将无法再恢复原图。0 无效，步进时会自动跳过 0。', 'libre-compress' ); ?></p>
-                    </td>
-                </tr>
-                <tr>
-                    <th scope="row"><?php esc_html_e( '压缩并发数', 'libre-compress' ); ?></th>
-                    <td>
-                        <input type="number" name="libre_compress_general[tool_concurrency]" value="<?php echo esc_attr( $options['tool_concurrency'] ?? 5 ); ?>" min="1" max="100" class="small-text">
                     </td>
                 </tr>
                 <tr>
