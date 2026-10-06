@@ -74,9 +74,17 @@ class Libre_Compress_Jpegoptim extends Libre_Compress_Tool_Base {
         // 构建命令
         $command_parts = array(
             escapeshellarg( $executable ),
-            '--strip-all',  // 移除所有元数据
             '--all-progressive',  // 编码为渐进式 JPEG
         );
+
+        // 只删隐私类元数据；ICC 色彩配置留着，删掉会让广色域图偏色。
+        if ( Libre_Compress_Settings::strips_metadata() ) {
+            $command_parts[] = '--strip-exif';
+            $command_parts[] = '--strip-iptc';
+            $command_parts[] = '--strip-com';
+        } else {
+            $command_parts[] = '--strip-none';
+        }
 
         if ( $lossless ) {
             // 无损压缩：不设置质量参数

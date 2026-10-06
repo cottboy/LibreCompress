@@ -79,10 +79,16 @@ class Libre_Compress_Pngquant extends Libre_Compress_Tool_Base {
             '--force',
             '--skip-if-larger',
             sprintf( '--quality=%d-%d', $min_quality, $quality ),
-            '--output',
-            escapeshellarg( $file_path ),
-            escapeshellarg( $file_path ),
         );
+
+        // pngquant 只在 macOS 上默认清元数据，其他平台要显式加 --strip
+        if ( Libre_Compress_Settings::strips_metadata() ) {
+            $command_parts[] = '--strip';
+        }
+
+        $command_parts[] = '--output';
+        $command_parts[] = escapeshellarg( $file_path );
+        $command_parts[] = escapeshellarg( $file_path );
 
         return implode( ' ', $command_parts );
     }

@@ -87,6 +87,11 @@ class Libre_Compress_Gifsicle extends Libre_Compress_Tool_Base {
             $command_parts[] = sprintf( '--lossy=%d', $lossiness );
         }
 
+        // GIF 的注释扩展块里常是作者与制作工具信息
+        if ( Libre_Compress_Settings::strips_metadata() ) {
+            $command_parts[] = '--no-comments';
+        }
+
         $command_parts[] = '-o';
         $command_parts[] = escapeshellarg( $temp_output );
         $command_parts[] = escapeshellarg( $file_path );

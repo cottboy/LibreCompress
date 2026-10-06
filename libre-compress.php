@@ -284,6 +284,7 @@ function libre_compress_activate() {
         'auto_compress'         => false,
         'backup_enabled'        => true,
         'backup_retention_days' => -1,
+        'strip_metadata'        => true,
         'tool_concurrency'      => 5,
         'disable_thumbnails'    => false,
         'output_format'         => 'webp',

@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: LibreCompress 1.2.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-06 18:12+0800\n"
+"POT-Creation-Date: 2026-10-06 18:53+0800\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -42,11 +42,11 @@ msgstr ""
 msgid "动画或多帧 AVIF 暂不支持同格式压缩，已保持原文件不变"
 msgstr ""
 
-#: compression\class-avif.php:265
+#: compression\class-avif.php:271
 msgid "暂无官方包，建议从 GitHub Releases 下载或自行编译"
 msgstr ""
 
-#: compression\class-avif.php:268
+#: compression\class-avif.php:274
 msgid "从 libavif GitHub Releases 下载静态编译的 avifenc.exe 和 avifdec.exe"
 msgstr ""
 
@@ -54,15 +54,15 @@ msgstr ""
 msgid "从 Google 官网下载预编译的二进制文件"
 msgstr ""
 
-#: compression\class-gifsicle.php:129
+#: compression\class-gifsicle.php:134
 msgid "从 eternallybored.org 下载预编译的 gifsicle.exe"
 msgstr ""
 
-#: compression\class-jpegoptim.php:116 compression\class-oxipng.php:105
+#: compression\class-jpegoptim.php:124 compression\class-oxipng.php:105
 msgid "从 GitHub 下载预编译的二进制文件"
 msgstr ""
 
-#: compression\class-pngquant.php:111
+#: compression\class-pngquant.php:117
 msgid "从官网下载预编译的二进制文件"
 msgstr ""
 
@@ -430,355 +430,367 @@ msgstr ""
 msgid "无法创建锁文件，请检查上传目录的写入权限"
 msgstr ""
 
-#: includes\class-settings.php:50 includes\class-settings.php:51 includes\class-settings.php:140
+#: includes\class-settings.php:64 includes\class-settings.php:65 includes\class-settings.php:155
 msgid "LibreCompress"
 msgstr ""
 
-#: includes\class-settings.php:144
+#: includes\class-settings.php:159
 msgid "基本设置"
 msgstr ""
 
-#: includes\class-settings.php:147
+#: includes\class-settings.php:162
 msgid "压缩工具"
 msgstr ""
 
-#: includes\class-settings.php:185
+#: includes\class-settings.php:200
 msgid "自动压缩"
 msgstr ""
 
-#: includes\class-settings.php:189
+#: includes\class-settings.php:204
 msgid "上传图片时自动压缩"
 msgstr ""
 
-#: includes\class-settings.php:194
+#: includes\class-settings.php:209
 msgid "压缩并发数"
 msgstr ""
 
-#: includes\class-settings.php:200
+#: includes\class-settings.php:215
 msgid "备份原图"
 msgstr ""
 
-#: includes\class-settings.php:204
+#: includes\class-settings.php:219
 msgid "压缩前备份原图"
 msgstr ""
 
-#: includes\class-settings.php:209
+#: includes\class-settings.php:224
 msgid "原图备份保留时长"
 msgstr ""
 
-#: includes\class-settings.php:212
+#: includes\class-settings.php:227
 msgid "天"
 msgstr ""
 
-#: includes\class-settings.php:213
+#: includes\class-settings.php:228
 msgid "填 -1 表示永久保留；填天数则备份到期后自动删除，届时这张图将无法再恢复原图。0 无效，步进时会自动跳过 0。"
 msgstr ""
 
-#: includes\class-settings.php:217
-msgid "SVG 上传"
-msgstr ""
-
-#: includes\class-settings.php:221
-msgid "允许上传 SVG 文件"
-msgstr ""
-
-#: includes\class-settings.php:223
-msgid "上传时自动清理脚本等危险内容；SVG 可能被用于 XSS 攻击，仅在信任上传者时开启。"
-msgstr ""
-
-#: includes\class-settings.php:227
-msgid "格式转换"
-msgstr ""
-
-#: includes\class-settings.php:231
-msgid "PNG"
+#: includes\class-settings.php:232
+msgid "图片元数据"
 msgstr ""
 
 #: includes\class-settings.php:236
-msgid "JPG"
+msgid "压缩时删除图片元数据"
 msgstr ""
 
-#: includes\class-settings.php:241
-msgid "GIF"
+#: includes\class-settings.php:238
+msgid "删除 EXIF、GPS 拍摄位置、设备型号、作者与软件信息等隐私数据，ICC 色彩配置会保留以免偏色。取消勾选则尽量保留元数据，但 WebP 和经 PNG 中转的 AVIF 由编码工具决定，不保证留得住。原图备份始终是完整原样，备份目录已禁止直接访问。"
+msgstr ""
+
+#: includes\class-settings.php:242
+msgid "SVG 上传"
 msgstr ""
 
 #: includes\class-settings.php:246
-msgid "SVG"
+msgid "允许上传 SVG 文件"
 msgstr ""
 
 #: includes\class-settings.php:248
-msgid "勾选的源格式执行压缩时输出为目标格式；未勾选的格式只执行同格式压缩。所有成功结果都记为已压缩。"
+msgid "上传时自动清理脚本等危险内容；SVG 可能被用于 XSS 攻击，仅在信任上传者时开启。"
 msgstr ""
 
 #: includes\class-settings.php:252
-msgid "目标格式"
+msgid "格式转换"
 msgstr ""
 
 #: includes\class-settings.php:256
-msgid "WebP"
-msgstr ""
-
-#: includes\class-settings.php:258
-msgid "AVIF"
+msgid "PNG"
 msgstr ""
 
 #: includes\class-settings.php:261
+msgid "JPG"
+msgstr ""
+
+#: includes\class-settings.php:266
+msgid "GIF"
+msgstr ""
+
+#: includes\class-settings.php:271
+msgid "SVG"
+msgstr ""
+
+#: includes\class-settings.php:273
+msgid "勾选的源格式执行压缩时输出为目标格式；未勾选的格式只执行同格式压缩。所有成功结果都记为已压缩。"
+msgstr ""
+
+#: includes\class-settings.php:277
+msgid "目标格式"
+msgstr ""
+
+#: includes\class-settings.php:281
+msgid "WebP"
+msgstr ""
+
+#: includes\class-settings.php:283
+msgid "AVIF"
+msgstr ""
+
+#: includes\class-settings.php:286
 msgid "选择目标格式：AVIF 压缩率更高但压缩更慢，WebP 兼容性更好。"
 msgstr ""
 
-#: includes\class-settings.php:275
+#: includes\class-settings.php:300
 msgid "批量压缩未压缩的图片"
 msgstr ""
 
-#: includes\class-settings.php:279
+#: includes\class-settings.php:304
 msgid "按当前设置压缩媒体库中所有未压缩的图片"
 msgstr ""
 
-#: includes\class-settings.php:285
+#: includes\class-settings.php:310
 msgid "清除压缩记录与原图备份"
 msgstr ""
 
-#: includes\class-settings.php:289
+#: includes\class-settings.php:314
 msgid "同时删除备份文件、备份索引和格式转换映射，之后所有图片都可重新压缩；此操作不可撤销。"
 msgstr ""
 
-#: includes\class-settings.php:295
+#: includes\class-settings.php:320
 msgid "恢复所有原图备份"
 msgstr ""
 
-#: includes\class-settings.php:299
+#: includes\class-settings.php:324
 msgid "将所有已压缩的图片恢复为原图"
 msgstr ""
 
-#: includes\class-settings.php:305
+#: includes\class-settings.php:330
 msgid "删除所有原图备份"
 msgstr ""
 
-#: includes\class-settings.php:309
+#: includes\class-settings.php:334
 msgid "删除所有备份文件，释放磁盘空间"
 msgstr ""
 
-#: includes\class-settings.php:315
+#: includes\class-settings.php:340
 msgid "禁止生成缩略图"
 msgstr ""
 
-#: includes\class-settings.php:319
+#: includes\class-settings.php:344
 msgid "后续上传的图片将不再生成缩略图"
 msgstr ""
 
-#: includes\class-settings.php:325
+#: includes\class-settings.php:350
 msgid "重新启用缩略图"
 msgstr ""
 
-#: includes\class-settings.php:329
+#: includes\class-settings.php:354
 msgid "后续上传的图片将重新生成缩略图"
 msgstr ""
 
-#: includes\class-settings.php:335
+#: includes\class-settings.php:360
 msgid "删除已有缩略图"
 msgstr ""
 
-#: includes\class-settings.php:339
+#: includes\class-settings.php:364
 msgid "删除所有缩略图并将文章中的图片链接替换为原图"
 msgstr ""
 
-#: includes\class-settings.php:345
+#: includes\class-settings.php:370
 msgid "重新生成缩略图"
 msgstr ""
 
-#: includes\class-settings.php:349
+#: includes\class-settings.php:374
 msgid "为缺少缩略图的图片生成缩略图，并将文章中的图片链接替换为\"大\"尺寸"
 msgstr ""
 
-#: includes\class-settings.php:401
+#: includes\class-settings.php:426
 msgid "系统状态"
 msgstr ""
 
-#: includes\class-settings.php:408
+#: includes\class-settings.php:433
 msgid "可用"
 msgstr ""
 
-#: includes\class-settings.php:410
+#: includes\class-settings.php:435
 msgid "不可用"
 msgstr ""
 
-#: includes\class-settings.php:411
+#: includes\class-settings.php:436
 msgid "压缩依赖 exec() 和 proc_open() 函数，请联系主机商启用"
 msgstr ""
 
-#: includes\class-settings.php:418
+#: includes\class-settings.php:443
 msgid "工具状态"
 msgstr ""
 
-#: includes\class-settings.php:422
+#: includes\class-settings.php:447
 msgid "工具"
 msgstr ""
 
-#: includes\class-settings.php:423 includes\class-settings.php:466
+#: includes\class-settings.php:448 includes\class-settings.php:491
 msgid "状态"
 msgstr ""
 
-#: includes\class-settings.php:424
+#: includes\class-settings.php:449
 msgid "安装路径"
 msgstr ""
 
-#: includes\class-settings.php:425
+#: includes\class-settings.php:450
 msgid "链接"
 msgstr ""
 
-#: includes\class-settings.php:434
+#: includes\class-settings.php:459
 msgid "已安装"
 msgstr ""
 
-#: includes\class-settings.php:436
+#: includes\class-settings.php:461
 msgid "未安装"
 msgstr ""
 
-#: includes\class-settings.php:448
+#: includes\class-settings.php:473
 msgid "跳转"
 msgstr ""
 
-#: includes\class-settings.php:457
+#: includes\class-settings.php:482
 msgid "安装方式：① 把可执行文件直接放进 /wp-content/LibreCompress-bin 目录；② 把工具所在文件夹加入系统 Path 环境变量；③ 使用包管理器安装。"
 msgstr ""
 
-#: includes\class-settings.php:460
+#: includes\class-settings.php:485
 msgid "路径支持状态"
 msgstr ""
 
-#: includes\class-settings.php:464
+#: includes\class-settings.php:489
 msgid "路径"
 msgstr ""
 
-#: includes\class-settings.php:465
+#: includes\class-settings.php:490
 msgid "依赖"
 msgstr ""
 
-#: includes\class-settings.php:476
+#: includes\class-settings.php:501
 msgid "支持"
 msgstr ""
 
-#: includes\class-settings.php:478
+#: includes\class-settings.php:503
 msgid "不支持"
 msgstr ""
 
-#: includes\class-settings.php:480
+#: includes\class-settings.php:505
 msgid "缺少：%s"
 msgstr ""
 
-#: includes\class-settings.php:491
+#: includes\class-settings.php:516
 msgid "压缩参数设置"
 msgstr ""
 
-#: includes\class-settings.php:495 includes\class-settings.php:691
+#: includes\class-settings.php:520 includes\class-settings.php:716
 msgid "JPEG 压缩"
 msgstr ""
 
-#: includes\class-settings.php:498 includes\class-settings.php:524 includes\class-settings.php:558 includes\class-settings.php:584 includes\class-settings.php:610
+#: includes\class-settings.php:523 includes\class-settings.php:549 includes\class-settings.php:583 includes\class-settings.php:609 includes\class-settings.php:635
 msgid "压缩模式"
 msgstr ""
 
-#: includes\class-settings.php:502 includes\class-settings.php:528 includes\class-settings.php:562 includes\class-settings.php:588 includes\class-settings.php:614
+#: includes\class-settings.php:527 includes\class-settings.php:553 includes\class-settings.php:587 includes\class-settings.php:613 includes\class-settings.php:639
 msgid "有损压缩"
 msgstr ""
 
-#: includes\class-settings.php:507 includes\class-settings.php:533 includes\class-settings.php:567 includes\class-settings.php:593 includes\class-settings.php:619
+#: includes\class-settings.php:532 includes\class-settings.php:558 includes\class-settings.php:592 includes\class-settings.php:618 includes\class-settings.php:644
 msgid "无损压缩"
 msgstr ""
 
-#: includes\class-settings.php:512 includes\class-settings.php:572 includes\class-settings.php:598 includes\class-settings.php:624
+#: includes\class-settings.php:537 includes\class-settings.php:597 includes\class-settings.php:623 includes\class-settings.php:649
 msgid "压缩质量"
 msgstr ""
 
-#: includes\class-settings.php:516 includes\class-settings.php:576 includes\class-settings.php:602 includes\class-settings.php:628
+#: includes\class-settings.php:541 includes\class-settings.php:601 includes\class-settings.php:627 includes\class-settings.php:653
 msgid "0-100，数值越高质量越好，文件越大（仅有损压缩有效）"
 msgstr ""
 
-#: includes\class-settings.php:521
+#: includes\class-settings.php:546
 msgid "PNG 压缩"
 msgstr ""
 
-#: includes\class-settings.php:538
+#: includes\class-settings.php:563
 msgid "有损压缩质量"
 msgstr ""
 
-#: includes\class-settings.php:542
+#: includes\class-settings.php:567
 msgid "pngquant 质量参数，0-100"
 msgstr ""
 
-#: includes\class-settings.php:546
+#: includes\class-settings.php:571
 msgid "无损压缩级别"
 msgstr ""
 
-#: includes\class-settings.php:550
+#: includes\class-settings.php:575
 msgid "oxipng 无损压缩级别，0-6，数值越高压缩越慢但效果越好"
 msgstr ""
 
-#: includes\class-settings.php:555 includes\class-settings.php:693
+#: includes\class-settings.php:580 includes\class-settings.php:718
 msgid "WEBP 压缩"
 msgstr ""
 
-#: includes\class-settings.php:581 includes\class-settings.php:694
+#: includes\class-settings.php:606 includes\class-settings.php:719
 msgid "AVIF 压缩"
 msgstr ""
 
-#: includes\class-settings.php:607 includes\class-settings.php:695
+#: includes\class-settings.php:632 includes\class-settings.php:720
 msgid "GIF 压缩"
 msgstr ""
 
-#: includes\class-settings.php:633 includes\class-settings.php:696
+#: includes\class-settings.php:658 includes\class-settings.php:721
 msgid "SVG 压缩"
 msgstr ""
 
-#: includes\class-settings.php:636
+#: includes\class-settings.php:661
 msgid "压缩精度"
 msgstr ""
 
-#: includes\class-settings.php:640
+#: includes\class-settings.php:665
 msgid "坐标小数有效位数 0-8，数值越高越保真，文件越大"
 msgstr ""
 
-#: includes\class-settings.php:687
+#: includes\class-settings.php:712
 msgid "GD 扩展"
 msgstr ""
 
-#: includes\class-settings.php:692
+#: includes\class-settings.php:717
 msgid "PNG 压缩（按模式使用其中一种）"
 msgstr ""
 
-#: includes\class-settings.php:697
+#: includes\class-settings.php:722
 msgid "PNG/JPG 压缩为 WebP"
 msgstr ""
 
-#: includes\class-settings.php:698
+#: includes\class-settings.php:723
 msgid "PNG/JPG 压缩为 AVIF"
 msgstr ""
 
-#: includes\class-settings.php:699
+#: includes\class-settings.php:724
 msgid "静态 GIF 压缩为 WebP"
 msgstr ""
 
-#: includes\class-settings.php:700
+#: includes\class-settings.php:725
 msgid "静态 GIF 压缩为 AVIF"
 msgstr ""
 
-#: includes\class-settings.php:701
+#: includes\class-settings.php:726
 msgid "动画 GIF 压缩为 WebP"
 msgstr ""
 
-#: includes\class-settings.php:702
+#: includes\class-settings.php:727
 msgid "动画 GIF 压缩为 AVIF"
 msgstr ""
 
-#: includes\class-settings.php:703
+#: includes\class-settings.php:728
 msgid "SVG 压缩为 WebP"
 msgstr ""
 
-#: includes\class-settings.php:704
+#: includes\class-settings.php:729
 msgid "SVG 压缩为 AVIF"
 msgstr ""
 
-#: includes\class-settings.php:737
+#: includes\class-settings.php:762
 msgid "或"
 msgstr ""
 

@@ -68,12 +68,12 @@ class Libre_Compress_Oxipng extends Libre_Compress_Tool_Base {
 
         // 构建命令
         // -o: 无损压缩级别（0-6）
-        // --strip: 移除所有元数据
+        // --strip: 元数据取舍，等号形式避免 Windows 命令行解析问题
         // --quiet: 静默模式
         $command_parts = array(
             escapeshellarg( $executable ),
             sprintf( '-o %d', $level ),
-            '--strip=all',  // 使用等号形式避免 Windows 命令行解析问题
+            Libre_Compress_Settings::strips_metadata() ? '--strip=safe' : '--strip=none',
             '--quiet',
             escapeshellarg( $file_path ),
         );

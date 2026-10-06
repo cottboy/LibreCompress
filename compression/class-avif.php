@@ -212,6 +212,12 @@ class Libre_Compress_Avif extends Libre_Compress_Tool_Base {
             '-j 4',  // 编码线程数
         );
 
+        // avifenc 默认会把输入 PNG 里的 EXIF/XMP 原样搬进 AVIF，而 AVIF 是对外公开访问的文件
+        if ( Libre_Compress_Settings::strips_metadata() ) {
+            $command_parts[] = '--ignore-exif';
+            $command_parts[] = '--ignore-xmp';
+        }
+
         if ( $lossless ) {
             // 无损压缩
             $command_parts[] = '--lossless';

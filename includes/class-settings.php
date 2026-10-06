@@ -36,6 +36,20 @@ class Libre_Compress_Settings {
         return $days < 0 ? self::RETENTION_PERMANENT : $days;
     }
 
+    /**
+     * 压缩与格式转换时是否删除图片元数据
+     *
+     * 选项缺失时按删除处理：拍摄地点、设备型号这类信息留在对外展示的图片上属于隐私泄露，
+     * 默认不删不如默认删。
+     *
+     * @return bool
+     */
+    public static function strips_metadata(): bool {
+        $general = get_option( 'libre_compress_general', array() );
+
+        return ! isset( $general['strip_metadata'] ) || (bool) $general['strip_metadata'];
+    }
+
     public function __construct() {
         $this->init_hooks();
     }
@@ -76,6 +90,7 @@ class Libre_Compress_Settings {
         $sanitized['auto_compress']      = ! empty( $input['auto_compress'] );
         $sanitized['backup_enabled']     = ! empty( $input['backup_enabled'] );
         $sanitized['backup_retention_days'] = self::normalize_retention_days( isset( $input['backup_retention_days'] ) ? $input['backup_retention_days'] : null );
+        $sanitized['strip_metadata']        = ! empty( $input['strip_metadata'] );
         $sanitized['tool_concurrency']   = isset( $input['tool_concurrency'] ) ? absint( $input['tool_concurrency'] ) : 5;
         $sanitized['disable_thumbnails'] = array_key_exists( 'disable_thumbnails', $input )
             ? ! empty( $input['disable_thumbnails'] )
@@ -211,6 +226,16 @@ class Libre_Compress_Settings {
                         <input type="number" id="libre-compress-retention-days" name="libre_compress_general[backup_retention_days]" value="<?php echo esc_attr( $retention_days ); ?>" min="-1" step="1" class="small-text">
                         <?php esc_html_e( '天', 'libre-compress' ); ?>
                         <p class="description"><?php esc_html_e( '填 -1 表示永久保留；填天数则备份到期后自动删除，届时这张图将无法再恢复原图。0 无效，步进时会自动跳过 0。', 'libre-compress' ); ?></p>
+                    </td>
+                </tr>
+                <tr>
+                    <th scope="row"><?php esc_html_e( '图片元数据', 'libre-compress' ); ?></th>
+                    <td>
+                        <label>
+                            <input type="checkbox" name="libre_compress_general[strip_metadata]" value="1" <?php checked( $options['strip_metadata'] ?? true ); ?>>
+                            <?php esc_html_e( '压缩时删除图片元数据', 'libre-compress' ); ?>
+                        </label>
+                        <p class="description"><?php esc_html_e( '删除 EXIF、GPS 拍摄位置、设备型号、作者与软件信息等隐私数据，ICC 色彩配置会保留以免偏色。取消勾选则尽量保留元数据，但 WebP 和经 PNG 中转的 AVIF 由编码工具决定，不保证留得住。原图备份始终是完整原样，备份目录已禁止直接访问。', 'libre-compress' ); ?></p>
                     </td>
                 </tr>
                 <tr>

@@ -1519,14 +1519,17 @@ class Libre_Compress_Output {
 
         $mode = isset( $settings['avif_mode'] ) ? $settings['avif_mode'] : 'lossy';
 
+        // avifenc 默认会把输入图片里的 EXIF/XMP 原样搬进 AVIF，而转换结果正是对外访问的那张图
+        $meta_flags = Libre_Compress_Settings::strips_metadata() ? '--ignore-exif --ignore-xmp ' : '';
+
         if ( 'lossless' === $mode ) {
-            return $binary . ' -j 4 --lossless ' . $source_esc . ' ' . $output_esc;
+            return $binary . ' -j 4 ' . $meta_flags . '--lossless ' . $source_esc . ' ' . $output_esc;
         }
 
         $quality = isset( $settings['avif_quality'] ) ? absint( $settings['avif_quality'] ) : 80;
         $quality = max( 0, min( 100, $quality ) );
 
-        return $binary . ' -j 4 ' . sprintf( '-q %d', $quality ) . ' ' . $source_esc . ' ' . $output_esc;
+        return $binary . ' -j 4 ' . $meta_flags . sprintf( '-q %d', $quality ) . ' ' . $source_esc . ' ' . $output_esc;
     }
 
     /**
