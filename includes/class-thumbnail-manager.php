@@ -18,19 +18,9 @@ if ( ! defined( 'ABSPATH' ) ) {
 class Libre_Compress_Thumbnail_Manager {
 
     /**
-     * 缩略图清理待改写的正文引用
-     */
-    const CLEANUP_META_KEY = '_libre_compress_thumbnail_cleanup';
-
-    /**
      * 遍历附件时的游标分页数量
      */
     const BATCH_SIZE = 100;
-
-    /**
-     * 一次正文改写携带的替换对数量，避免 SQL 条件过长
-     */
-    const REFERENCE_CHUNK_SIZE = 50;
 
     /**
      * 构造函数
@@ -124,8 +114,6 @@ class Libre_Compress_Thumbnail_Manager {
             return $result;
         }
 
-        $pairs    = array();
-        $pending_ids = array();
         $after_id = 0;
 
         do {
@@ -139,19 +127,20 @@ class Libre_Compress_Thumbnail_Manager {
                     continue;
                 }
 
+                if ( ! empty( $outcome['content_failed'] ) ) {
+                    $result['failed_ids'][]    = (int) $attachment_id;
+                    $result['content_failed']  = true;
+                    $result['replaced_links'] += (int) $outcome['replaced'];
+                    continue;
+                }
+
                 $result['deleted_files'] += $outcome['deleted'];
+                $result['replaced_links'] += $outcome['replaced'];
 
                 if ( $outcome['deleted'] > 0 ) {
                     $result['affected_attachments']++;
                 }
 
-                foreach ( $outcome['pairs'] as $from => $to ) {
-                    $pairs[ $from ] = $to;
-                }
-
-                if ( ! empty( $outcome['pending'] ) ) {
-                    $pending_ids[] = (int) $attachment_id;
-                }
             }
 
             if ( ! empty( $attachments ) ) {
@@ -159,24 +148,13 @@ class Libre_Compress_Thumbnail_Manager {
             }
         } while ( count( $attachments ) === self::BATCH_SIZE );
 
-        $rewrite                   = $this->update_content_in_chunks( $pairs );
-        $result['replaced_links']  = $rewrite['replaced'];
-        $result['content_failed']  = $rewrite['failed'];
-
-        if ( ! $rewrite['failed'] ) {
-            foreach ( array_unique( $pending_ids ) as $attachment_id ) {
-                delete_post_meta( $attachment_id, self::CLEANUP_META_KEY );
-            }
-        }
-
         return $result;
     }
 
     /**
      * 删除单个附件中未勾选尺寸的缩略图
      *
-     * 先改元数据再删文件：即使删文件失败，也只会留下没人引用的多余文件，
-     * 不会出现指向已删文件的死链接。找不到替代尺寸的不删。
+     * 先更新正文链接，成功后再改元数据和删文件；正文更新失败时不做任何清理。
      *
      * @param int $attachment_id 附件 ID
      * @return array|null 计划结果；锁被占用或元数据写入失败时返回 null
@@ -194,23 +172,12 @@ class Libre_Compress_Thumbnail_Manager {
         }
 
         try {
-            $pending = get_post_meta( $attachment_id, self::CLEANUP_META_KEY, true );
-
-            if ( is_array( $pending ) && ! empty( $pending ) ) {
-                return array(
-                    'deleted' => 0,
-                    'pairs'   => $this->sanitize_cleanup_pairs( $pending ),
-                    'pending' => true,
-                );
-            }
-
             $metadata = wp_get_attachment_metadata( $attachment_id );
 
             if ( empty( $metadata ) || empty( $metadata['file'] ) || empty( $metadata['sizes'] ) ) {
                 return array(
                     'deleted' => 0,
-                    'pairs'   => array(),
-                    'pending' => false,
+                    'replaced' => 0,
                 );
             }
 
@@ -248,8 +215,7 @@ class Libre_Compress_Thumbnail_Manager {
             if ( empty( $victims ) ) {
                 return array(
                     'deleted' => 0,
-                    'pairs'   => array(),
-                    'pending' => false,
+                    'replaced' => 0,
                 );
             }
 
@@ -279,18 +245,26 @@ class Libre_Compress_Thumbnail_Manager {
             if ( empty( $targets ) ) {
                 return array(
                     'deleted' => 0,
-                    'pairs'   => array(),
-                    'pending' => false,
+                    'replaced' => 0,
                 );
             }
 
-            $cleanup_pairs = array();
+            $replacements = array();
             foreach ( $targets as $size_name => $target_path ) {
-                $cleanup_pairs[ $victims[ $size_name ]['file'] ] = $target_path;
+                $replacements[] = array(
+                    'from' => $victims[ $size_name ]['file'],
+                    'to'   => $target_path,
+                );
             }
 
-            if ( ! $this->store_cleanup_pairs( $attachment_id, $cleanup_pairs ) ) {
-                return null;
+            $replaced = 0;
+
+            if ( ! libre_compress()->output_processor->update_content_references( $replacements, $replaced ) ) {
+                return array(
+                    'deleted'        => 0,
+                    'replaced'       => $replaced,
+                    'content_failed' => true,
+                );
             }
 
             foreach ( array_keys( $targets ) as $size_name ) {
@@ -298,12 +272,10 @@ class Libre_Compress_Thumbnail_Manager {
             }
 
             if ( ! $this->write_metadata( $attachment_id, $metadata ) ) {
-                delete_post_meta( $attachment_id, self::CLEANUP_META_KEY );
                 return null;
             }
 
             $deleted = 0;
-            $pairs   = array();
 
             foreach ( $targets as $size_name => $target_path ) {
                 $path = $victims[ $size_name ]['file'];
@@ -322,8 +294,6 @@ class Libre_Compress_Thumbnail_Manager {
                 }
 
                 $deleted++;
-                $pairs[ $path ] = $target_path;
-
                 $database = libre_compress()->database;
                 $record   = $database->get_record( $attachment_id, $size_name );
 
@@ -333,43 +303,13 @@ class Libre_Compress_Thumbnail_Manager {
             }
 
             return array(
-                'deleted' => $deleted,
-                'pairs'   => $pairs,
-                'pending' => true,
+                'deleted'  => $deleted,
+                'replaced' => $replaced,
             );
         } finally {
             libre_compress()->processor->release_attachment_lock( $global_lock );
             libre_compress()->processor->release_attachment_lock( $lock );
         }
-    }
-
-    /**
-     * 保存待改写映射并读回校验
-     */
-    private function store_cleanup_pairs( int $attachment_id, array $pairs ): bool {
-        update_post_meta( $attachment_id, self::CLEANUP_META_KEY, wp_slash( $pairs ) );
-        $stored = get_post_meta( $attachment_id, self::CLEANUP_META_KEY, true );
-
-        return is_array( $stored ) && count( $stored ) === count( $pairs );
-    }
-
-    /**
-     * 过滤持久化映射，避免不可信元数据进入正文替换流程
-     */
-    private function sanitize_cleanup_pairs( array $pairs ): array {
-        $clean = array();
-
-        foreach ( $pairs as $from => $to ) {
-            if ( ! is_string( $from ) || ! is_string( $to ) || '' === $from || '' === $to ) {
-                continue;
-            }
-
-            if ( $this->is_safe_upload_path( $from ) && $this->is_safe_upload_path( $to ) ) {
-                $clean[ $from ] = $to;
-            }
-        }
-
-        return $clean;
     }
 
     /**
@@ -398,41 +338,6 @@ class Libre_Compress_Thumbnail_Manager {
         }
 
         return $best;
-    }
-
-    /**
-     * 分批改写正文里指向被删缩略图的链接
-     *
-     * @param array $pairs 被删文件绝对路径 => 替代文件绝对路径
-     * @return array replaced、failed
-     */
-    private function update_content_in_chunks( array $pairs ): array {
-        $replaced = 0;
-        $failed   = false;
-
-        foreach ( array_chunk( $pairs, self::REFERENCE_CHUNK_SIZE, true ) as $chunk ) {
-            $replacements = array();
-
-            foreach ( $chunk as $from => $to ) {
-                $replacements[] = array(
-                    'from' => $from,
-                    'to'   => $to,
-                );
-            }
-
-            $count = 0;
-
-            if ( ! libre_compress()->output_processor->update_content_references( $replacements, $count ) ) {
-                $failed = true;
-            }
-
-            $replaced += $count;
-        }
-
-        return array(
-            'replaced' => $replaced,
-            'failed'   => $failed,
-        );
     }
 
     /**

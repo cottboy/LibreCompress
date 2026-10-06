@@ -524,13 +524,7 @@ class Libre_Compress_Processor {
             return false;
         }
 
-        if ( ! $this->delete_restore_state( $attachment_id ) ) {
-            return false;
-        }
-
-        delete_post_meta( $attachment_id, Libre_Compress_Thumbnail_Manager::CLEANUP_META_KEY );
-
-        return true;
+        return $this->delete_restore_state( $attachment_id );
     }
 
     /**
