@@ -281,11 +281,12 @@ function libre_compress_activate() {
 
     // 设置默认选项
     $default_general = array(
-        'auto_compress'      => false,
-        'backup_enabled'     => true,
-        'tool_concurrency'   => 5,
-        'disable_thumbnails' => false,
-        'output_format'      => 'webp',
+        'auto_compress'         => false,
+        'backup_enabled'        => true,
+        'backup_retention_days' => -1,
+        'tool_concurrency'      => 5,
+        'disable_thumbnails'    => false,
+        'output_format'         => 'webp',
     );
 
     $default_tools = array(
@@ -317,6 +318,11 @@ function libre_compress_activate() {
         wp_schedule_event( time() + HOUR_IN_SECONDS, 'hourly', Libre_Compress_Processor::PENDING_SWEEP_HOOK );
     }
 
+    // 注册原图备份到期清理任务，保留时长为永久时任务本身会直接跳过
+    if ( ! wp_next_scheduled( Libre_Compress_Processor::BACKUP_PRUNE_HOOK ) ) {
+        wp_schedule_event( time() + 2 * HOUR_IN_SECONDS, 'daily', Libre_Compress_Processor::BACKUP_PRUNE_HOOK );
+    }
+
     // 刷新重写规则
     flush_rewrite_rules();
 }
@@ -330,6 +336,7 @@ function libre_compress_deactivate() {
     libre_compress_load_dependencies();
 
     wp_clear_scheduled_hook( Libre_Compress_Processor::PENDING_SWEEP_HOOK );
+    wp_clear_scheduled_hook( Libre_Compress_Processor::BACKUP_PRUNE_HOOK );
 
     // 刷新重写规则
     flush_rewrite_rules();

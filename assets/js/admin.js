@@ -40,6 +40,30 @@
             $('#libre-compress-regenerate-thumbnails').on('click', this.handleRegenerateThumbnails.bind(this));
             $('#libre-compress-bulk-compress').on('click', this.handleBulkCompress.bind(this));
             $('#libre-compress-delete-all-backups').on('click', this.handleDeleteAllBackups.bind(this));
+
+            // 原图备份保留时长不接受 0，步进跨过 0 时按方向落到 1 或 -1
+            $(document).on('input change', '#libre-compress-retention-days', this.skipRetentionZero.bind(this));
+        },
+
+        /**
+         * 归一化备份保留时长输入，跳过无效值 0
+         */
+        skipRetentionZero: function($input) {
+            var days = parseInt($input.val(), 10);
+
+            if (isNaN(days)) {
+                return;
+            }
+
+            if (days !== 0) {
+                $input.data('lastDays', days);
+                return;
+            }
+
+            var last = $input.data('lastDays');
+            days = (typeof last === 'number' && last > 0) ? -1 : 1;
+
+            $input.val(days).data('lastDays', days);
         },
 
         /**

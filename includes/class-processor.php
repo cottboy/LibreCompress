@@ -66,6 +66,21 @@ class Libre_Compress_Processor {
     const HISTORY_PAGE_SIZE = 20;
 
     /**
+     * 原图备份到期清理任务的钩子名
+     */
+    const BACKUP_PRUNE_HOOK = 'libre_compress_backup_prune_event';
+
+    /**
+     * 备份到期清理单批处理的附件数量
+     */
+    const BACKUP_PRUNE_PAGE_SIZE = 20;
+
+    /**
+     * 单次定时任务最多清理的附件数量，剩余积压延后到补排的任务
+     */
+    const BACKUP_PRUNE_LIMIT = 200;
+
+    /**
      * 是否暂停自动压缩
      *
      * @var bool
@@ -99,6 +114,7 @@ class Libre_Compress_Processor {
         add_action( 'shutdown', array( $this, 'process_queued_uploads' ), 1 );
         add_action( 'admin_init', array( $this, 'process_pending_uploads' ), 20 );
         add_action( self::PENDING_SWEEP_HOOK, array( $this, 'run_pending_sweep' ) );
+        add_action( self::BACKUP_PRUNE_HOOK, array( $this, 'prune_expired_backups' ) );
     }
 
     /**
@@ -408,7 +424,9 @@ class Libre_Compress_Processor {
         $entries = libre_compress()->output_processor->get_output_entries( $attachment_id );
         $backups = libre_compress()->backup->get_backups( $attachment_id );
 
-        if ( empty( $entries ) && empty( $backups ) ) {
+        // 没有备份就没有可恢复的东西。备份被到期清理后附件仍留有映射和记录，
+        // 若继续往下走会只清理不还原，把已压缩的图片误标成未处理。
+        if ( empty( $backups ) ) {
             return false;
         }
 
@@ -583,6 +601,93 @@ class Libre_Compress_Processor {
             'failed_ids'    => $failed,
             'next_after'    => empty( $ids ) ? $after_id : max( $ids ),
             'has_more'      => $has_more,
+        );
+    }
+
+    /**
+     * 定时清理超过保留时长的原图备份
+     *
+     * 只删备份文件和备份索引：图片与正文保持压缩、转换后的状态，压缩记录和格式转换
+     * 映射一并保留，否则下一轮批量会把这批图重新压一遍。代价是从这一刻起无法再恢复原图。
+     */
+    public function prune_expired_backups(): void {
+        $settings = get_option( 'libre_compress_general', array() );
+        $days     = Libre_Compress_Settings::normalize_retention_days(
+            isset( $settings['backup_retention_days'] ) ? $settings['backup_retention_days'] : null
+        );
+
+        if ( Libre_Compress_Settings::RETENTION_PERMANENT === $days ) {
+            return;
+        }
+
+        $after_id  = 0;
+        $processed = 0;
+        $has_more  = true;
+
+        do {
+            $page      = $this->prune_expired_backup_page( $days, $after_id );
+            $after_id  = (int) $page['next_after'];
+            $processed += count( $page['pruned_ids'] ) + count( $page['failed_ids'] );
+            $has_more  = (bool) $page['has_more'];
+        } while ( $has_more && $processed < self::BACKUP_PRUNE_LIMIT );
+
+        // 还有积压时不必等到明天，稍后补排一次继续清理。
+        if ( $has_more ) {
+            wp_schedule_single_event( time() + 5 * MINUTE_IN_SECONDS, self::BACKUP_PRUNE_HOOK );
+        }
+    }
+
+    /**
+     * 清理一批到期原图备份
+     *
+     * 附件的备份索引逐条删除，任一条失败都保留其索引，等下次任务重试。
+     *
+     * @param int $days     保留天数
+     * @param int $after_id 上一批最后处理的附件 ID
+     * @return array pruned_ids、failed_ids、next_after、has_more
+     */
+    public function prune_expired_backup_page( int $days, int $after_id = 0 ): array {
+        $ids      = libre_compress()->database->get_expired_backup_attachment_ids_after( $days, $after_id, self::BACKUP_PRUNE_PAGE_SIZE + 1 );
+        $has_more = count( $ids ) > self::BACKUP_PRUNE_PAGE_SIZE;
+
+        if ( $has_more ) {
+            array_pop( $ids );
+        }
+
+        $pruned = array();
+        $failed = array();
+
+        foreach ( $ids as $attachment_id ) {
+            $lock = $this->acquire_attachment_lock( $attachment_id );
+            if ( false === $lock ) {
+                $failed[] = $attachment_id;
+                continue;
+            }
+
+            $global_lock = $this->acquire_global_lock( false );
+            if ( false === $global_lock ) {
+                $this->release_attachment_lock( $lock );
+                $failed[] = $attachment_id;
+                continue;
+            }
+
+            try {
+                if ( libre_compress()->backup->delete_backup( $attachment_id ) ) {
+                    $pruned[] = $attachment_id;
+                } else {
+                    $failed[] = $attachment_id;
+                }
+            } finally {
+                $this->release_attachment_lock( $global_lock );
+                $this->release_attachment_lock( $lock );
+            }
+        }
+
+        return array(
+            'pruned_ids' => $pruned,
+            'failed_ids' => $failed,
+            'next_after' => empty( $ids ) ? $after_id : (int) max( $ids ),
+            'has_more'   => $has_more,
         );
     }
 

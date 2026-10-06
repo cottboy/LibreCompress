@@ -168,11 +168,13 @@ class Libre_Compress {
      * 补注册定时任务，兼容插件升级前已启用的站点
      */
     public function ensure_scheduled_tasks(): void {
-        if ( wp_next_scheduled( Libre_Compress_Processor::PENDING_SWEEP_HOOK ) ) {
-            return;
+        if ( ! wp_next_scheduled( Libre_Compress_Processor::PENDING_SWEEP_HOOK ) ) {
+            wp_schedule_event( time() + HOUR_IN_SECONDS, 'hourly', Libre_Compress_Processor::PENDING_SWEEP_HOOK );
         }
 
-        wp_schedule_event( time() + HOUR_IN_SECONDS, 'hourly', Libre_Compress_Processor::PENDING_SWEEP_HOOK );
+        if ( ! wp_next_scheduled( Libre_Compress_Processor::BACKUP_PRUNE_HOOK ) ) {
+            wp_schedule_event( time() + 2 * HOUR_IN_SECONDS, 'daily', Libre_Compress_Processor::BACKUP_PRUNE_HOOK );
+        }
     }
 
     /**

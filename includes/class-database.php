@@ -525,6 +525,49 @@ class Libre_Compress_Database {
     }
 
     /**
+     * 按附件 ID 游标获取原图备份已全部过期的附件
+     *
+     * 到期时间必须由 MySQL 的 NOW() 计算：WordPress 把 PHP 时区强制设成 UTC，
+     * 而 created_at 由数据库时钟写入，用 PHP 时间戳去比会让保留期整体偏移数小时。
+     * 用 MAX(created_at) 判断是为了让同一附件的所有备份一起淘汰——只删一部分会
+     * 把恢复做成“主图回到原图、缩略图还是压缩版”的半新半旧状态。
+     *
+     * @param int $days     保留天数，小于 1 表示不清理
+     * @param int $after_id 上一批最后处理的附件 ID
+     * @param int $limit    本批数量
+     * @return int[]
+     */
+    public function get_expired_backup_attachment_ids_after( $days, $after_id = 0, $limit = 20 ): array {
+        global $wpdb;
+
+        // 不用 absint：-1（永久保留）会被它变成 1，等于把保留期改成一天。
+        $days     = is_numeric( $days ) ? (int) $days : 0;
+        $after_id = absint( $after_id );
+        $limit    = max( 1, min( 100, absint( $limit ) ) );
+
+        if ( $days < 1 ) {
+            return array();
+        }
+
+        // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+        $ids = $wpdb->get_col(
+            $wpdb->prepare(
+                "SELECT attachment_id FROM {$this->backups_table}
+                 WHERE attachment_id > %d
+                 GROUP BY attachment_id
+                 HAVING MAX(created_at) < DATE_SUB(NOW(), INTERVAL %d DAY)
+                 ORDER BY attachment_id ASC
+                 LIMIT %d",
+                $after_id,
+                $days,
+                $limit
+            )
+        );
+
+        return array_map( 'absint', (array) $ids );
+    }
+
+    /**
      * 按附件 ID 游标获取需要执行恢复流程的附件
      *
      * 包含仍有备份索引的附件，以及引用已还原但残留文件与记录尚未清理的附件。

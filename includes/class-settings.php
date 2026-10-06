@@ -6,7 +6,35 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 class Libre_Compress_Settings {
 
+    /**
+     * 原图备份永久保留的取值
+     */
+    const RETENTION_PERMANENT = -1;
+
     private $current_tab = 'general';
+
+    /**
+     * 归一化原图备份保留时长
+     *
+     * -1 为永久保留；0 不是合法值，按步进方向落到 1；其他负数和非数字一律按永久处理；
+     * 正整数不设上限。
+     *
+     * @param mixed $value 待归一化的原始值
+     * @return int
+     */
+    public static function normalize_retention_days( $value ): int {
+        if ( ! is_numeric( $value ) ) {
+            return self::RETENTION_PERMANENT;
+        }
+
+        $days = (int) $value;
+
+        if ( 0 === $days ) {
+            return 1;
+        }
+
+        return $days < 0 ? self::RETENTION_PERMANENT : $days;
+    }
 
     public function __construct() {
         $this->init_hooks();
@@ -47,6 +75,7 @@ class Libre_Compress_Settings {
         $current_general = get_option( 'libre_compress_general', array() );
         $sanitized['auto_compress']      = ! empty( $input['auto_compress'] );
         $sanitized['backup_enabled']     = ! empty( $input['backup_enabled'] );
+        $sanitized['backup_retention_days'] = self::normalize_retention_days( isset( $input['backup_retention_days'] ) ? $input['backup_retention_days'] : null );
         $sanitized['tool_concurrency']   = isset( $input['tool_concurrency'] ) ? absint( $input['tool_concurrency'] ) : 5;
         $sanitized['disable_thumbnails'] = array_key_exists( 'disable_thumbnails', $input )
             ? ! empty( $input['disable_thumbnails'] )
@@ -137,6 +166,7 @@ class Libre_Compress_Settings {
 
     private function render_general_tab() {
         $options = get_option( 'libre_compress_general', array() );
+        $retention_days = Libre_Compress_Settings::normalize_retention_days( isset( $options['backup_retention_days'] ) ? $options['backup_retention_days'] : null );
         ?>
         <style>
             .libre-compress-seg { position: relative; display: inline-flex; background: #dcdcde; border-radius: 8px; padding: 3px; vertical-align: middle; }
@@ -167,6 +197,14 @@ class Libre_Compress_Settings {
                             <input type="checkbox" name="libre_compress_general[backup_enabled]" value="1" <?php checked( $options['backup_enabled'] ?? true ); ?>>
                             <?php esc_html_e( '压缩前备份原图', 'libre-compress' ); ?>
                         </label>
+                    </td>
+                </tr>
+                <tr>
+                    <th scope="row"><label for="libre-compress-retention-days"><?php esc_html_e( '原图备份保留时长', 'libre-compress' ); ?></label></th>
+                    <td>
+                        <input type="number" id="libre-compress-retention-days" name="libre_compress_general[backup_retention_days]" value="<?php echo esc_attr( $retention_days ); ?>" min="-1" step="1" class="small-text">
+                        <?php esc_html_e( '天', 'libre-compress' ); ?>
+                        <p class="description"><?php esc_html_e( '填 -1 表示永久保留；填天数则备份到期后自动删除，届时这张图将无法再恢复原图。0 无效，步进时会自动跳过 0。', 'libre-compress' ); ?></p>
                     </td>
                 </tr>
                 <tr>
