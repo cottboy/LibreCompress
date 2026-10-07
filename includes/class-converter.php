@@ -476,12 +476,38 @@ class Libre_Compress_Output {
      * @return bool 恒为 false
      */
     private function abort_commit( int $attachment_id, array $snapshot, array $entries, string $message ): bool {
-        $this->restore_reference_snapshot( $attachment_id, $snapshot );
-        $this->update_content_references( $this->reference_pairs( $entries, true ) );
+        // 源文件是逐条删除的，失败时可能只删掉一部分。此时把引用全量退回快照，
+        // 会让附件引用和正文链接指向已经被删除的源文件，全站图片直接 404。
+        // 因此只对仍然存在的源文件做退回，已删除的就让引用留在转换结果上。
+        $restorable = array();
 
         foreach ( $entries as $entry ) {
-            $size  = file_exists( $entry['from'] ) ? (int) filesize( $entry['from'] ) : 0;
-            $saved = $this->save_record( $attachment_id, $entry['from'], $entry['size_type'], $size, $size, 'target-output', 'failed', $message );
+            if ( file_exists( $entry['from'] ) ) {
+                $restorable[] = $entry;
+            }
+        }
+
+        // 主文件源文件已被删除时，退回附件路径同样会指向不存在的文件；
+        // 转换结果还在，引用应当留在转换结果上。
+        $full_alive = true;
+
+        if ( isset( $entries['full'] ) && ! file_exists( $entries['full']['from'] ) ) {
+            $full_alive = false;
+        }
+
+        if ( $full_alive ) {
+            $this->restore_reference_snapshot( $attachment_id, $snapshot );
+        }
+
+        if ( ! empty( $restorable ) ) {
+            $this->update_content_references( $this->reference_pairs( $restorable, true ) );
+        }
+
+        foreach ( $entries as $entry ) {
+            // 源文件已删时记录要指向仍在使用的转换结果，否则记录会指向不存在的文件。
+            $record_path = file_exists( $entry['from'] ) ? $entry['from'] : $entry['to'];
+            $size        = file_exists( $record_path ) ? (int) filesize( $record_path ) : 0;
+            $saved       = $this->save_record( $attachment_id, $record_path, $entry['size_type'], $size, $size, 'target-output', 'failed', $message );
 
             if ( ! $saved ) {
                 // 连失败记录都写不进去时，绝不能留下成功记录造成误判。
