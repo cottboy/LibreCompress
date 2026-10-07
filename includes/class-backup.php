@@ -52,13 +52,93 @@ class Libre_Compress_Backup {
     }
 
     /**
+     * 获取上传目录根路径（纯正斜杠、保留原大小写）
+     *
+     * @return string
+     */
+    private function upload_basedir(): string {
+        $upload_dir = wp_upload_dir();
+        $basedir    = isset( $upload_dir['basedir'] ) ? (string) $upload_dir['basedir'] : '';
+
+        if ( '' === $basedir ) {
+            return '';
+        }
+
+        return untrailingslashit( wp_normalize_path( $basedir ) );
+    }
+
+    /**
+     * 规范化路径用于不区分大小写的比较
+     *
+     * @param string $path 路径
+     * @return string
+     */
+    private function normalized_path( string $path ): string {
+        $normalized = wp_normalize_path( $path );
+        return 'WIN' === strtoupper( substr( PHP_OS, 0, 3 ) ) ? strtolower( $normalized ) : $normalized;
+    }
+
+    /**
+     * 绝对路径转 uploads 目录内的相对路径
+     *
+     * 数据库一律只存相对路径：站点换目录或迁移到别的服务器后，存的绝对路径会全部指向
+     * 不存在的文件，格式转换后仅存的原图备份就再也恢复不了。备份文件必然位于 uploads 内，
+     * 相对路径承载的信息是完整的。
+     *
+     * @param string $absolute_path 绝对路径
+     * @return string 不在 uploads 内或路径非法时返回空字符串
+     */
+    private function to_relative_path( string $absolute_path ): string {
+        $basedir = $this->upload_basedir();
+
+        if ( '' === $basedir ) {
+            return '';
+        }
+
+        $normalized = wp_normalize_path( $absolute_path );
+
+        if ( 0 !== strpos( $this->normalized_path( $normalized ), $this->normalized_path( $basedir ) . '/' ) ) {
+            return '';
+        }
+
+        $relative = ltrim( substr( $normalized, strlen( $basedir ) ), '/' );
+
+        // 持久化数据入库前逐项校验：不允许回溯、不允许带盘符或协议。
+        if ( '' === $relative || false !== strpos( $relative, '..' ) || false !== strpos( $relative, ':' ) ) {
+            return '';
+        }
+
+        return $relative;
+    }
+
+    /**
+     * 相对路径还原为绝对路径
+     *
+     * @param string $relative_path uploads 目录内的相对路径
+     * @return string 路径非法或上传目录不可用时返回空字符串
+     */
+    private function to_absolute_path( string $relative_path ): string {
+        $basedir = $this->upload_basedir();
+        $relative = ltrim( wp_normalize_path( $relative_path ), '/' );
+
+        if ( '' === $basedir || '' === $relative ) {
+            return '';
+        }
+
+        if ( false !== strpos( $relative, '..' ) || false !== strpos( $relative, ':' ) ) {
+            return '';
+        }
+
+        return $basedir . '/' . $relative;
+    }
+
+    /**
      * 获取备份目录路径
      *
      * @return string 备份目录绝对路径
      */
     public function get_backup_dir(): string {
-        $upload_dir = wp_upload_dir();
-        return $upload_dir['basedir'] . '/' . self::BACKUP_DIR_NAME;
+        return $this->upload_basedir() . '/' . self::BACKUP_DIR_NAME;
     }
 
     /**
@@ -95,23 +175,20 @@ class Libre_Compress_Backup {
     }
 
     /**
-     * 生成备份文件路径
+     * 生成备份文件相对路径
      *
-     * @param int    $attachment_id 附件 ID
-     * @param string $original_path 原文件路径
-     * @return string 备份文件路径
+     * @param int    $attachment_id   附件 ID
+     * @param string $relative_source 原文件的 uploads 相对路径
+     * @return string 备份文件相对路径
      */
-    private function generate_backup_path( int $attachment_id, string $original_path ): string {
-        $backup_dir = $this->get_backup_dir();
-        $basename   = basename( $original_path );
-
-        // 随机令牌避免备份 URL 被 predictable 拼接枚举。
+    private function generate_backup_path( int $attachment_id, string $relative_source ): string {
+        // 随机令牌避免备份路径被 predictable 拼接枚举。
         return sprintf(
             '%s/%d_%s_%s',
-            $backup_dir,
+            self::BACKUP_DIR_NAME,
             $attachment_id,
             wp_generate_password( 16, false, false ),
-            $basename
+            basename( $relative_source )
         );
     }
 
@@ -120,6 +197,8 @@ class Libre_Compress_Backup {
      *
      * 同一原始路径只保留第一次备份：文件压缩后体积必然变小，若按当前大小重建
      * 备份，最初原图会被压缩结果顶替，之后再也回不到原图。
+     *
+     * 文件操作一律用绝对路径，落库一律存 uploads 相对路径。
      *
      * @param int    $attachment_id 附件 ID
      * @param string $file_path     原文件绝对路径
@@ -136,11 +215,17 @@ class Libre_Compress_Backup {
             return false;
         }
 
+        $relative = $this->to_relative_path( $file_path );
+
+        if ( '' === $relative ) {
+            return false;
+        }
+
         $database = libre_compress()->database;
-        $existing = $database->get_backup_by_path( $file_path );
+        $existing = $database->get_backup_by_path( $relative );
 
         if ( $existing ) {
-            $backup_path = isset( $existing['backup_path'] ) ? (string) $existing['backup_path'] : '';
+            $backup_path = $this->to_absolute_path( (string) $existing['backup_path'] );
 
             // 备份文件必须真实存在且位于备份目录内，否则不可信，不能当作原图。
             if ( '' !== $backup_path && $this->is_backup_file_path( $backup_path ) && file_exists( $backup_path ) ) {
@@ -156,7 +241,12 @@ class Libre_Compress_Backup {
             return false;
         }
 
-        $backup_path = $this->generate_backup_path( $attachment_id, $file_path );
+        $backup_relative = $this->generate_backup_path( $attachment_id, $relative );
+        $backup_path     = $this->to_absolute_path( $backup_relative );
+
+        if ( '' === $backup_path ) {
+            return false;
+        }
 
         // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_copy
         if ( ! copy( $file_path, $backup_path ) || ! $this->files_match( $file_path, $backup_path ) ) {
@@ -171,8 +261,8 @@ class Libre_Compress_Backup {
         $record_id = $database->add_backup(
             array(
                 'attachment_id' => $attachment_id,
-                'original_path' => $file_path,
-                'backup_path'   => $backup_path,
+                'original_path' => $relative,
+                'backup_path'   => $backup_relative,
             )
         );
 
@@ -188,11 +278,27 @@ class Libre_Compress_Backup {
     /**
      * 获取附件的备份索引
      *
+     * 落库的是 uploads 相对路径，对外统一还原成绝对路径，调用方无需关心存储形态。
+     *
      * @param int $attachment_id 附件 ID
      * @return array
      */
     public function get_backups( int $attachment_id ): array {
-        return libre_compress()->database->get_backups_by_attachment( $attachment_id );
+        $rows   = libre_compress()->database->get_backups_by_attachment( $attachment_id );
+        $result = array();
+
+        foreach ( (array) $rows as $row ) {
+            if ( ! is_array( $row ) ) {
+                continue;
+            }
+
+            $row['original_path'] = $this->to_absolute_path( (string) $row['original_path'] );
+            $row['backup_path']   = $this->to_absolute_path( (string) $row['backup_path'] );
+
+            $result[] = $row;
+        }
+
+        return $result;
     }
 
     /**
@@ -294,7 +400,7 @@ class Libre_Compress_Backup {
      */
     public function delete_backup( int $attachment_id ): bool {
         $database = libre_compress()->database;
-        $backups  = $database->get_backups_by_attachment( $attachment_id );
+        $backups  = $this->get_backups( $attachment_id );
         $success  = true;
 
         foreach ( $backups as $backup ) {
@@ -374,9 +480,9 @@ class Libre_Compress_Backup {
         $count    = 0;
 
         foreach ( $backups as $backup ) {
-            $backup_path = isset( $backup['backup_path'] ) ? (string) $backup['backup_path'] : '';
+            $backup_path = $this->to_absolute_path( isset( $backup['backup_path'] ) ? (string) $backup['backup_path'] : '' );
 
-            if ( ! $this->is_backup_file_path( $backup_path ) ) {
+            if ( '' === $backup_path || ! $this->is_backup_file_path( $backup_path ) ) {
                 continue;
             }
 
