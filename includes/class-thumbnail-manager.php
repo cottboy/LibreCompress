@@ -639,6 +639,9 @@ class Libre_Compress_Thumbnail_Manager {
     /**
      * 写入元数据并读回校验
      *
+     * 只比较尺寸集合不比较顺序：WordPress 按键名取用缩略图，顺序没有语义，
+     * 其他插件重排顺序不再误判；真正增删尺寸仍对不上，失败保护还在。
+     *
      * @param int   $attachment_id 附件 ID
      * @param array $metadata      待写入的元数据
      * @return bool
@@ -654,6 +657,9 @@ class Libre_Compress_Thumbnail_Manager {
         }
 
         $stored_sizes = isset( $stored['sizes'] ) && is_array( $stored['sizes'] ) ? array_keys( $stored['sizes'] ) : array();
+
+        sort( $stored_sizes );
+        sort( $current );
 
         return $stored_sizes === $current;
     }

@@ -293,8 +293,8 @@ function libre_compress_activate() {
     if ( ! file_exists( LIBRE_COMPRESS_BIN_PATH ) ) {
         wp_mkdir_p( LIBRE_COMPRESS_BIN_PATH );
 
-        // 添加 .htaccess 保护文件
-        $htaccess_content = "# 禁止直接访问\nOrder deny,allow\nDeny from all\n";
+        // 添加 .htaccess 保护文件（新旧 Apache 双兼容写法，见 Libre_Compress_Backup）
+        $htaccess_content = Libre_Compress_Backup::protection_htaccess_content();
         file_put_contents( LIBRE_COMPRESS_BIN_PATH . '.htaccess', $htaccess_content );
 
         // 添加 index.php 保护文件

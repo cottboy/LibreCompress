@@ -33,6 +33,36 @@ class Libre_Compress_Backup {
     }
 
     /**
+     * 目录访问保护 .htaccess 内容
+     *
+     * 新旧 Apache 双兼容（2.4 走 Require，2.2 走 Order/Deny），
+     * OpenLiteSpeed 同样识别 .htaccess 的 IfModule 条件与这两套访问控制写法。
+     *
+     * @return string
+     */
+    public static function protection_htaccess_content(): string {
+        return "# 禁止直接访问\n"
+            . "<IfModule mod_authz_core.c>\n"
+            . "  Require all denied\n"
+            . "</IfModule>\n"
+            . "<IfModule !mod_authz_core.c>\n"
+            . "  Order deny,allow\n"
+            . "  Deny from all\n"
+            . "</IfModule>\n";
+    }
+
+    /**
+     * 历史 .htaccess 内容（存量升级识别用）
+     *
+     * @return string[]
+     */
+    public static function legacy_htaccess_contents(): array {
+        return array(
+            "# 禁止直接访问\nOrder deny,allow\nDeny from all\n",
+            'Deny from all',
+        );
+    }
+    /**
      * 获取备份目录路径
      *
      * @return string 备份目录绝对路径
@@ -55,7 +85,7 @@ class Libre_Compress_Backup {
         }
 
         $protection_files = array(
-            '.htaccess'    => 'Deny from all',
+            '.htaccess'    => self::protection_htaccess_content(),
             'index.php'    => '<?php // Silence is golden.',
             'web.config'   => "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<configuration><system.webServer><authorization><remove users=\"*\" roles=\"\" verbs=\"\"/><add users=\"\" roles=\"\" verbs=\"\" /></authorization></system.webServer></configuration>",
         );

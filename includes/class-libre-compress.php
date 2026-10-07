@@ -175,6 +175,42 @@ class Libre_Compress {
         if ( ! wp_next_scheduled( Libre_Compress_Processor::BACKUP_PRUNE_HOOK ) ) {
             wp_schedule_event( time() + 2 * HOUR_IN_SECONDS, 'daily', Libre_Compress_Processor::BACKUP_PRUNE_HOOK );
         }
+
+        $this->ensure_protection_files();
+    }
+
+    /**
+     * 将存量目录保护文件升级为双兼容写法
+     *
+     * 只处理内容完全等于历史版本的文件：缺失则补建，管理员手改过的原样保留。
+     * 升级完成后内容与期望一致，后续不再重复写入。
+     */
+    private function ensure_protection_files(): void {
+        $expected = Libre_Compress_Backup::protection_htaccess_content();
+        $legacy   = Libre_Compress_Backup::legacy_htaccess_contents();
+        $paths    = array();
+
+        if ( defined( 'LIBRE_COMPRESS_BIN_PATH' ) && is_dir( LIBRE_COMPRESS_BIN_PATH ) ) {
+            $paths[] = LIBRE_COMPRESS_BIN_PATH . '.htaccess';
+        }
+
+        if ( isset( $this->backup ) ) {
+            $backup_dir = $this->backup->get_backup_dir();
+
+            if ( is_string( $backup_dir ) && '' !== $backup_dir && is_dir( $backup_dir ) ) {
+                $paths[] = $backup_dir . '/.htaccess';
+            }
+        }
+
+        foreach ( $paths as $path ) {
+            // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_get_contents
+            $current = file_exists( $path ) ? file_get_contents( $path ) : false;
+
+            if ( false === $current || in_array( $current, $legacy, true ) ) {
+                // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents
+                file_put_contents( $path, $expected );
+            }
+        }
     }
 
     /**
