@@ -1281,12 +1281,20 @@ class Libre_Compress_Processor {
      * @param string $path 文件路径
      * @return string
      */
+    /**
+     * 获取上传目录内的相对路径
+     *
+     * 返回值只统一分隔符、不动大小写，避免写入元数据的文件名大小写被改掉。
+     *
+     * @param string $path 绝对路径或相对路径
+     * @return string
+     */
     private function get_relative_upload_path( string $path ): string {
         $upload_dir = wp_upload_dir();
-        $normalized = $this->normalized_path( $path );
-        $base_dir   = $this->normalized_path( $upload_dir['basedir'] );
+        $normalized = wp_normalize_path( $path );
+        $base_dir   = $upload_dir['basedir'];
 
-        if ( 0 === strpos( $normalized, $base_dir . '/' ) ) {
+        if ( 0 === strpos( $this->normalized_path( $normalized ), $this->normalized_path( $base_dir ) . '/' ) ) {
             return ltrim( substr( $normalized, strlen( $base_dir ) ), '/' );
         }
 

@@ -679,6 +679,11 @@ class Libre_Compress_Output {
     /**
      * 写入附件路径并读回校验
      *
+     * 只传相对路径：update_attached_file 内部用 str_starts_with 与 uploads 的 basedir
+     * 逐字符比对，Windows 下 basedir 是反斜杠，而本插件的路径一律是正斜杠，
+     * 传绝对路径会匹配失败并把整个绝对路径存进 _wp_attached_file，
+     * 之后 get_attached_file 会拼出 uploads + 绝对路径 的双重前缀。
+     *
      * update_post_meta 在值未变化时同样返回 false，因此一律以读回结果为准。
      *
      * @param int    $attachment_id 附件 ID
@@ -686,9 +691,14 @@ class Libre_Compress_Output {
      * @return bool
      */
     private function write_attached_file( int $attachment_id, string $absolute_path ): bool {
+        // uploads 外的路径一律不写，否则会把任意绝对路径存进 _wp_attached_file。
+        if ( ! $this->is_safe_destination_path( $absolute_path ) ) {
+            return false;
+        }
+
         $relative = $this->get_relative_upload_path( $absolute_path );
 
-        update_attached_file( $attachment_id, $absolute_path );
+        update_attached_file( $attachment_id, $relative );
 
         return $this->normalized_path( (string) get_post_meta( $attachment_id, '_wp_attached_file', true ) ) === $this->normalized_path( $relative );
     }
@@ -1855,15 +1865,19 @@ class Libre_Compress_Output {
     /**
      * 获取上传目录内的相对路径
      *
+     * 返回值只统一分隔符、不动大小写：写进元数据、映射和正文链接的是用户可见的文件名，
+     * 改成小写会让 URL 大小写敏感的环境（Linux、CDN）直接 404。
+     * 大小写只在比较时由 normalized_path 忽略。
+     *
      * @param string $path 绝对路径或相对路径
      * @return string
      */
     private function get_relative_upload_path( string $path ): string {
         $upload_dir = wp_upload_dir();
-        $normalized = $this->normalized_path( $path );
-        $base_dir   = $this->normalized_path( $upload_dir['basedir'] );
+        $normalized = wp_normalize_path( $path );
+        $base_dir   = $upload_dir['basedir'];
 
-        if ( 0 === strpos( $normalized, $base_dir . '/' ) ) {
+        if ( 0 === strpos( $this->normalized_path( $normalized ), $this->normalized_path( $base_dir ) . '/' ) ) {
             return ltrim( substr( $normalized, strlen( $base_dir ) ), '/' );
         }
 
