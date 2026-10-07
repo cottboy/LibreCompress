@@ -541,22 +541,27 @@
             }
 
             function finish() {
+                var summary;
+
                 if (completed === 0 && hadError) {
-                    $progressFill.css('width', '100%');
-                    $progressText.text(self.i18n.error);
+                    summary = self.i18n.error;
                 } else if (completed === 0) {
-                    $progressFill.css('width', '100%');
-                    $progressText.text(self.i18n.noCompressItems);
+                    summary = self.i18n.noCompressItems;
                 } else {
-                    var summary = self.i18n.batchSummary
+                    summary = self.i18n.batchSummary
                         .replace('%1$s', completed)
                         .replace('%2$d', success)
                         .replace('%3$d', skipped)
                         .replace('%4$d', failed);
-                    $progressFill.css('width', '100%');
-                    $progressText.text(summary);
                 }
+
+                $progressFill.css('width', '100%');
+                $progressText.text(summary);
                 $btn.prop('disabled', false);
+
+                // 压缩结果只体现在页面统计和媒体库列上，不刷新就看不到本次成果
+                alert(summary);
+                location.reload();
             }
 
             function countResult(data) {

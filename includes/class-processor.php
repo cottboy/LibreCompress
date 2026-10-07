@@ -348,7 +348,7 @@ class Libre_Compress_Processor {
                 return $result;
             }
 
-            $this->refresh_metadata_file_size( $attachment_id );
+            $this->refresh_metadata_file_sizes( $attachment_id );
 
             if ( empty( $result['message'] ) ) {
                 if ( $result['success'] === $result['total'] ) {
@@ -611,6 +611,10 @@ class Libre_Compress_Processor {
      * 映射一并保留，否则下一轮批量会把这批图重新压一遍。代价是从这一刻起无法再恢复原图。
      */
     public function prune_expired_backups(): void {
+        // 无主数据与保留期无关：附件都没了，它的备份和记录已经无人认领，
+        // 备份文件还会一直占磁盘，所以放在永久保留的判断之前。
+        $this->prune_orphan_history();
+
         $settings = get_option( 'libre_compress_general', array() );
         $days     = Libre_Compress_Settings::normalize_retention_days(
             isset( $settings['backup_retention_days'] ) ? $settings['backup_retention_days'] : null
@@ -635,6 +639,97 @@ class Libre_Compress_Processor {
         if ( $has_more ) {
             wp_schedule_single_event( time() + 5 * MINUTE_IN_SECONDS, self::BACKUP_PRUNE_HOOK );
         }
+    }
+
+    /**
+     * 清理已删除附件留下的处理痕迹
+     *
+     * 附件被永久删除时，删除钩子只在当场尽力清理一次：拿不到锁就静默放弃，
+     * 也没有任何重试入口。这里兜底扫描，删掉无主的备份文件、备份索引、
+     * 压缩记录和转换映射，否则这些文件会一直占着磁盘。
+     *
+     * @return array removed_ids、failed_ids、removed_count、failed_count、has_more
+     */
+    public function prune_orphan_history(): array {
+        $after_id  = 0;
+        $removed   = array();
+        $failed    = array();
+        $processed = 0;
+        $has_more  = true;
+
+        do {
+            $page      = $this->prune_orphan_history_page( $after_id );
+            $after_id  = (int) $page['next_after'];
+            $removed   = array_merge( $removed, $page['removed_ids'] );
+            $failed    = array_merge( $failed, $page['failed_ids'] );
+            $processed += count( $page['removed_ids'] ) + count( $page['failed_ids'] );
+            $has_more  = (bool) $page['has_more'];
+        } while ( $has_more && $processed < self::BACKUP_PRUNE_LIMIT );
+
+        if ( $has_more ) {
+            wp_schedule_single_event( time() + 5 * MINUTE_IN_SECONDS, self::BACKUP_PRUNE_HOOK );
+        }
+
+        return array(
+            'removed_ids'   => $removed,
+            'failed_ids'    => $failed,
+            'removed_count' => count( $removed ),
+            'failed_count'  => count( $failed ),
+            'has_more'      => $has_more,
+        );
+    }
+
+    /**
+     * 清理一批已删除附件的处理痕迹
+     *
+     * 附件已经不存在，不会有人再来压缩它，因此不取附件锁——否则只会给
+     * 无主的附件 ID 留下永远不会用到的锁文件。仍要取全局维护锁，
+     * 避免与“删除所有备份”并发。
+     *
+     * @param int $after_id 上一批最后处理的附件 ID
+     * @return array removed_ids、failed_ids、next_after、has_more
+     */
+    public function prune_orphan_history_page( int $after_id = 0 ): array {
+        $ids      = libre_compress()->database->get_orphan_history_attachment_ids_after( $after_id, self::BACKUP_PRUNE_PAGE_SIZE + 1 );
+        $has_more = count( $ids ) > self::BACKUP_PRUNE_PAGE_SIZE;
+
+        if ( $has_more ) {
+            array_pop( $ids );
+        }
+
+        $removed = array();
+        $failed  = array();
+
+        foreach ( $ids as $attachment_id ) {
+            // 附件可能在扫描与清理之间被重新上传占用同一 ID，只处理确实已不存在的。
+            if ( $this->attachment_exists( $attachment_id ) ) {
+                continue;
+            }
+
+            $global_lock = $this->acquire_global_lock( false );
+
+            if ( false === $global_lock ) {
+                $failed[] = $attachment_id;
+                continue;
+            }
+
+            try {
+                if ( $this->clear_attachment_history( $attachment_id ) ) {
+                    $removed[] = $attachment_id;
+                } else {
+                    $failed[] = $attachment_id;
+                }
+            } finally {
+                $this->release_attachment_lock( $global_lock );
+            }
+        }
+
+        return array(
+            'removed_ids' => $removed,
+            'failed_ids'  => $failed,
+            'next_after'  => empty( $ids ) ? $after_id : (int) max( $ids ),
+            'has_more'    => $has_more,
+        );
     }
 
     /**
@@ -1205,24 +1300,75 @@ class Libre_Compress_Processor {
     }
 
     /**
-     * 更新当前主文件大小元数据
+     * 同步附件元数据中记录的文件大小
+     *
+     * 主文件和每个尺寸都要同步：压缩或格式转换后文件已经变小，
+     * 只更新主文件会让所有尺寸的 filesize 停留在压缩前的旧值，
+     * 读取元数据的调用方拿到的就是错误大小。
      *
      * @param int $attachment_id 附件 ID
      */
-    private function refresh_metadata_file_size( int $attachment_id ): void {
+    private function refresh_metadata_file_sizes( int $attachment_id ): void {
         $metadata = wp_get_attachment_metadata( $attachment_id );
+
         if ( ! is_array( $metadata ) || empty( $metadata['file'] ) ) {
             return;
         }
 
-        $upload_dir = wp_upload_dir();
-        $main_file  = $upload_dir['basedir'] . '/' . ltrim( $metadata['file'], '/' );
-        if ( ! $this->is_inside_upload_dir( $main_file ) || ! is_file( $main_file ) ) {
+        $changed = $this->sync_metadata_filesize( $metadata, (string) $metadata['file'] );
+
+        if ( ! empty( $metadata['sizes'] ) && is_array( $metadata['sizes'] ) ) {
+            $file_dir = dirname( (string) $metadata['file'] );
+
+            foreach ( $metadata['sizes'] as $size_name => $size_data ) {
+                if ( ! is_array( $size_data ) || empty( $size_data['file'] ) ) {
+                    continue;
+                }
+
+                $synced = $this->sync_metadata_filesize(
+                    $metadata['sizes'][ $size_name ],
+                    $file_dir . '/' . $size_data['file']
+                );
+
+                $changed = $changed || $synced;
+            }
+        }
+
+        if ( ! $changed ) {
             return;
         }
 
-        $metadata['filesize'] = (int) filesize( $main_file );
         wp_update_attachment_metadata( $attachment_id, $metadata );
+    }
+
+    /**
+     * 把单个文件条目的 filesize 对齐磁盘实际大小
+     *
+     * @param array  $target       待同步的元数据条目（引用传递）
+     * @param string $relative_path 相对 uploads 根的路径
+     * @return bool 是否发生改动
+     */
+    private function sync_metadata_filesize( array &$target, string $relative_path ): bool {
+        if ( '' === $relative_path ) {
+            return false;
+        }
+
+        $absolute_path = untrailingslashit( wp_normalize_path( wp_upload_dir()['basedir'] ) ) . '/' . ltrim( $relative_path, '/' );
+
+        if ( ! $this->is_inside_upload_dir( $absolute_path ) || ! is_file( $absolute_path ) ) {
+            return false;
+        }
+
+        clearstatcache( true, $absolute_path );
+        $filesize = (int) filesize( $absolute_path );
+
+        if ( isset( $target['filesize'] ) && (int) $target['filesize'] === $filesize ) {
+            return false;
+        }
+
+        $target['filesize'] = $filesize;
+
+        return true;
     }
 
     /**

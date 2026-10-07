@@ -655,6 +655,50 @@ class Libre_Compress_Database {
     }
 
     /**
+     * 按附件 ID 游标获取已不存在的附件残留的处理痕迹
+     *
+     * 附件被永久删除时，删除钩子只做一次尽力而为的清理：拿不到锁就静默放弃，
+     * 且没有任何重试入口。附件本身已经不在，原图备份、压缩记录和格式转换映射
+     * 就成了永远无人认领的残留——备份文件还会继续占磁盘。
+     * 定时任务据此兜底清理。
+     *
+     * @param int $after_id 上一批最后处理的附件 ID
+     * @param int $limit    本批数量
+     * @return int[]
+     */
+    public function get_orphan_history_attachment_ids_after( $after_id = 0, $limit = 20 ): array {
+        global $wpdb;
+
+        $after_id = absint( $after_id );
+        $limit    = max( 1, min( 100, absint( $limit ) ) );
+
+        // 回收站里的附件不算残留：移回回收站后还要能恢复原图。
+        // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+        $ids = $wpdb->get_col(
+            $wpdb->prepare(
+                "SELECT attachment_id FROM (
+                    SELECT DISTINCT r.attachment_id
+                    FROM {$this->records_table} r
+                    LEFT JOIN {$wpdb->posts} p ON p.ID = r.attachment_id
+                    WHERE r.attachment_id > %d AND ( p.ID IS NULL OR p.post_type <> 'attachment' )
+                    UNION
+                    SELECT DISTINCT b.attachment_id
+                    FROM {$this->backups_table} b
+                    LEFT JOIN {$wpdb->posts} p ON p.ID = b.attachment_id
+                    WHERE b.attachment_id > %d AND ( p.ID IS NULL OR p.post_type <> 'attachment' )
+                ) orphan
+                ORDER BY attachment_id ASC
+                LIMIT %d",
+                $after_id,
+                $after_id,
+                $limit
+            )
+        );
+
+        return array_map( 'absint', $ids );
+    }
+
+    /**
      * 获取所有备份
      *
      * @return array
