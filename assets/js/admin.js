@@ -401,7 +401,7 @@
         },
 
         /**
-         * 发送缩略图管理请求
+         * 发送缩略图管理请求（按附件游标分页，避免大媒体库单次请求超时）
          */
         runThumbnailAction: function(e, actionType) {
             var self = this;
@@ -409,28 +409,106 @@
 
             $btn.prop('disabled', true).text(this.i18n.processing);
 
-            $.ajax({
-                url: this.ajaxUrl,
-                type: 'POST',
-                data: {
-                    action: 'libre_compress_thumbnail_action',
-                    action_type: actionType,
-                    nonce: this.nonce
-                },
-                success: function(response) {
-                    if (response.success) {
-                        alert(response.data.message + self.formatFailedIds(response.data.failed_ids || []));
-                    } else {
-                        alert(response.data && response.data.message ? response.data.message : self.i18n.error);
+            var after = 0;
+            var done = 0;
+            var pageErrors = 0;
+            var acc = {
+                deleted: 0, affected: 0, replaced: 0,
+                generated: 0, generatedFiles: 0, skipped: 0,
+                failed: 0, failedIds: [], contentFailed: false
+            };
+
+            function finish(interrupted) {
+                var summary;
+
+                if (actionType === 'delete') {
+                    summary = self.i18n.thumbnailDeleteSummary
+                        .replace('%1$d', acc.deleted)
+                        .replace('%2$d', acc.affected)
+                        .replace('%3$d', acc.replaced);
+
+                    if (acc.contentFailed) {
+                        summary += ' ' + self.i18n.thumbnailContentFailed;
                     }
-                    $btn.prop('disabled', false);
-                    location.reload();
-                },
-                error: function() {
-                    alert(self.i18n.error);
-                    $btn.prop('disabled', false);
+                } else {
+                    summary = self.i18n.thumbnailGenerateSummary
+                        .replace('%1$d', acc.generated)
+                        .replace('%2$d', acc.generatedFiles)
+                        .replace('%3$d', acc.skipped)
+                        .replace('%4$d', acc.failed);
                 }
-            });
+
+                summary += self.formatFailedIds(acc.failedIds);
+
+                if (interrupted) {
+                    summary += '\n' + self.i18n.thumbnailInterrupted;
+                }
+
+                alert(summary);
+                $btn.prop('disabled', false);
+                location.reload();
+            }
+
+            function loadPage() {
+                $.ajax({
+                    url: self.ajaxUrl,
+                    type: 'POST',
+                    data: {
+                        action: 'libre_compress_thumbnail_action',
+                        action_type: actionType,
+                        nonce: self.nonce,
+                        after: after
+                    },
+                    success: function(response) {
+                        pageErrors = 0;
+
+                        if (!response.success) {
+                            finish(true);
+                            return;
+                        }
+
+                        var d = response.data || {};
+                        done += parseInt(d.processed, 10) || 0;
+
+                        if (actionType === 'delete') {
+                            acc.deleted += parseInt(d.deleted_files, 10) || 0;
+                            acc.affected += parseInt(d.affected_count, 10) || 0;
+                            acc.replaced += parseInt(d.replaced_links, 10) || 0;
+
+                            if (d.content_failed) {
+                                acc.contentFailed = true;
+                            }
+                        } else {
+                            acc.generated += parseInt(d.generated_attachments, 10) || 0;
+                            acc.generatedFiles += parseInt(d.generated_files, 10) || 0;
+                            acc.skipped += parseInt(d.skipped_attachments, 10) || 0;
+                        }
+
+                        acc.failed += (d.failed_ids || []).length;
+                        acc.failedIds = acc.failedIds.concat(d.failed_ids || []);
+                        $btn.text(self.i18n.thumbnailProgress.replace('%d', done));
+
+                        if (d.has_more && parseInt(d.next_after, 10) > after) {
+                            after = parseInt(d.next_after, 10);
+                            loadPage();
+                        } else {
+                            finish(false);
+                        }
+                    },
+                    error: function() {
+                        pageErrors++;
+
+                        if (pageErrors <= 3) {
+                            loadPage();
+                            return;
+                        }
+
+                        finish(true);
+                    }
+                });
+            }
+
+            loadPage();
         },
 
         /**
@@ -450,6 +528,7 @@
             var failed = 0;
             var skipped = 0;
             var hadError = false;
+            var pageErrors = 0;
             var concurrency = parseInt(libreCompressData.concurrency, 10) || 5;
 
             $btn.prop('disabled', true);
@@ -559,6 +638,8 @@
                         after: after
                     },
                     success: function(response) {
+                        pageErrors = 0;
+
                         if (!response.success) {
                             hadError = true;
                             failed++;
@@ -573,6 +654,14 @@
                         );
                     },
                     error: function() {
+                        pageErrors++;
+
+                        // 取页失败最多重试 3 次，仍失败才按中断结算，避免一次网络抖动丢下整个批量
+                        if (pageErrors <= 3) {
+                            loadPage();
+                            return;
+                        }
+
                         alert(self.i18n.error);
                         hadError = true;
                         failed++;

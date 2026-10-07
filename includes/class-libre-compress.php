@@ -241,6 +241,14 @@ class Libre_Compress {
                     'clearFinished'           => __( '清除完成', 'libre-compress' ),
                     /* translators: %d: 已处理附件数 */
                     'clearInterrupted'        => __( '清除中断：已完成 %d 个附件，再次执行可继续清除剩余附件。', 'libre-compress' ),
+                    /* translators: %d: 已处理附件数 */
+                    'thumbnailProgress'       => __( '已处理 %d 个附件', 'libre-compress' ),
+                    /* translators: 1: 删除的文件数, 2: 影响的附件数, 3: 替换的链接数 */
+                    'thumbnailDeleteSummary'  => __( '已删除 %1$d 个未勾选尺寸的缩略图（涉及 %2$d 个附件），替换了 %3$d 个图片链接', 'libre-compress' ),
+                    /* translators: 1: 补生成的附件数, 2: 新增文件数, 3: 跳过的附件数, 4: 失败的附件数 */
+                    'thumbnailGenerateSummary' => __( '已为 %1$d 个附件补生成 %2$d 个缩略图（%3$d 个无需处理或已跳过，%4$d 个失败）', 'libre-compress' ),
+                    'thumbnailContentFailed'  => __( '部分正文链接未更新成功，可再次执行本操作继续处理。', 'libre-compress' ),
+                    'thumbnailInterrupted'    => __( '处理中断，再次执行可继续处理剩余附件。', 'libre-compress' ),
                 ),
             )
         );

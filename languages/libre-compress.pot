@@ -306,6 +306,26 @@ msgstr ""
 msgid "清除中断：已完成 %d 个附件，再次执行可继续清除剩余附件。"
 msgstr ""
 
+#: includes\class-libre-compress.php:245
+msgid "已处理 %d 个附件"
+msgstr ""
+
+#: includes\class-libre-compress.php:247
+msgid "已删除 %1$d 个未勾选尺寸的缩略图（涉及 %2$d 个附件），替换了 %3$d 个图片链接"
+msgstr ""
+
+#: includes\class-libre-compress.php:249
+msgid "已为 %1$d 个附件补生成 %2$d 个缩略图（%3$d 个无需处理或已跳过，%4$d 个失败）"
+msgstr ""
+
+#: includes\class-libre-compress.php:250
+msgid "部分正文链接未更新成功，可再次执行本操作继续处理。"
+msgstr ""
+
+#: includes\class-libre-compress.php:251
+msgid "处理中断，再次执行可继续处理剩余附件。"
+msgstr ""
+
 #: includes\class-libre-compress.php:271
 msgid "设置"
 msgstr ""

@@ -133,7 +133,7 @@ class Libre_Compress_Settings {
 
         $sanitized['png_mode']           = isset( $input['png_mode'] ) && in_array( $input['png_mode'], array( 'lossy', 'lossless' ), true ) ? $input['png_mode'] : 'lossy';
         $sanitized['png_lossy_quality']  = isset( $input['png_lossy_quality'] ) ? absint( $input['png_lossy_quality'] ) : 80;
-        $sanitized['png_lossless_level'] = isset( $input['png_lossless_level'] ) ? absint( $input['png_lossless_level'] ) : 6;
+        $sanitized['png_lossless_level'] = isset( $input['png_lossless_level'] ) ? absint( $input['png_lossless_level'] ) : 4;
 
         $sanitized['webp_mode']    = isset( $input['webp_mode'] ) && in_array( $input['webp_mode'], array( 'lossy', 'lossless' ), true ) ? $input['webp_mode'] : 'lossy';
         $sanitized['webp_quality'] = isset( $input['webp_quality'] ) ? absint( $input['webp_quality'] ) : 80;
@@ -597,8 +597,8 @@ class Libre_Compress_Settings {
                 <tr>
                     <th scope="row"><?php esc_html_e( '无损压缩级别', 'libre-compress' ); ?></th>
                     <td>
-                        <input type="range" name="libre_compress_tools[png_lossless_level]" value="<?php echo esc_attr( $options['png_lossless_level'] ?? 6 ); ?>" min="0" max="6" oninput="this.nextElementSibling.value = this.value">
-                        <output><?php echo esc_html( $options['png_lossless_level'] ?? 6 ); ?></output>
+                        <input type="range" name="libre_compress_tools[png_lossless_level]" value="<?php echo esc_attr( $options['png_lossless_level'] ?? 4 ); ?>" min="0" max="6" oninput="this.nextElementSibling.value = this.value">
+                        <output><?php echo esc_html( $options['png_lossless_level'] ?? 4 ); ?></output>
                         <p class="description"><?php esc_html_e( 'oxipng 无损压缩级别，0-6，数值越高压缩越慢但效果越好', 'libre-compress' ); ?></p>
                     </td>
                 </tr>

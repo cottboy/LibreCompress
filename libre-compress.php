@@ -134,10 +134,11 @@ function libre_compress_sanitize_svg_content( string $content ) {
 
     $doc = new DOMDocument();
 
-    libxml_use_internal_errors( true );
+    $prev_libxml_errors = libxml_use_internal_errors( true );
     // LIBXML_NONET：禁止加载外部实体
     $loaded = $doc->loadXML( $content, LIBXML_NONET );
     libxml_clear_errors();
+    libxml_use_internal_errors( $prev_libxml_errors );
 
     if ( ! $loaded ) {
         return false;
@@ -145,8 +146,8 @@ function libre_compress_sanitize_svg_content( string $content ) {
 
     $xpath = new DOMXPath( $doc );
 
-    // 移除 script 与 foreignObject 元素
-    foreach ( array( 'script', 'foreignObject' ) as $tag ) {
+    // 移除可执行外部文档或插件内容的元素：脚本、外部 HTML 容器、内嵌框架与嵌入对象
+    foreach ( array( 'script', 'foreignObject', 'iframe', 'embed', 'object' ) as $tag ) {
         $nodes = $xpath->query( '//*[local-name()="' . $tag . '"]' );
 
         if ( $nodes ) {
@@ -158,7 +159,26 @@ function libre_compress_sanitize_svg_content( string $content ) {
         }
     }
 
-    // 移除危险属性：on* 事件、脚本伪协议、HTML 数据协议
+    // <style> 块里的 CSS 同样不允许出现脚本伪协议与可嵌套脚本的数据协议
+    $style_nodes = $xpath->query( '//*[local-name()="style"]' );
+
+    if ( $style_nodes ) {
+        foreach ( iterator_to_array( $style_nodes ) as $node ) {
+            $css = strtolower( (string) $node->textContent );
+            // 浏览器会忽略协议中的 ASCII 控制字符与空白，清理后再判断。
+            $css = preg_replace( '/[\x00-\x20\x7F]+/', '', $css );
+
+            if ( false !== strpos( $css, 'javascript:' ) || false !== strpos( $css, 'vbscript:' )
+                || false !== strpos( $css, 'data:text/html' ) || false !== strpos( $css, 'data:image/svg+xml' ) ) {
+                if ( null !== $node->parentNode ) {
+                    $node->parentNode->removeChild( $node );
+                }
+            }
+        }
+    }
+
+    // 移除危险属性：on* 事件、脚本伪协议、HTML/XML 数据协议；
+    // style 属性值出现在任意位置同样危险（如 url(javascript:...)），一并检查
     $elements = $xpath->query( '//*' );
 
     if ( $elements ) {
@@ -173,7 +193,14 @@ function libre_compress_sanitize_svg_content( string $content ) {
                 // 浏览器会忽略 URL 协议中的 ASCII 控制字符，清理后再判断协议。
                 $value = preg_replace( '/[\x00-\x20\x7F]+/', '', $value );
 
-                if ( 0 === strpos( $name, 'on' ) || preg_match( '/^(javascript|vbscript):|^data:text\/html/', $value ) ) {
+                // data:image/svg+xml 等可嵌套脚本的数据协议与 data:text/html 同等危险
+                $is_script_protocol = (bool) preg_match( '/^(javascript|vbscript):|^data:(text\/html|image\/svg\+xml|text\/xml|application\/(xhtml\+xml|xml))/', $value );
+                $is_style_attack    = 'style' === $name && (
+                    false !== strpos( $value, 'javascript:' ) || false !== strpos( $value, 'vbscript:' )
+                    || false !== strpos( $value, 'data:text/html' ) || false !== strpos( $value, 'data:image/svg+xml' )
+                );
+
+                if ( 0 === strpos( $name, 'on' ) || $is_script_protocol || $is_style_attack ) {
                     $element->removeAttributeNode( $attribute );
                 }
             }

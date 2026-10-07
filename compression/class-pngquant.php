@@ -45,6 +45,71 @@ class Libre_Compress_Pngquant extends Libre_Compress_Tool_Base {
     }
 
     /**
+     * 压缩 PNG 图片
+     *
+     * pngquant 在 --skip-if-larger 跳过（结果更大）时以 98 退出、在质量不达标时以 99
+     * 退出，两种情况都保持原文件不动：这正是“没有压缩收益，保留原图”的情形，
+     * 按成功返回，交由上层记为 0% 已压缩，避免被误记为失败导致反复重试。
+     * 文件内容有任何变动都仍按失败处理，防止把真正的错误藏起来。
+     *
+     * @param string $file_path 图片绝对路径
+     * @param array  $options   压缩选项
+     * @return array 压缩结果
+     */
+    public function compress( string $file_path, array $options = array() ): array {
+        if ( ! $this->is_tool_available() ) {
+            return parent::compress( $file_path, $options );
+        }
+
+        if ( ! file_exists( $file_path ) ) {
+            return parent::compress( $file_path, $options );
+        }
+
+        $extension = strtolower( pathinfo( $file_path, PATHINFO_EXTENSION ) );
+        if ( ! in_array( $extension, $this->get_supported_formats(), true ) ) {
+            return parent::compress( $file_path, $options );
+        }
+
+        $original_size = filesize( $file_path );
+        $command       = $this->build_command( $file_path, $options );
+        $result        = $this->execute_command( $command );
+
+        if ( $result['success'] ) {
+            clearstatcache( true, $file_path );
+            $compressed_size = filesize( $file_path );
+
+            return array(
+                'success'         => true,
+                'message'         => __( '压缩成功', 'libre-compress' ),
+                'original_size'   => $original_size,
+                'compressed_size' => $compressed_size,
+            );
+        }
+
+        $skipped = isset( $result['return_code'] ) && in_array( (int) $result['return_code'], array( 98, 99 ), true );
+
+        if ( $skipped && file_exists( $file_path ) ) {
+            clearstatcache( true, $file_path );
+
+            if ( (int) filesize( $file_path ) === (int) $original_size ) {
+                return array(
+                    'success'         => true,
+                    'message'         => __( '压缩成功', 'libre-compress' ),
+                    'original_size'   => $original_size,
+                    'compressed_size' => $original_size,
+                );
+            }
+        }
+
+        return array(
+            'success'         => false,
+            'message'         => $result['output'],
+            'original_size'   => $original_size,
+            'compressed_size' => $original_size,
+        );
+    }
+
+    /**
      * 构建压缩命令
      *
      * @param string $file_path 文件路径
