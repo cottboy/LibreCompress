@@ -325,11 +325,19 @@ class Libre_Compress_Thumbnail_Manager {
     }
 
     /**
+     * 替代尺寸允许的最大像素面积倍数
+     *
+     * 删缩略图是为了省空间，把正文链接改写成完整原图会让页面体积反而暴涨，
+     * 因此面积差超过这个倍数时放弃替换，宁可让浏览器加载不到该尺寸。
+     */
+    const REPLACEMENT_AREA_RATIO = 4;
+
+    /**
      * 为被删尺寸挑一个像素面积最接近的替代尺寸，平手时选更大的
      *
      * @param array $victim     被删尺寸的文件与宽高
      * @param array $candidates 仍然存在的候选尺寸
-     * @return array|null
+     * @return array|null 面积差过大时返回 null
      */
     private function nearest_replacement( array $victim, array $candidates ) {
         $victim_area = max( 1, $victim['width'] * $victim['height'] );
@@ -347,6 +355,11 @@ class Libre_Compress_Thumbnail_Manager {
                 );
                 $best_score = $score;
             }
+        }
+
+        // 最接近的替代尺寸仍然大出太多倍，说明没有真正合适的替代：宁可留空也不换成原图。
+        if ( null !== $best && $best['area'] > $victim_area * self::REPLACEMENT_AREA_RATIO ) {
+            return null;
         }
 
         return $best;

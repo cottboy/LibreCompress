@@ -168,16 +168,27 @@ class Libre_Compress_Processor {
         $files = libre_compress()->compressor->get_attachment_files( $attachment_id );
         $state = array(
             'status'               => 'empty',
-            'total_files'          => count( $files ),
+            'total_files'          => 0,
             'success_count'        => 0,
             'failed_count'         => 0,
             'pending_count'        => 0,
+            'skipped_count'        => 0,
+            'missing_count'        => 0,
             'total_original_size'  => 0,
             'total_compressed_size' => 0,
             'total_ratio'          => 0,
         );
 
         foreach ( $files as $file ) {
+            // 元数据声明但磁盘上已不存在的尺寸不是待处理项：重试多少次都不会变，
+            // 计入 pending 会让整个附件永远显示"待压缩"并被反复重试。
+            if ( ! is_file( $file['file_path'] ) ) {
+                $state['missing_count']++;
+                continue;
+            }
+
+            $state['total_files']++;
+
             $record   = libre_compress()->database->get_record( $attachment_id, $file['size_type'] );
             $complete = $this->is_complete_record( $file['file_path'], $record );
 
@@ -187,6 +198,10 @@ class Libre_Compress_Processor {
                 $state['total_compressed_size'] += max( 0, (int) $record['compressed_size'] );
             } elseif ( $record && 'failed' === $record['status'] ) {
                 $state['failed_count']++;
+            } elseif ( $record && 'skipped' === $record['status'] ) {
+                // 主动跳过（如 APNG 动图、缺工具、超过大小限制）已记录在案，
+                // 不该每轮批量都当成待处理重新尝试。
+                $state['skipped_count']++;
             } else {
                 $state['pending_count']++;
             }

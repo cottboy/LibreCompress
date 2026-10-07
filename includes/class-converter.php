@@ -316,6 +316,13 @@ class Libre_Compress_Output {
 
             $this->remove_output_entry( $attachment_id, $size_type );
 
+            // 复用了旧映射的目标名时，上一轮的转换结果文件会变成无人引用的孤儿：
+            // 映射刚被删掉，它既不会被下次重跑覆盖，也不会被恢复流程删除。
+            if ( $entry && file_exists( $target_path ) && $this->is_safe_path( $target_path ) ) {
+                // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
+                unlink( $target_path );
+            }
+
             $result_template['status']          = 'success';
             $result_template['message']         = __( '转换结果没有变小，已保留原图', 'libre-compress' );
             $result_template['original_size']   = $original_size;

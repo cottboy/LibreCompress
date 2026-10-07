@@ -211,11 +211,20 @@ class Libre_Compress_Media_Library {
                 <button type="button" class="button button-small libre-compress-btn" data-action="restore" data-attachment-id="<?php echo esc_attr( $attachment_id ); ?>">
                     <?php esc_html_e( '恢复原图', 'libre-compress' ); ?>
                 </button>
-            <?php endif; ?>
-            <?php if ( $has_backup ) : ?>
+            <?php elseif ( $has_backup ) : ?>
+                <br>
                 <button type="button" class="button button-small libre-compress-btn" data-action="delete-backup" data-attachment-id="<?php echo esc_attr( $attachment_id ); ?>">
                     <?php esc_html_e( '删除备份', 'libre-compress' ); ?>
                 </button>
+            <?php else : ?>
+                <?php
+                // 备份被保留期清理或手动删除后，格式转换的原文件已经找不回来了。
+                // 不提示的话用户会以为还能一键还原。
+                ?>
+                <br>
+                <small style="color: #996800;">
+                    <?php esc_html_e( '原图备份已清理，无法恢复原图', 'libre-compress' ); ?>
+                </small>
             <?php endif; ?>
         </div>
         <?php

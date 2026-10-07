@@ -267,9 +267,12 @@ class Libre_Compress_Compressor {
 
         // APNG 的后缀与 MIME 都是 png，但 pngquant 只会留下第一帧，动图就毁了。
         if ( 'png' === $extension && self::is_apng( $file_path ) ) {
+            $message = __( 'APNG 动图不压缩', 'libre-compress' );
+            $this->record_skipped_file( $attachment_id, $file_path, $size_type, $message );
+
             return array(
                 'success' => false,
-                'message' => __( 'APNG 动图不压缩', 'libre-compress' ),
+                'message' => $message,
                 'status'  => 'skipped',
             );
         }
@@ -279,9 +282,12 @@ class Libre_Compress_Compressor {
         $tool           = $this->get_tool_for_format( $extension );
 
         if ( ! $tool ) {
+            $message = __( '没有可用的压缩工具', 'libre-compress' );
+            $this->record_skipped_file( $attachment_id, $file_path, $size_type, $message );
+
             return array(
                 'success' => false,
-                'message' => __( '没有可用的压缩工具', 'libre-compress' ),
+                'message' => $message,
                 'status'  => 'skipped',
             );
         }
@@ -291,12 +297,15 @@ class Libre_Compress_Compressor {
         $max_size_bytes = $max_size_mb * 1024 * 1024;
 
         if ( $max_size_mb > 0 && $file_size > $max_size_bytes ) {
+            $message = sprintf(
+                __( '文件大小超过限制（最大 %d MB）', 'libre-compress' ),
+                $max_size_mb
+            );
+            $this->record_skipped_file( $attachment_id, $file_path, $size_type, $message );
+
             return array(
                 'success' => false,
-                'message' => sprintf(
-                    __( '文件大小超过限制（最大 %d MB）', 'libre-compress' ),
-                    $max_size_mb
-                ),
+                'message' => $message,
                 'status'  => 'skipped',
             );
         }
@@ -304,9 +313,12 @@ class Libre_Compress_Compressor {
         if ( $backup_enabled ) {
             $backup = libre_compress()->backup;
             if ( ! $backup->create_backup( $attachment_id, $file_path ) ) {
+                $message = __( '无法创建原图备份，已停止压缩', 'libre-compress' );
+                $this->record_skipped_file( $attachment_id, $file_path, $size_type, $message );
+
                 return array(
                     'success' => false,
-                    'message' => __( '无法创建原图备份，已停止压缩', 'libre-compress' ),
+                    'message' => $message,
                     'status'  => 'failed',
                 );
             }
@@ -317,9 +329,12 @@ class Libre_Compress_Compressor {
 
         // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_copy
         if ( ! copy( $file_path, $rollback_path ) ) {
+            $message = __( '无法创建回滚副本，已跳过压缩', 'libre-compress' );
+            $this->record_skipped_file( $attachment_id, $file_path, $size_type, $message );
+
             return array(
                 'success' => false,
-                'message' => __( '无法创建回滚副本，已跳过压缩', 'libre-compress' ),
+                'message' => $message,
                 'status'  => 'failed',
             );
         }
@@ -452,6 +467,34 @@ class Libre_Compress_Compressor {
             'original_size'   => $original_size,
             'compressed_size' => $compressed_size,
             'ratio'           => $ratio,
+        );
+    }
+
+    /**
+     * 记录一个"已决定不压缩"的文件
+     *
+     * 不落库的话这条记录永远不存在，附件状态判定会把它当成待处理，
+     * 每轮批量都重复尝试一次（APNG、缺工具、超过大小限制都会卡在这里）。
+     * 文件字节未变，所以压缩前后体积一致，按 0% 记为已处理。
+     *
+     * @param int    $attachment_id 附件 ID
+     * @param string $file_path     文件绝对路径
+     * @param string $size_type     尺寸类型
+     * @param string $message       跳过原因
+     * @return bool 是否写入成功
+     */
+    private function record_skipped_file( int $attachment_id, string $file_path, string $size_type, string $message ): bool {
+        $size = file_exists( $file_path ) ? (int) filesize( $file_path ) : 0;
+
+        return $this->save_compression_record(
+            $attachment_id,
+            $file_path,
+            $size_type,
+            $size,
+            $size,
+            'skipped',
+            'skipped',
+            $message
         );
     }
 

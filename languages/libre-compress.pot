@@ -102,6 +102,22 @@ msgstr ""
 msgid "压缩成功"
 msgstr ""
 
+#: compression\class-tool-base.php:432
+msgid "压缩结果替换失败，已保留原文件"
+msgstr ""
+
+#: compression\class-tool-base.php:448
+msgid "压缩结果为空文件，已保留原文件"
+msgstr ""
+
+#: compression\class-tool-base.php:340
+msgid "命令为空"
+msgstr ""
+
+#: includes\class-media-library.php:212
+msgid "原图备份已清理，无法恢复原图"
+msgstr ""
+
 #: includes\class-compressor.php:251 includes\class-converter.php:161
 msgid "文件路径不安全"
 msgstr ""
