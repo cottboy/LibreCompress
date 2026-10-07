@@ -404,11 +404,15 @@ class Libre_Compress_Backup {
         $success  = true;
 
         foreach ( $backups as $backup ) {
+            // get_backups() 已把索引里的相对路径还原成绝对路径，这里直接使用。
             $backup_path = isset( $backup['backup_path'] ) ? (string) $backup['backup_path'] : '';
 
-            if ( ! $this->is_backup_file_path( $backup_path ) ) {
-                // 索引指向备份目录之外，可能是被篡改的记录，绝不删除该文件。
-                $success = false;
+            if ( '' === $backup_path || ! $this->is_backup_file_path( $backup_path ) ) {
+                // 路径为空、已损坏，或指向备份目录之外（可能被篡改）：绝不删除该文件。
+                // 但索引必须清掉——它永远定位不到备份文件，留着只会让恢复流程每次都卡在这一行。
+                if ( ! $database->delete_backup( $backup['id'] ) ) {
+                    $success = false;
+                }
                 continue;
             }
 
@@ -480,9 +484,13 @@ class Libre_Compress_Backup {
         $count    = 0;
 
         foreach ( $backups as $backup ) {
+            // get_all_backups() 返回的是库里的原始相对路径，这里才需要还原成绝对路径。
             $backup_path = $this->to_absolute_path( isset( $backup['backup_path'] ) ? (string) $backup['backup_path'] : '' );
 
             if ( '' === $backup_path || ! $this->is_backup_file_path( $backup_path ) ) {
+                // 路径损坏或指向备份目录之外：文件一律不动，但索引要清掉，
+                // 否则"删除所有备份"之后还会留下一批永远定位不到文件的索引。
+                $database->delete_backup( $backup['id'] );
                 continue;
             }
 

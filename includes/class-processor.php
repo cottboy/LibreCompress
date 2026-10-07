@@ -444,7 +444,8 @@ class Libre_Compress_Processor {
             }
         }
 
-        $targets = array();
+        $targets   = array();
+        $restored = 0;
 
         foreach ( $backups as $backup ) {
             $original  = (string) $backup['original_path'];
@@ -460,9 +461,18 @@ class Libre_Compress_Processor {
                 return false;
             }
 
+            $restored++;
+
             if ( null !== $mapped ) {
                 $targets[] = $mapped['to_relative'];
             }
+        }
+
+        // 一个文件都没还原就往下走清理，等于凭空的删除动作：格式转换映射可能被外部清掉，
+        // 此时备份与源文件对不上号，若继续执行 finish_restore 会删掉备份文件和索引，
+        // 用户就此永久失去恢复原图的能力，而界面还显示恢复成功。
+        if ( 0 === $restored ) {
+            return false;
         }
 
         if ( ! empty( $revertible ) && ! libre_compress()->output_processor->revert_attachment_format( $attachment_id, array_values( $revertible ) ) ) {
