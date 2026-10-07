@@ -417,29 +417,4 @@ abstract class Libre_Compress_Tool_Base {
             'compressed_size' => $compressed_size,
         );
     }
-
-    /**
-     * 获取工具版本
-     *
-     * @return string|false 版本号或 false
-     */
-    public function get_version() {
-        if ( ! $this->is_tool_available() ) {
-            return false;
-        }
-
-        $executable = $this->get_executable_path();
-        $command    = escapeshellarg( $executable ) . ' --version 2>&1';
-        $result     = $this->execute_command( $command );
-
-        if ( $result['success'] && ! empty( $result['output'] ) ) {
-            // 尝试从输出中提取版本号
-            if ( preg_match( '/(\d+\.\d+(?:\.\d+)?)/', $result['output'], $matches ) ) {
-                return $matches[1];
-            }
-            return $result['output'];
-        }
-
-        return false;
-    }
 }

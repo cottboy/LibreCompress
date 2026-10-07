@@ -165,27 +165,6 @@ class Libre_Compress_Database {
     }
 
     /**
-     * 根据附件 ID 获取压缩记录
-     *
-     * @param int $attachment_id 附件 ID
-     * @return array 压缩记录列表
-     */
-    public function get_records_by_attachment( $attachment_id ) {
-        global $wpdb;
-
-        $attachment_id = absint( $attachment_id );
-
-        // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-        return $wpdb->get_results(
-            $wpdb->prepare(
-                "SELECT * FROM {$this->records_table} WHERE attachment_id = %d ORDER BY size_type ASC",
-                $attachment_id
-            ),
-            ARRAY_A
-        );
-    }
-
-    /**
      * 根据附件 ID 和尺寸类型获取单条记录
      *
      * @param int    $attachment_id 附件 ID
@@ -204,33 +183,6 @@ class Libre_Compress_Database {
                 "SELECT * FROM {$this->records_table} WHERE attachment_id = %d AND size_type = %s",
                 $attachment_id,
                 $size_type
-            ),
-            ARRAY_A
-        );
-    }
-
-    /**
-     * 根据状态获取压缩记录
-     *
-     * @param string $status 状态
-     * @param int    $limit  数量限制
-     * @param int    $offset 偏移量
-     * @return array
-     */
-    public function get_records_by_status( $status, $limit = 100, $offset = 0 ) {
-        global $wpdb;
-
-        $status = sanitize_text_field( $status );
-        $limit  = absint( $limit );
-        $offset = absint( $offset );
-
-        // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-        return $wpdb->get_results(
-            $wpdb->prepare(
-                "SELECT * FROM {$this->records_table} WHERE status = %s ORDER BY created_at DESC LIMIT %d OFFSET %d",
-                $status,
-                $limit,
-                $offset
             ),
             ARRAY_A
         );
@@ -500,28 +452,6 @@ class Libre_Compress_Database {
         );
 
         return false !== $result;
-    }
-
-    /**
-     * 检查附件是否存在备份
-     *
-     * @param int $attachment_id 附件 ID
-     * @return bool
-     */
-    public function has_backup( $attachment_id ) {
-        global $wpdb;
-
-        $attachment_id = absint( $attachment_id );
-
-        // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-        $count = $wpdb->get_var(
-            $wpdb->prepare(
-                "SELECT COUNT(*) FROM {$this->backups_table} WHERE attachment_id = %d",
-                $attachment_id
-            )
-        );
-
-        return $count > 0;
     }
 
     /**

@@ -414,7 +414,8 @@ class Libre_Compress_Compressor {
             );
         }
 
-        $ratio = round( ( 1 - $compressed_size / $original_size ) * 100, 2 );
+        // original_size 为 0 时不做除法，直接按 0% 处理。
+        $ratio = $original_size > 0 ? round( ( 1 - $compressed_size / $original_size ) * 100, 2 ) : 0.0;
 
         // 统一状态必须先可靠写入，记录失败时恢复原文件。
         $record_saved = $this->save_compression_record(
@@ -455,6 +456,21 @@ class Libre_Compress_Compressor {
     }
 
     /**
+     * 规范化路径用于大小写不敏感的前缀比较
+     *
+     * Windows 上文件系统不区分大小写，比较时必须忽略大小写；
+     * Linux 上保持原样，避免把不同的文件误判成同一个。
+     *
+     * @param string $path 文件路径
+     * @return string
+     */
+    private static function normalized_compare_path( string $path ): string {
+        $normalized = wp_normalize_path( $path );
+
+        return 'WIN' === strtoupper( substr( PHP_OS, 0, 3 ) ) ? strtolower( $normalized ) : $normalized;
+    }
+
+    /**
      * 保存压缩记录
      *
      * @param int    $attachment_id   附件 ID
@@ -481,7 +497,11 @@ class Libre_Compress_Compressor {
         $upload_dir    = wp_upload_dir();
         $base_dir      = untrailingslashit( wp_normalize_path( $upload_dir['basedir'] ) );
         $normalized    = wp_normalize_path( $file_path );
-        $relative_path = 0 === strpos( $normalized, $base_dir . '/' )
+
+        // 前缀比对必须和 is_complete_record 用同一套大小写规则，
+        // 否则 Windows 上大小写不同会落进 else 分支把绝对路径存进记录，
+        // 而完整性校验永远比对不上，该附件就会被无限重复压缩。
+        $relative_path = 0 === strpos( self::normalized_compare_path( $normalized ), self::normalized_compare_path( $base_dir ) . '/' )
             ? ltrim( substr( $normalized, strlen( $base_dir ) ), '/' )
             : ltrim( $normalized, '/' );
         $ratio         = $original_size > 0 ? round( ( 1 - $compressed_size / $original_size ) * 100, 2 ) : 0;
