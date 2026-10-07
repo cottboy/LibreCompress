@@ -49,9 +49,9 @@ class Libre_Compress_Oxipng extends Libre_Compress_Tool_Base {
      *
      * @param string $file_path 文件路径
      * @param array  $options   压缩选项
-     * @return string 完整命令
+     * @return array[] 命令链
      */
-    protected function build_command( string $file_path, array $options ): string {
+    protected function build_command_chain( string $file_path, array $options ): array {
         $executable = $this->get_executable_path();
 
         // 获取压缩设置
@@ -66,19 +66,14 @@ class Libre_Compress_Oxipng extends Libre_Compress_Tool_Base {
         // 确保无损压缩级别在有效范围内（0-6）
         $level = max( 0, min( 6, $level ) );
 
-        // 构建命令
-        // -o: 无损压缩级别（0-6）
-        // --strip: 元数据取舍，等号形式避免 Windows 命令行解析问题
-        // --quiet: 静默模式
-        $command_parts = array(
-            escapeshellarg( $executable ),
-            sprintf( '-o %d', $level ),
+        // 构建命令：-o 无损级别，--strip 元数据取舍，--quiet 静默
+        return array( array(
+            $executable,
+            sprintf( '-o%d', $level ),
             Libre_Compress_Settings::strips_metadata() ? '--strip=safe' : '--strip=none',
             '--quiet',
-            escapeshellarg( $file_path ),
-        );
-
-        return implode( ' ', $command_parts );
+            $file_path,
+        ) );
     }
 
     /**

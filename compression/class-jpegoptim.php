@@ -49,9 +49,9 @@ class Libre_Compress_Jpegoptim extends Libre_Compress_Tool_Base {
      *
      * @param string $file_path 文件路径
      * @param array  $options   压缩选项
-     * @return string 完整命令
+     * @return array[] 命令链
      */
-    protected function build_command( string $file_path, array $options ): string {
+    protected function build_command_chain( string $file_path, array $options ): array {
         $executable = $this->get_executable_path();
 
         // 获取压缩设置
@@ -73,7 +73,7 @@ class Libre_Compress_Jpegoptim extends Libre_Compress_Tool_Base {
 
         // 构建命令
         $command_parts = array(
-            escapeshellarg( $executable ),
+            $executable,
             '--all-progressive',  // 编码为渐进式 JPEG
         );
 
@@ -86,18 +86,14 @@ class Libre_Compress_Jpegoptim extends Libre_Compress_Tool_Base {
             $command_parts[] = '--strip-none';
         }
 
-        if ( $lossless ) {
-            // 无损压缩：不设置质量参数
-            // jpegoptim 默认就是无损的
-        } else {
-            // 有损压缩：设置最大质量
+        if ( ! $lossless ) {
+            // 有损压缩设置最大质量；无损下不传质量参数，jpegoptim 默认就是无损的
             $command_parts[] = sprintf( '--max=%d', $quality );
         }
 
-        // 添加文件路径（必须转义）
-        $command_parts[] = escapeshellarg( $file_path );
+        $command_parts[] = $file_path;
 
-        return implode( ' ', $command_parts );
+        return array( $command_parts );
     }
 
     /**

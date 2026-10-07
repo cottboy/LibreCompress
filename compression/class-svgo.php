@@ -49,9 +49,9 @@ class Libre_Compress_Svgo extends Libre_Compress_Tool_Base {
      *
      * @param string $file_path 文件路径
      * @param array  $options   压缩选项
-     * @return string 完整命令
+     * @return array[] 命令链
      */
-    protected function build_command( string $file_path, array $options ): string {
+    protected function build_command_chain( string $file_path, array $options ): array {
         $executable = $this->get_executable_path();
 
         // 获取压缩精度设置（数值有效位数，越小文件越小但可能损失精度）
@@ -66,33 +66,30 @@ class Libre_Compress_Svgo extends Libre_Compress_Tool_Base {
         // 确保精度在有效范围内（svgo 默认 3，8 已接近无损）
         $precision = max( 0, min( 8, $precision ) );
 
-        // 创建临时输出文件路径
-        $temp_output = $file_path . '.tmp.svg';
+        // 编码结果先落到临时文件，替换由基类用 PHP 文件函数完成
+        $temp_output = $this->get_temp_output_path( $file_path );
 
         // 构建命令：-q 静默输出，--multipass 多轮压缩更彻底
-        $command_parts = array(
-            escapeshellarg( $executable ),
+        return array( array(
+            $executable,
             '-q',
             '--multipass',
-            sprintf( '-p %d', $precision ),
+            sprintf( '-p%d', $precision ),
             '-i',
-            escapeshellarg( $file_path ),
+            $file_path,
             '-o',
-            escapeshellarg( $temp_output ),
-        );
+            $temp_output,
+        ) );
+    }
 
-        // 压缩成功后替换原文件（move /y 直接覆盖，压缩失败时不会破坏原文件）
-        if ( $this->is_windows() ) {
-            $move_command = sprintf(
-                '&& move /y "%s" "%s"',
-                str_replace( '/', '\\', $temp_output ),
-                str_replace( '/', '\\', $file_path )
-            );
-        } else {
-            $move_command = sprintf( '&& mv -f %s %s', escapeshellarg( $temp_output ), escapeshellarg( $file_path ) );
-        }
-
-        return implode( ' ', $command_parts ) . ' ' . $move_command;
+    /**
+     * 获取编码结果的临时文件路径
+     *
+     * @param string $file_path 文件路径
+     * @return string
+     */
+    protected function get_temp_output_path( string $file_path ): string {
+        return $file_path . '.tmp.svg';
     }
 
     /**
@@ -110,22 +107,20 @@ class Libre_Compress_Svgo extends Libre_Compress_Tool_Base {
         }
 
         if ( $this->is_windows() ) {
-            $command = 'where ' . escapeshellarg( $executable_name ) . ' 2>nul';
+            $found = self::run_command( array( 'where', $executable_name ), 15 );
         } else {
-            $command = 'which ' . escapeshellarg( $executable_name ) . ' 2>/dev/null';
+            $found = self::run_command( array( 'which', $executable_name ), 15 );
         }
 
-        $output = array();
-        $result = 0;
-
-        // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.system_calls_exec
-        exec( $command, $output, $result );
-
-        if ( 0 !== $result || empty( $output ) ) {
+        if ( empty( $found['success'] ) ) {
             return false;
         }
 
-        $candidates = array_map( 'trim', $output );
+        $candidates = array_filter( array_map( 'trim', preg_split( '/\R/', (string) $found['output'] ) ) );
+
+        if ( empty( $candidates ) ) {
+            return false;
+        }
 
         if ( $this->is_windows() ) {
             foreach ( $candidates as $path ) {

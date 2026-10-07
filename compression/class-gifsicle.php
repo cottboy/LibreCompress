@@ -49,9 +49,9 @@ class Libre_Compress_Gifsicle extends Libre_Compress_Tool_Base {
      *
      * @param string $file_path 文件路径
      * @param array  $options   压缩选项
-     * @return string 完整命令
+     * @return array[] 命令链
      */
-    protected function build_command( string $file_path, array $options ): string {
+    protected function build_command_chain( string $file_path, array $options ): array {
         $executable = $this->get_executable_path();
 
         // 获取压缩设置
@@ -73,12 +73,12 @@ class Libre_Compress_Gifsicle extends Libre_Compress_Tool_Base {
         $lossiness = (int) round( 200 - $quality * 2 );
         $lossiness = max( 20, min( 200, $lossiness ) );
 
-        // 创建临时输出文件路径
-        $temp_output = $file_path . '.tmp.gif';
+        // 编码结果先落到临时文件，替换由基类用 PHP 文件函数完成
+        $temp_output = $this->get_temp_output_path( $file_path );
 
         // 构建命令
         $command_parts = array(
-            escapeshellarg( $executable ),
+            $executable,
             '-O3',  // 最高级别无损压缩
         );
 
@@ -93,21 +93,20 @@ class Libre_Compress_Gifsicle extends Libre_Compress_Tool_Base {
         }
 
         $command_parts[] = '-o';
-        $command_parts[] = escapeshellarg( $temp_output );
-        $command_parts[] = escapeshellarg( $file_path );
+        $command_parts[] = $temp_output;
+        $command_parts[] = $file_path;
 
-        // 压缩成功后替换原文件（move /y 直接覆盖，压缩失败时不会破坏原文件）
-        if ( $this->is_windows() ) {
-            $move_command = sprintf(
-                '&& move /y "%s" "%s"',
-                str_replace( '/', '\\', $temp_output ),
-                str_replace( '/', '\\', $file_path )
-            );
-        } else {
-            $move_command = sprintf( '&& mv -f %s %s', escapeshellarg( $temp_output ), escapeshellarg( $file_path ) );
-        }
+        return array( $command_parts );
+    }
 
-        return implode( ' ', $command_parts ) . ' ' . $move_command;
+    /**
+     * 获取编码结果的临时文件路径
+     *
+     * @param string $file_path 文件路径
+     * @return string
+     */
+    protected function get_temp_output_path( string $file_path ): string {
+        return $file_path . '.tmp.gif';
     }
 
     /**

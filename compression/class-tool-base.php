@@ -60,13 +60,21 @@ abstract class Libre_Compress_Tool_Base {
     abstract protected function get_executable_name(): string;
 
     /**
-     * 构建压缩命令
+     * 构建压缩命令链
+     *
+     * 返回命令参数数组的数组：外层是执行顺序，内层是单条命令的可执行文件加参数。
+     * 基类按顺序依次执行，任一条失败即整体失败且不再执行后续命令。
+     *
+     * 必须是参数数组而不是命令字符串：字符串会交给 shell 解析，
+     * 而 Windows 上 proc_open 走 cmd，escapeshellarg 挡不住 %VAR% 展开——
+     * 文件名里出现 %PATH% 会被替换成系统 PATH 内容，命令直接找不到文件。
+     * 传数组时 PHP 直接 CreateProcess，不经过 shell，% & 引号全部是普通字符。
      *
      * @param string $file_path 文件路径
      * @param array  $options   压缩选项
-     * @return string 完整命令
+     * @return array[] 命令链，每项为参数数组
      */
-    abstract protected function build_command( string $file_path, array $options ): string;
+    abstract protected function build_command_chain( string $file_path, array $options ): array;
 
     /**
      * 获取单张图片最大文件大小（MB）
@@ -77,6 +85,66 @@ abstract class Libre_Compress_Tool_Base {
      */
     public function get_max_file_size(): int {
         return 0;
+    }
+
+    /**
+     * 获取编码结果的临时文件路径
+     *
+     * 返回空字符串表示工具自己原地覆盖原文件（默认）。
+     * 返回非空时，build_command 只负责把编码结果写到这个临时文件，
+     * 由基类在编码成功后用 PHP 的文件函数替换原文件。
+     *
+     * 不用 shell 的 move/mv 做替换有两个原因：
+     * 一是 Windows 上 proc_open 走 cmd，move /y "%s" 里的 %VAR% 在双引号内仍会展开，
+     * 文件名带 % 或 & 就会失败并留下临时文件；
+     * 二是命令被超时中断时 move 根本不会执行，临时文件就永久留在公开的 uploads 里。
+     *
+     * 路径必须是确定性的：基类要在命令结束后按同一路径做替换和兜底清理。
+     * 并发由压缩调度器的附件级锁保证，同一文件不会被两个进程同时编码。
+     *
+     * @param string $file_path 文件路径
+     * @return string 临时输出路径，空字符串表示原地覆盖
+     */
+    protected function get_temp_output_path( string $file_path ): string {
+        return '';
+    }
+
+    /**
+     * 获取编码过程中产生的其他临时文件
+     *
+     * 只用于兜底清理，不参与替换。
+     *
+     * @param string $file_path 文件路径
+     * @return string[]
+     */
+    protected function get_extra_temp_paths( string $file_path ): array {
+        return array();
+    }
+
+    /**
+     * 把临时输出替换为原文件
+     *
+     * 先删后改名，兼容 Windows 上 rename 不覆盖已有文件的行为；
+     * 原文件删掉后改名失败会返回 false，上层回滚副本负责还原。
+     *
+     * @param string $temp_output 临时输出路径
+     * @param string $file_path    原文件路径
+     * @return bool 是否替换成功
+     */
+    private function replace_with_temp_output( string $temp_output, string $file_path ): bool {
+        clearstatcache( true, $temp_output );
+
+        if ( ! is_file( $temp_output ) || 0 === (int) filesize( $temp_output ) ) {
+            return false;
+        }
+
+        clearstatcache( true, $file_path );
+
+        if ( file_exists( $file_path ) && ! unlink( $file_path ) ) {
+            return false;
+        }
+
+        return rename( $temp_output, $file_path );
     }
 
     /**
@@ -140,20 +208,20 @@ abstract class Libre_Compress_Tool_Base {
 
         // 使用 which 或 where 命令查找
         if ( $this->is_windows() ) {
-            $command = 'where ' . escapeshellarg( $executable_name ) . ' 2>nul';
+            $output = self::run_command( array( 'where', $executable_name ), 15 );
         } else {
-            $command = 'which ' . escapeshellarg( $executable_name ) . ' 2>/dev/null';
+            $output = self::run_command( array( 'which', $executable_name ), 15 );
         }
 
-        $output = array();
-        $result = 0;
+        if ( empty( $output['success'] ) ) {
+            return false;
+        }
 
-        // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.system_calls_exec
-        exec( $command, $output, $result );
+        // where/which 可能输出多行，逐行找第一个真实存在的文件
+        foreach ( preg_split( '/\R/', (string) $output['output'] ) as $line ) {
+            $path = trim( $line );
 
-        if ( 0 === $result && ! empty( $output[0] ) ) {
-            $path = trim( $output[0] );
-            if ( file_exists( $path ) ) {
+            if ( '' !== $path && file_exists( $path ) ) {
                 return $path;
             }
         }
@@ -195,24 +263,35 @@ abstract class Libre_Compress_Tool_Base {
     /**
      * 执行命令
      *
-     * @param string $command 要执行的命令
-     * @return array 执行结果：
-     *               - success: bool 是否成功
-     *               - output: string 输出内容
-     *               - return_code: int 返回码
+     * @param array $command 要执行的命令参数数组
+     * @return array 执行结果
      */
-    protected function execute_command( string $command ): array {
+    protected function execute_command( array $command ): array {
         return self::run_command( $command );
     }
 
     /**
      * 执行带超时和进程树终止保护的本地命令
      *
-     * @param string $command 完整命令
-     * @param int    $timeout 超时秒数
+     * 命令以参数数组传入：PHP 会直接 CreateProcess 而不经过 shell，
+     * 路径里的 % & 等字符不会被解释，也不会构成命令注入。
+     *
+     * @param array $command 可执行文件加参数的数组
+     * @param int   $timeout 超时秒数
      * @return array{success:bool,output:string,return_code:int}
      */
-    public static function run_command( string $command, int $timeout = 120 ): array {
+    public static function run_command( array $command, int $timeout = 120 ): array {
+        $command = array_values( array_filter( $command, static function ( $part ) {
+            return '' !== $part && null !== $part;
+        } ) );
+
+        if ( empty( $command ) ) {
+            return array(
+                'success'     => false,
+                'output'      => __( '命令为空', 'libre-compress' ),
+                'return_code' => -1,
+            );
+        }
         if ( ! self::is_command_execution_available() ) {
             return array(
                 'success'     => false,
@@ -393,28 +472,69 @@ abstract class Libre_Compress_Tool_Base {
         // 获取原始文件大小
         $original_size = filesize( $file_path );
 
-        // 构建并执行命令
-        $command = $this->build_command( $file_path, $options );
-        $result  = $this->execute_command( $command );
+        // 临时路径必须在命令链构建之前确定：基类要在命令结束后
+        // 按同一路径做替换和兜底清理。
+        $temp_output = $this->get_temp_output_path( $file_path );
+        $temp_paths  = array_filter( array_merge( array( $temp_output ), $this->get_extra_temp_paths( $file_path ) ) );
 
-        if ( ! $result['success'] ) {
-            return array(
-                'success'         => false,
-                'message'         => $result['output'],
-                'original_size'   => $original_size,
-                'compressed_size' => $original_size,
-            );
+        // 按顺序执行命令链，任一条失败即整体失败且不再执行后续命令
+        $result = array( 'success' => false, 'output' => '', 'return_code' => -1 );
+
+        foreach ( $this->build_command_chain( $file_path, $options ) as $command ) {
+            $result = $this->execute_command( $command );
+
+            if ( ! $result['success'] ) {
+                break;
+            }
         }
 
-        // 清除文件状态缓存，获取压缩后大小
-        clearstatcache( true, $file_path );
-        $compressed_size = filesize( $file_path );
+        try {
+            if ( ! $result['success'] ) {
+                return array(
+                    'success'         => false,
+                    'message'         => $result['output'],
+                    'original_size'   => $original_size,
+                    'compressed_size' => $original_size,
+                );
+            }
 
-        return array(
-            'success'         => true,
-            'message'         => __( '压缩成功', 'libre-compress' ),
-            'original_size'   => $original_size,
-            'compressed_size' => $compressed_size,
-        );
+            if ( '' !== $temp_output && ! $this->replace_with_temp_output( $temp_output, $file_path ) ) {
+                return array(
+                    'success'         => false,
+                    'message'         => __( '压缩结果替换失败，已保留原文件', 'libre-compress' ),
+                    'original_size'   => $original_size,
+                    'compressed_size' => $original_size,
+                );
+            }
+
+            // 清除文件状态缓存，获取压缩后大小
+            clearstatcache( true, $file_path );
+            $compressed_size = (int) filesize( $file_path );
+
+            if ( $compressed_size <= 0 ) {
+                return array(
+                    'success'         => false,
+                    'message'         => __( '压缩结果为空文件，已保留原文件', 'libre-compress' ),
+                    'original_size'   => $original_size,
+                    'compressed_size' => $original_size,
+                );
+            }
+
+            return array(
+                'success'         => true,
+                'message'         => __( '压缩成功', 'libre-compress' ),
+                'original_size'   => $original_size,
+                'compressed_size' => $compressed_size,
+            );
+        } finally {
+            // 临时文件兜底清理：命令失败、超时、替换失败都要清干净，
+            // 编码中间产物留在公开的 uploads 里等于泄漏未压缩内容。
+            foreach ( $temp_paths as $temp_path ) {
+                if ( '' !== $temp_path && file_exists( $temp_path ) ) {
+                    // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
+                    unlink( $temp_path );
+                }
+            }
+        }
     }
 }

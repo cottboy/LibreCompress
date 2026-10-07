@@ -71,8 +71,15 @@ class Libre_Compress_Pngquant extends Libre_Compress_Tool_Base {
         }
 
         $original_size = filesize( $file_path );
-        $command       = $this->build_command( $file_path, $options );
-        $result        = $this->execute_command( $command );
+        $result        = array( 'success' => false, 'output' => '', 'return_code' => -1 );
+
+        foreach ( $this->build_command_chain( $file_path, $options ) as $command ) {
+            $result = $this->execute_command( $command );
+
+            if ( ! $result['success'] ) {
+                break;
+            }
+        }
 
         if ( $result['success'] ) {
             clearstatcache( true, $file_path );
@@ -114,9 +121,9 @@ class Libre_Compress_Pngquant extends Libre_Compress_Tool_Base {
      *
      * @param string $file_path 文件路径
      * @param array  $options   压缩选项
-     * @return string 完整命令
+     * @return array[] 命令链
      */
-    protected function build_command( string $file_path, array $options ): string {
+    protected function build_command_chain( string $file_path, array $options ): array {
         $executable = $this->get_executable_path();
 
         // 获取压缩设置
@@ -140,7 +147,7 @@ class Libre_Compress_Pngquant extends Libre_Compress_Tool_Base {
         // --quality: 设置质量范围
         // --skip-if-larger: 如果压缩后更大则跳过
         $command_parts = array(
-            escapeshellarg( $executable ),
+            $executable,
             '--force',
             '--skip-if-larger',
             sprintf( '--quality=%d-%d', $min_quality, $quality ),
@@ -152,10 +159,10 @@ class Libre_Compress_Pngquant extends Libre_Compress_Tool_Base {
         }
 
         $command_parts[] = '--output';
-        $command_parts[] = escapeshellarg( $file_path );
-        $command_parts[] = escapeshellarg( $file_path );
+        $command_parts[] = $file_path;
+        $command_parts[] = $file_path;
 
-        return implode( ' ', $command_parts );
+        return array( $command_parts );
     }
 
     /**

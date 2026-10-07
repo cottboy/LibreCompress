@@ -27,13 +27,6 @@ class Libre_Compress_Avif extends Libre_Compress_Tool_Base {
     protected $decoder_path = null;
 
     /**
-     * 当前调用产生的临时文件
-     *
-     * @var array
-     */
-    private $temporary_files = array();
-
-    /**
      * 获取渠道名称
      *
      * @return string 渠道名称
@@ -127,15 +120,13 @@ class Libre_Compress_Avif extends Libre_Compress_Tool_Base {
      * @return array
      */
     public function compress( string $file_path, array $options = array() ): array {
-        $this->temporary_files = array();
         $decoder = $this->get_decoder_path();
 
         if ( false === $decoder || ! $this->is_exec_available() ) {
             return parent::compress( $file_path, $options );
         }
 
-        $command = escapeshellarg( $decoder ) . ' --info ' . escapeshellarg( $file_path );
-        $result  = self::run_command( $command, 15 );
+        $result  = self::run_command( array( $decoder, '--info', $file_path ), 15 );
         $info    = $result['output'];
         $frames  = $this->parse_frame_count( $info );
 
@@ -157,16 +148,7 @@ class Libre_Compress_Avif extends Libre_Compress_Tool_Base {
             );
         }
 
-        $result = parent::compress( $file_path, $options );
-        foreach ( $this->temporary_files as $temporary_file ) {
-            if ( file_exists( $temporary_file ) ) {
-                // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
-                unlink( $temporary_file );
-            }
-        }
-        $this->temporary_files = array();
-
-        return $result;
+        return parent::compress( $file_path, $options );
     }
 
     /**
@@ -193,15 +175,18 @@ class Libre_Compress_Avif extends Libre_Compress_Tool_Base {
     }
 
     /**
-     * 构建压缩命令
+     * 构建压缩命令链
+     *
+     * 同格式 AVIF 压缩分两步：先无损解码成 PNG 中间文件，再用 avifenc 压回 AVIF。
+     * 两条命令分开返回，由基类顺序执行，任一步失败即整体失败。
      *
      * @param string $file_path 文件路径
      * @param array  $options   压缩选项
-     * @return string 完整命令
+     * @return array[] 命令链
      */
-    protected function build_command( string $file_path, array $options ): string {
-        $decoder = escapeshellarg( $this->get_decoder_path() );
-        $encoder = escapeshellarg( $this->get_executable_path() );
+    protected function build_command_chain( string $file_path, array $options ): array {
+        $decoder = $this->get_decoder_path();
+        $encoder = $this->get_executable_path();
 
         // 获取压缩设置
         $settings = get_option( 'libre_compress_tools', array() );
@@ -220,58 +205,53 @@ class Libre_Compress_Avif extends Libre_Compress_Tool_Base {
         // 确保质量在有效范围内
         $quality = max( 0, min( 100, $quality ) );
 
-        // 临时文件：使用唯一名称，避免异常重试互相覆盖。
-        $token           = wp_generate_password( 12, false, false );
-        $temp_png        = $file_path . '.lc-avif-' . $token . '.png';
-        $temp_avif       = $file_path . '.lc-avif-' . $token . '.avif';
-        $this->temporary_files = array( $temp_png, $temp_avif );
+        // 中间 PNG 与编码结果都走确定性路径，由基类统一替换和兜底清理。
+        $temp_png  = $file_path . '.lc-avif.png';
+        $temp_avif = $this->get_temp_output_path( $file_path );
 
-        // 第一步：无损解码为 PNG，保留完整像素
-        $command_parts = array(
-            $decoder,
-            escapeshellarg( $file_path ),
-            escapeshellarg( $temp_png ),
-            '&&',
-            $encoder,
-            '-j 4',  // 编码线程数
-        );
+        $decode = array( $decoder, $file_path, $temp_png );
+
+        $encode = array( $encoder, '-j', '4' );
 
         // avifenc 默认会把输入 PNG 里的 EXIF/XMP 原样搬进 AVIF，而 AVIF 是对外公开访问的文件
         if ( Libre_Compress_Settings::strips_metadata() ) {
-            $command_parts[] = '--ignore-exif';
-            $command_parts[] = '--ignore-xmp';
+            $encode[] = '--ignore-exif';
+            $encode[] = '--ignore-xmp';
         }
 
         if ( $lossless ) {
-            // 无损压缩
-            $command_parts[] = '--lossless';
+            $encode[] = '--lossless';
         } else {
-            // 有损压缩
-            $command_parts[] = sprintf( '-q %d', $quality );
+            $encode[] = '-q';
+            $encode[] = (string) $quality;
         }
 
-        // 第二步：重新编码回 AVIF
-        $command_parts[] = escapeshellarg( $temp_png );
-        $command_parts[] = escapeshellarg( $temp_avif );
+        $encode[] = $temp_png;
+        $encode[] = $temp_avif;
 
-        // 编码成功后清理中间文件并替换原文件（move/mv -f 直接覆盖，任何一步失败都不会破坏原文件）
-        if ( $this->is_windows() ) {
-            $command_parts[] = sprintf(
-                '&& del /f /q "%s" && move /y "%s" "%s"',
-                str_replace( '/', '\\', $temp_png ),
-                str_replace( '/', '\\', $temp_avif ),
-                str_replace( '/', '\\', $file_path )
-            );
-        } else {
-            $command_parts[] = sprintf(
-                '&& rm -f %s && mv -f %s %s',
-                escapeshellarg( $temp_png ),
-                escapeshellarg( $temp_avif ),
-                escapeshellarg( $file_path )
-            );
-        }
+        return array( $decode, $encode );
+    }
 
-        return implode( ' ', $command_parts );
+    /**
+     * 获取编码结果的临时文件路径
+     *
+     * @param string $file_path 文件路径
+     * @return string
+     */
+    protected function get_temp_output_path( string $file_path ): string {
+        return $file_path . '.lc-avif.avif';
+    }
+
+    /**
+     * 获取解码中间 PNG 的路径
+     *
+     * 中间文件由基类兜底清理，不再由命令里的 del/rm 处理。
+     *
+     * @param string $file_path 文件路径
+     * @return string[]
+     */
+    protected function get_extra_temp_paths( string $file_path ): array {
+        return array( $file_path . '.lc-avif.png' );
     }
 
     /**

@@ -265,7 +265,17 @@ class Libre_Compress_Output {
             $error_msg                 = __( '没有可用的压缩工具', 'libre-compress' );
             $result_template['status'] = 'skipped';
         } else {
-            $exec_result = Libre_Compress_Tool_Base::run_command( $command );
+            // 命令链按顺序执行，任一步失败即整体失败且不再执行后续步骤
+            $exec_result = array( 'success' => false, 'output' => '', 'return_code' => -1 );
+
+            foreach ( $command as $step ) {
+                $exec_result = Libre_Compress_Tool_Base::run_command( $step );
+
+                if ( ! $exec_result['success'] ) {
+                    break;
+                }
+            }
+
             clearstatcache( true, $temp_output );
 
             if ( ! $exec_result['success'] || ! file_exists( $temp_output ) || filesize( $temp_output ) <= 0 ) {
@@ -1576,37 +1586,45 @@ class Libre_Compress_Output {
             return false;
         }
 
-        $binary     = escapeshellarg( $tools[ $tool_name ]->get_tool_binary_path() );
-        $settings   = get_option( 'libre_compress_tools', array() );
-        $source_esc = escapeshellarg( $source );
-        $output_esc = escapeshellarg( $output );
+        $binary   = $tools[ $tool_name ]->get_tool_binary_path();
+        $settings = get_option( 'libre_compress_tools', array() );
 
         if ( 'webp' === $target ) {
             $mode = isset( $settings['webp_mode'] ) ? $settings['webp_mode'] : 'lossy';
 
             if ( 'lossless' === $mode ) {
-                return $binary . ' -quiet -lossless -z 9 ' . $source_esc . ' -o ' . $output_esc;
+                return array( $binary, '-quiet', '-lossless', '-z', '9', $source, '-o', $output );
             }
 
             $quality = isset( $settings['webp_quality'] ) ? absint( $settings['webp_quality'] ) : 80;
             $quality = max( 0, min( 100, $quality ) );
 
-            return $binary . ' -quiet -mt ' . sprintf( '-q %d', $quality ) . ' ' . $source_esc . ' -o ' . $output_esc;
+            return array( $binary, '-quiet', '-mt', '-q', (string) $quality, $source, '-o', $output );
         }
 
         $mode = isset( $settings['avif_mode'] ) ? $settings['avif_mode'] : 'lossy';
 
         // avifenc 默认会把输入图片里的 EXIF/XMP 原样搬进 AVIF，而转换结果正是对外访问的那张图
-        $meta_flags = Libre_Compress_Settings::strips_metadata() ? '--ignore-exif --ignore-xmp ' : '';
+        $encode = array( $binary, '-j', '4' );
 
-        if ( 'lossless' === $mode ) {
-            return $binary . ' -j 4 ' . $meta_flags . '--lossless ' . $source_esc . ' ' . $output_esc;
+        if ( Libre_Compress_Settings::strips_metadata() ) {
+            $encode[] = '--ignore-exif';
+            $encode[] = '--ignore-xmp';
         }
 
-        $quality = isset( $settings['avif_quality'] ) ? absint( $settings['avif_quality'] ) : 80;
-        $quality = max( 0, min( 100, $quality ) );
+        if ( 'lossless' === $mode ) {
+            $encode[] = '--lossless';
+        } else {
+            $quality = isset( $settings['avif_quality'] ) ? absint( $settings['avif_quality'] ) : 80;
+            $quality = max( 0, min( 100, $quality ) );
+            $encode[] = '-q';
+            $encode[] = (string) $quality;
+        }
 
-        return $binary . ' -j 4 ' . $meta_flags . sprintf( '-q %d', $quality ) . ' ' . $source_esc . ' ' . $output_esc;
+        $encode[] = $source;
+        $encode[] = $output;
+
+        return $encode;
     }
 
     /**
@@ -1649,9 +1667,7 @@ class Libre_Compress_Output {
             return false;
         }
 
-        $command = escapeshellarg( $binary ) . ' ' . escapeshellarg( $svg_path ) . ' ' . escapeshellarg( $png_path );
-
-        $exec_result = Libre_Compress_Tool_Base::run_command( $command );
+        $exec_result = Libre_Compress_Tool_Base::run_command( array( $binary, $svg_path, $png_path ) );
         clearstatcache( true, $png_path );
 
         return $exec_result['success'] && file_exists( $png_path ) && filesize( $png_path ) > 0;
@@ -1751,8 +1767,6 @@ class Libre_Compress_Output {
      */
     private function build_animated_gif_command( string $gif_path, string $output, string $target ) {
         $settings = get_option( 'libre_compress_tools', array() );
-        $gif_esc  = escapeshellarg( $gif_path );
-        $out_esc  = escapeshellarg( $output );
 
         if ( 'webp' === $target ) {
             $binary = $this->find_local_tool( 'gif2webp' );
@@ -1765,16 +1779,16 @@ class Libre_Compress_Output {
 
             // gif2webp 默认即无损编码，有损模式需显式开启并指定质量
             if ( 'lossy' !== $mode ) {
-                $command = escapeshellarg( $binary ) . ' ' . $gif_esc . ' -o ' . $out_esc;
+                $command = array( $binary, $gif_path, '-o', $output );
             } else {
                 $quality = isset( $settings['webp_quality'] ) ? absint( $settings['webp_quality'] ) : 80;
                 $quality = max( 0, min( 100, $quality ) );
 
-                $command = escapeshellarg( $binary ) . ' -lossy ' . sprintf( '-q %d', $quality ) . ' ' . $gif_esc . ' -o ' . $out_esc;
+                $command = array( $binary, '-lossy', '-q', (string) $quality, $gif_path, '-o', $output );
             }
 
             return array(
-                'command' => $command,
+                'command' => array( $command ),
                 'temp'    => '',
             );
         }
@@ -1793,19 +1807,25 @@ class Libre_Compress_Output {
         $quality = isset( $settings['avif_quality'] ) ? absint( $settings['avif_quality'] ) : 80;
         $quality = max( 0, min( 100, $quality ) );
 
+        $decode = array(
+            $ffmpeg, '-y', '-loglevel', 'error', '-i', $gif_path,
+            '-pix_fmt', 'yuv420p', '-f', 'yuv4mpegpipe', $temp_y4m,
+        );
+
+        $encode = array( $avifenc, '-j', '4' );
+
         if ( 'lossless' === $mode ) {
-            $encode_args = '--lossless';
+            $encode[] = '--lossless';
         } else {
-            $encode_args = sprintf( '-q %d', $quality );
+            $encode[] = '-q';
+            $encode[] = (string) $quality;
         }
 
-        $command = escapeshellarg( $ffmpeg ) . ' -y -loglevel error -i ' . $gif_esc
-            . ' -pix_fmt yuv420p -f yuv4mpegpipe ' . escapeshellarg( $temp_y4m )
-            . ' && ' . escapeshellarg( $avifenc ) . ' -j 4 ' . $encode_args . ' '
-            . escapeshellarg( $temp_y4m ) . ' ' . $out_esc;
+        $encode[] = $temp_y4m;
+        $encode[] = $output;
 
         return array(
-            'command' => $command,
+            'command' => array( $decode, $encode ),
             'temp'    => $temp_y4m,
         );
     }
@@ -1844,20 +1864,19 @@ class Libre_Compress_Output {
             return $bin_path;
         }
 
-        $command = $is_windows
-            ? 'where ' . escapeshellarg( $name ) . ' 2>nul'
-            : 'which ' . escapeshellarg( $name ) . ' 2>/dev/null';
+        $found = Libre_Compress_Tool_Base::run_command(
+            array( $is_windows ? 'where' : 'which', $name ),
+            15
+        );
 
-        $output = array();
-        $rc     = 0;
-        // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.system_calls_exec
-        exec( '(' . $command . ') 2>&1', $output, $rc );
+        if ( ! empty( $found['success'] ) ) {
+            foreach ( preg_split( '/\R/', (string) $found['output'] ) as $line ) {
+                $path = trim( $line );
 
-        if ( 0 === $rc && ! empty( $output[0] ) ) {
-            $path = trim( $output[0] );
-            if ( file_exists( $path ) ) {
-                $cache[ $name ] = $path;
-                return $path;
+                if ( '' !== $path && file_exists( $path ) ) {
+                    $cache[ $name ] = $path;
+                    return $path;
+                }
             }
         }
 
