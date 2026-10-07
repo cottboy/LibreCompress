@@ -52,17 +52,6 @@ class Libre_Compress_Backup {
     }
 
     /**
-     * 历史 .htaccess 内容（存量升级识别用）
-     *
-     * @return string[]
-     */
-    public static function legacy_htaccess_contents(): array {
-        return array(
-            "# 禁止直接访问\nOrder deny,allow\nDeny from all\n",
-            'Deny from all',
-        );
-    }
-    /**
      * 获取备份目录路径
      *
      * @return string 备份目录绝对路径

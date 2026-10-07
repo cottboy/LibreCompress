@@ -18,11 +18,6 @@ if ( ! defined( 'ABSPATH' ) ) {
 class Libre_Compress_Thumbnail_Manager {
 
     /**
-     * 遍历附件时的游标分页数量
-     */
-    const BATCH_SIZE = 100;
-
-    /**
      * AJAX 分页单页处理的附件数量
      *
      * 一次请求只处理一页，避免大媒体库下单次 PHP 请求超时；
@@ -105,48 +100,10 @@ class Libre_Compress_Thumbnail_Manager {
     }
 
     /**
-     * 删除所有附件中未勾选尺寸的缩略图
-     *
-     * 一次性全量（内部按页循环，供兼容调用）；设置页 AJAX 走 delete_disabled_page 分页，
-     * 避免大媒体库下单次 PHP 请求超时。
-     *
-     * @return array deleted_files、affected_attachments、replaced_links、failed_ids
-     */
-    public function delete_disabled_thumbnails(): array {
-        $result = array(
-            'deleted_files'        => 0,
-            'affected_attachments' => 0,
-            'replaced_links'       => 0,
-            'failed_ids'           => array(),
-            'content_failed'       => false,
-        );
-
-        if ( empty( self::disabled_sizes() ) ) {
-            return $result;
-        }
-
-        $after_id = 0;
-
-        do {
-            $page = $this->delete_disabled_page( $after_id, self::BATCH_SIZE );
-
-            $result['deleted_files']        += $page['deleted_files'];
-            $result['affected_attachments'] += $page['affected_attachments'];
-            $result['replaced_links']       += $page['replaced_links'];
-            $result['failed_ids']            = array_merge( $result['failed_ids'], $page['failed_ids'] );
-
-            if ( $page['content_failed'] ) {
-                $result['content_failed'] = true;
-            }
-
-            $after_id = $page['next_after'];
-        } while ( $page['has_more'] );
-
-        return $result;
-    }
-
-    /**
      * 按附件 ID 游标删除一页未勾选尺寸的缩略图
+     *
+     * 前端按 next_after 游标循环调用，每请求只处理一页，
+     * 避免大媒体库下单次 PHP 请求超时。
      *
      * @param int $after_id 上一批最后处理的附件 ID
      * @param int $limit    本页数量
@@ -396,39 +353,10 @@ class Libre_Compress_Thumbnail_Manager {
     }
 
     /**
-     * 为勾选了但缺失的尺寸补生成缩略图
-     *
-     * 一次性全量（内部按页循环，供兼容调用）；设置页 AJAX 走 generate_missing_page 分页，
-     * 避免大媒体库下单次 PHP 请求超时。
-     *
-     * @return array generated_attachments、generated_files、skipped_attachments、failed_ids
-     */
-    public function generate_missing_thumbnails(): array {
-        $result = array(
-            'generated_attachments' => 0,
-            'generated_files'       => 0,
-            'skipped_attachments'   => 0,
-            'failed_ids'            => array(),
-        );
-
-        $after_id = 0;
-
-        do {
-            $page = $this->generate_missing_page( $after_id, self::BATCH_SIZE );
-
-            $result['generated_attachments'] += $page['generated_attachments'];
-            $result['generated_files']       += $page['generated_files'];
-            $result['skipped_attachments']   += $page['skipped_attachments'];
-            $result['failed_ids']             = array_merge( $result['failed_ids'], $page['failed_ids'] );
-
-            $after_id = $page['next_after'];
-        } while ( $page['has_more'] );
-
-        return $result;
-    }
-
-    /**
      * 按附件 ID 游标为一页附件补齐缺失尺寸
+     *
+     * 前端按 next_after 游标循环调用，每请求只处理一页，
+     * 避免大媒体库下单次 PHP 请求超时。
      *
      * @param int $after_id 上一批最后处理的附件 ID
      * @param int $limit    本页数量
@@ -710,90 +638,38 @@ class Libre_Compress_Thumbnail_Manager {
 
         // 获取操作类型
         $action_type = isset( $_POST['action_type'] ) ? sanitize_text_field( wp_unslash( $_POST['action_type'] ) ) : '';
-
-        // 新版前端按游标分页（每请求 PAGE_SIZE 个附件），避免大媒体库单次请求超时；
-        // 未带 after 参数的旧请求走一次性全量，保持兼容。
-        $paged    = isset( $_POST['after'] );
-        $after_id = $paged ? absint( $_POST['after'] ) : 0;
+        $after_id    = isset( $_POST['after'] ) ? absint( $_POST['after'] ) : 0;
 
         switch ( $action_type ) {
             case 'delete':
-                if ( $paged ) {
-                    $page = $this->delete_disabled_page( $after_id, self::PAGE_SIZE );
-
-                    wp_send_json_success(
-                        array(
-                            'deleted_files'  => $page['deleted_files'],
-                            'affected_count' => $page['affected_attachments'],
-                            'replaced_links' => $page['replaced_links'],
-                            'failed_ids'     => $page['failed_ids'],
-                            'content_failed' => $page['content_failed'],
-                            'processed'      => $page['processed'],
-                            'next_after'     => $page['next_after'],
-                            'has_more'       => $page['has_more'],
-                        )
-                    );
-                    break;
-                }
-
-                $result  = $this->delete_disabled_thumbnails();
-                $message = sprintf(
-                    /* translators: 1: 删除的文件数, 2: 影响的附件数, 3: 替换的链接数 */
-                    __( '已删除 %1$d 个未勾选尺寸的缩略图（涉及 %2$d 个附件），替换了 %3$d 个图片链接', 'libre-compress' ),
-                    $result['deleted_files'],
-                    $result['affected_attachments'],
-                    $result['replaced_links']
-                );
-
-                if ( $result['content_failed'] ) {
-                    $message .= ' ' . __( '部分正文链接未更新成功，可再次执行本操作继续处理。', 'libre-compress' );
-                }
+                $page = $this->delete_disabled_page( $after_id, self::PAGE_SIZE );
 
                 wp_send_json_success(
                     array(
-                        'message'        => $message,
-                        'deleted_files'  => $result['deleted_files'],
-                        'affected_count' => $result['affected_attachments'],
-                        'replaced_links' => $result['replaced_links'],
-                        'failed_ids'     => $result['failed_ids'],
+                        'deleted_files'  => $page['deleted_files'],
+                        'affected_count' => $page['affected_attachments'],
+                        'replaced_links' => $page['replaced_links'],
+                        'failed_ids'     => $page['failed_ids'],
+                        'content_failed' => $page['content_failed'],
+                        'processed'      => $page['processed'],
+                        'next_after'     => $page['next_after'],
+                        'has_more'       => $page['has_more'],
                     )
                 );
                 break;
 
             case 'generate':
-                if ( $paged ) {
-                    $page = $this->generate_missing_page( $after_id, self::PAGE_SIZE );
-
-                    wp_send_json_success(
-                        array(
-                            'generated_attachments' => $page['generated_attachments'],
-                            'generated_files'       => $page['generated_files'],
-                            'skipped_attachments'   => $page['skipped_attachments'],
-                            'failed_ids'            => $page['failed_ids'],
-                            'processed'             => $page['processed'],
-                            'next_after'            => $page['next_after'],
-                            'has_more'              => $page['has_more'],
-                        )
-                    );
-                    break;
-                }
-
-                $result = $this->generate_missing_thumbnails();
+                $page = $this->generate_missing_page( $after_id, self::PAGE_SIZE );
 
                 wp_send_json_success(
                     array(
-                        'message'        => sprintf(
-                            /* translators: 1: 补生成的附件数, 2: 新增文件数, 3: 跳过的附件数, 4: 失败的附件数 */
-                            __( '已为 %1$d 个附件补生成 %2$d 个缩略图（%3$d 个无需处理或已跳过，%4$d 个失败）', 'libre-compress' ),
-                            $result['generated_attachments'],
-                            $result['generated_files'],
-                            $result['skipped_attachments'],
-                            count( $result['failed_ids'] )
-                        ),
-                        'generated_attachments' => $result['generated_attachments'],
-                        'generated_files'       => $result['generated_files'],
-                        'skipped_attachments'   => $result['skipped_attachments'],
-                        'failed_ids'            => $result['failed_ids'],
+                        'generated_attachments' => $page['generated_attachments'],
+                        'generated_files'       => $page['generated_files'],
+                        'skipped_attachments'   => $page['skipped_attachments'],
+                        'failed_ids'            => $page['failed_ids'],
+                        'processed'             => $page['processed'],
+                        'next_after'            => $page['next_after'],
+                        'has_more'              => $page['has_more'],
                     )
                 );
                 break;
