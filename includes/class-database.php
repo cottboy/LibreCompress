@@ -386,20 +386,27 @@ class Libre_Compress_Database {
     }
 
     /**
-     * 根据原始路径获取备份
+     * 根据附件 ID 和原始路径获取备份
      *
-     * @param string $original_path 原始路径
+     * 必须同时限定附件：WordPress 的重复媒体会让多个附件指向同一个文件，
+     * 只按路径匹配会让后一个附件白拿前一个附件的备份，
+     * 结果它自己恢复不了，而清理前一个附件时又把它唯一的恢复依据一起删掉。
+     *
+     * @param int    $attachment_id 附件 ID
+     * @param string $original_path uploads 目录内的相对路径
      * @return array|null
      */
-    public function get_backup_by_path( $original_path ) {
+    public function get_backup_by_attachment_and_path( $attachment_id, $original_path ) {
         global $wpdb;
 
+        $attachment_id = absint( $attachment_id );
         $original_path = sanitize_text_field( $original_path );
 
         // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
         return $wpdb->get_row(
             $wpdb->prepare(
-                "SELECT * FROM {$this->backups_table} WHERE original_path = %s",
+                "SELECT * FROM {$this->backups_table} WHERE attachment_id = %d AND original_path = %s",
+                $attachment_id,
                 $original_path
             ),
             ARRAY_A

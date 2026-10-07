@@ -222,7 +222,7 @@ class Libre_Compress_Backup {
         }
 
         $database = libre_compress()->database;
-        $existing = $database->get_backup_by_path( $relative );
+        $existing = $database->get_backup_by_attachment_and_path( $attachment_id, $relative );
 
         if ( $existing ) {
             $backup_path = $this->to_absolute_path( (string) $existing['backup_path'] );
