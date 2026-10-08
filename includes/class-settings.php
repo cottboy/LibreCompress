@@ -13,13 +13,13 @@ class Libre_Compress_Settings {
 
     // 统一约束保存值与命令参数，防止篡改选项绕过表单范围。
     const SPEED_SETTINGS = array(
-        'pngquant_speed'     => array( 1, 11, 1 ),
-        'oxipng_level'       => array( 0, 6, 6 ),
-        'webp_method'        => array( 0, 6, 6 ),
-        'webp_lossless_level' => array( 0, 9, 9 ),
+        'pngquant_speed'     => array( 1, 11, 4 ),
+        'oxipng_level'       => array( 0, 6, 2 ),
+        'webp_method'        => array( 0, 6, 4 ),
+        'webp_lossless_level' => array( 0, 9, 6 ),
         'gif2webp_method'    => array( 0, 6, 4 ),
-        'avif_speed'         => array( 0, 10, 0 ),
-        'gifsicle_level'     => array( 1, 3, 3 ),
+        'avif_speed'         => array( 0, 10, 6 ),
+        'gifsicle_level'     => array( 1, 3, 2 ),
     );
 
     public static function normalize_speed( string $key, $value ): int {
@@ -281,9 +281,9 @@ class Libre_Compress_Settings {
                     <td>
                         <label>
                             <input type="checkbox" name="libre_compress_general[original_fallback]" value="1" <?php checked( ! empty( $options['original_fallback'] ) ); ?>>
-                            <?php esc_html_e( '为不支持 WebP / AVIF 的浏览器提供备份原图', 'libre-compress' ); ?>
+                            <?php esc_html_e( '为不支持新格式的浏览器提供备份原图', 'libre-compress' ); ?>
                         </label>
-                        <p class="description"><?php esc_html_e( '需要启用原图备份；备份到期或被删除后回退失效。回退原图包含原始元数据，备份目录允许直接访问。', 'libre-compress' ); ?></p>
+                        <p class="description"><?php esc_html_e( '仅对转换为新格式且有可用旧格式原图备份的图片生效。关闭原图备份或备份被删除后不再提供回退。同格式压缩不提供回退。回退原图包含原始元数据，备份目录允许直接访问。', 'libre-compress' ); ?></p>
                     </td>
                 </tr>
                 <tr>
@@ -636,7 +636,8 @@ class Libre_Compress_Settings {
                         <p class="description"><?php esc_html_e( 'pngquant 质量参数，0-100', 'libre-compress' ); ?></p>
                     </td>
                 </tr>
-
+                <?php $this->render_speed_field( 'pngquant_speed', __( 'pngquant 有损 PNG 速度', 'libre-compress' ), $options ); ?>
+                <?php $this->render_speed_field( 'oxipng_level', __( 'oxipng 无损 PNG 级别', 'libre-compress' ), $options ); ?>
             </table>
 
             <h3><?php esc_html_e( 'WEBP 压缩', 'libre-compress' ); ?></h3>
@@ -663,6 +664,9 @@ class Libre_Compress_Settings {
                         <p class="description"><?php esc_html_e( '0-100，数值越高质量越好，文件越大（仅有损压缩有效）', 'libre-compress' ); ?></p>
                     </td>
                 </tr>
+                <?php $this->render_speed_field( 'webp_method', __( 'cwebp 有损 WebP 方法', 'libre-compress' ), $options ); ?>
+                <?php $this->render_speed_field( 'webp_lossless_level', __( 'cwebp 无损 WebP 级别', 'libre-compress' ), $options ); ?>
+                <?php $this->render_speed_field( 'gif2webp_method', __( 'gif2webp 动画 WebP 方法', 'libre-compress' ), $options ); ?>
             </table>
 
             <h3><?php esc_html_e( 'AVIF 压缩', 'libre-compress' ); ?></h3>
@@ -689,6 +693,7 @@ class Libre_Compress_Settings {
                         <p class="description"><?php esc_html_e( '0-100，数值越高质量越好，文件越大（仅有损压缩有效）', 'libre-compress' ); ?></p>
                     </td>
                 </tr>
+                <?php $this->render_speed_field( 'avif_speed', __( 'avifenc AVIF 速度', 'libre-compress' ), $options ); ?>
             </table>
 
             <h3><?php esc_html_e( 'GIF 压缩', 'libre-compress' ); ?></h3>
@@ -715,6 +720,7 @@ class Libre_Compress_Settings {
                         <p class="description"><?php esc_html_e( '0-100，数值越高质量越好，文件越大（仅有损压缩有效）', 'libre-compress' ); ?></p>
                     </td>
                 </tr>
+                <?php $this->render_speed_field( 'gifsicle_level', __( 'gifsicle GIF 优化级别', 'libre-compress' ), $options ); ?>
             </table>
 
             <h3><?php esc_html_e( 'SVG 压缩', 'libre-compress' ); ?></h3>
@@ -727,34 +733,6 @@ class Libre_Compress_Settings {
                         <p class="description"><?php esc_html_e( '坐标小数有效位数 0-8，数值越高越保真，文件越大', 'libre-compress' ); ?></p>
                     </td>
                 </tr>
-            </table>
-
-            <h3><?php esc_html_e( '压缩速度', 'libre-compress' ); ?></h3>
-            <table class="form-table">
-                <?php
-                $speed_labels = array(
-                    'pngquant_speed'      => __( 'pngquant 有损 PNG 速度', 'libre-compress' ),
-                    'oxipng_level'        => __( 'oxipng 无损 PNG 级别', 'libre-compress' ),
-                    'webp_method'         => __( 'cwebp 有损 WebP 方法', 'libre-compress' ),
-                    'webp_lossless_level' => __( 'cwebp 无损 WebP 级别', 'libre-compress' ),
-                    'gif2webp_method'     => __( 'gif2webp 动画 WebP 方法', 'libre-compress' ),
-                    'avif_speed'          => __( 'avifenc AVIF 速度', 'libre-compress' ),
-                    'gifsicle_level'      => __( 'gifsicle GIF 优化级别', 'libre-compress' ),
-                );
-                foreach ( self::SPEED_SETTINGS as $key => $range ) :
-                    $value = self::normalize_speed( $key, $options[ $key ] ?? null );
-                    ?>
-                    <tr>
-                        <th scope="row"><label for="libre-compress-<?php echo esc_attr( $key ); ?>"><?php echo esc_html( $speed_labels[ $key ] ); ?></label></th>
-                        <td>
-                            <input type="range" id="libre-compress-<?php echo esc_attr( $key ); ?>" name="libre_compress_tools[<?php echo esc_attr( $key ); ?>]" value="<?php echo esc_attr( $value ); ?>" min="<?php echo esc_attr( $range[0] ); ?>" max="<?php echo esc_attr( $range[1] ); ?>" step="1" oninput="this.nextElementSibling.value = this.value">
-                            <output><?php echo esc_html( $value ); ?></output>
-                            <p class="description"><?php echo esc_html( in_array( $key, array( 'pngquant_speed', 'avif_speed' ), true )
-                                ? __( '数值越大速度越快，通常文件越大；数值越小压缩越慢，通常文件越小。', 'libre-compress' )
-                                : __( '数值越大压缩越慢，通常文件越小；数值越小速度越快，通常文件越大。', 'libre-compress' ) ); ?></p>
-                        </td>
-                    </tr>
-                <?php endforeach; ?>
                 <tr>
                     <th scope="row"><?php esc_html_e( 'SVGO 多轮优化', 'libre-compress' ); ?></th>
                     <td>
@@ -769,6 +747,27 @@ class Libre_Compress_Settings {
 
             <?php submit_button(); ?>
         </form>
+        <?php
+    }
+
+    private function render_speed_field( string $key, string $label, array $options ): void {
+        list( $min, $max, $default ) = self::SPEED_SETTINGS[ $key ];
+        $value = self::normalize_speed( $key, $options[ $key ] ?? null );
+        $description = in_array( $key, array( 'pngquant_speed', 'avif_speed' ), true )
+            ? __( '数值越大速度越快，通常文件越大；数值越小压缩越慢，通常文件越小。', 'libre-compress' )
+            : __( '数值越大压缩越慢，通常文件越小；数值越小速度越快，通常文件越大。', 'libre-compress' );
+        ?>
+        <tr>
+            <th scope="row"><label for="libre-compress-<?php echo esc_attr( $key ); ?>"><?php echo esc_html( $label ); ?></label></th>
+            <td>
+                <input type="range" id="libre-compress-<?php echo esc_attr( $key ); ?>" name="libre_compress_tools[<?php echo esc_attr( $key ); ?>]" value="<?php echo esc_attr( $value ); ?>" min="<?php echo esc_attr( $min ); ?>" max="<?php echo esc_attr( $max ); ?>" step="1" oninput="this.nextElementSibling.value = this.value">
+                <output><?php echo esc_html( $value ); ?></output>
+                <p class="description"><?php
+                    /* translators: 1: 最小档位，2: 最大档位，3: 默认档位。 */
+                    echo esc_html( sprintf( __( '范围 %1$d-%2$d，默认 %3$d。', 'libre-compress' ), $min, $max, $default ) . $description );
+                ?></p>
+            </td>
+        </tr>
         <?php
     }
 

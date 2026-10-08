@@ -15,4 +15,8 @@ php tests/run.php C:/你的WordPress目录 --keep-files
 node tests/browser.cjs http://你的站点/wp-content/uploads/本轮测试目录/ C:/浏览器测试截图目录
 ```
 
-浏览器验证桌面与移动端的新格式选图、模拟不支持格式时的 PNG 回退、图片像素、设置控件交互和 JavaScript 错误。`--keep-files` 会保留本轮测试目录，完成浏览器验证后可清理该目录。
+浏览器验证桌面与移动端的新格式选图、模拟不支持格式时的 PNG 回退、图片像素、默认档位、速度与质量控件的位置、设置控件交互和 JavaScript 错误。`--keep-files` 会保留带有测试标记的本轮目录，完成浏览器验证后使用以下命令逐文件清理：
+
+```powershell
+php tests/run.php C:/你的WordPress目录 --cleanup-files 本轮测试目录名
+```

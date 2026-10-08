@@ -41,9 +41,21 @@ async function main() {
                 const controls = page.locator('input[name^="libre_compress_tools["]');
                 if (tab === 'tools') {
                     const speedKeys = ['pngquant_speed', 'oxipng_level', 'webp_method', 'webp_lossless_level', 'gif2webp_method', 'avif_speed', 'gifsicle_level'];
+                    const qualityKeys = ['png_lossy_quality', 'png_lossy_quality', 'webp_quality', 'webp_quality', 'webp_quality', 'avif_quality', 'gif_quality'];
+                    const defaults = [4, 2, 4, 6, 4, 6, 2];
                     for (const key of speedKeys) {
                         const input = page.locator(`input[name="libre_compress_tools[${key}]"]`);
                         assert.equal(await input.count(), 1);
+                        await input.scrollIntoViewIfNeeded();
+                        const index = speedKeys.indexOf(key);
+                        assert.equal(await input.inputValue(), String(defaults[index]));
+                        const placement = await input.evaluate((element, qualityKey) => {
+                            const table = element.closest('table');
+                            const quality = table.querySelector(`input[name="libre_compress_tools[${qualityKey}]"]`);
+                            return !!quality && !!(quality.compareDocumentPosition(element) & Node.DOCUMENT_POSITION_FOLLOWING);
+                        }, qualityKeys[index]);
+                        assert.ok(placement, '速度必须位于对应质量下方且在同一表格内');
+                        checks += 2;
                         const value = await input.evaluate(element => {
                             element.value = element.min;
                             element.dispatchEvent(new Event('input', { bubbles: true }));
@@ -60,7 +72,8 @@ async function main() {
                     await multipass.check();
                     assert.equal(await multipass.isChecked(), true);
                     checks += 2;
-                    await page.locator('h3').filter({ hasText: '压缩速度' }).scrollIntoViewIfNeeded();
+                    assert.equal(await page.locator('h3').filter({ hasText: '压缩速度' }).count(), 0);
+                    await page.locator('h3').filter({ hasText: 'WEBP 压缩' }).scrollIntoViewIfNeeded();
                 } else {
                     const checkbox = page.locator('input[name="libre_compress_general[original_fallback]"]');
                     await checkbox.uncheck();

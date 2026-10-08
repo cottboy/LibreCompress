@@ -33,7 +33,8 @@ class Libre_Compress_Fallback {
 
     private function enabled(): bool {
         $settings = get_option( 'libre_compress_general', array() );
-        return ! is_admin() && ! empty( $settings['original_fallback'] );
+        return ! is_admin() && ! empty( $settings['original_fallback'] )
+            && in_array( $settings['backup_enabled'] ?? true, array( true, 1, '1' ), true );
     }
 
     public function filter_attachment_image( string $html, int $attachment_id ): string {

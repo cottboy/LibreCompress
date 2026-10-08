@@ -531,15 +531,15 @@ msgid "浏览器原图回退"
 msgstr ""
 
 #: includes/class-settings.php
-msgid "为不支持 WebP / AVIF 的浏览器提供备份原图"
+msgid "为不支持新格式的浏览器提供备份原图"
 msgstr ""
 
 #: includes/class-settings.php
-msgid "需要启用原图备份；备份到期或被删除后回退失效。回退原图包含原始元数据，备份目录允许直接访问。"
+msgid "仅对转换为新格式且有可用旧格式原图备份的图片生效。关闭原图备份或备份被删除后不再提供回退。同格式压缩不提供回退。回退原图包含原始元数据，备份目录允许直接访问。"
 msgstr ""
 
 #: includes/class-settings.php
-msgid "压缩速度"
+msgid "范围 %1$d-%2$d，默认 %3$d。"
 msgstr ""
 
 #: includes/class-settings.php

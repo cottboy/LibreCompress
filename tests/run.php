@@ -130,6 +130,30 @@ function lc_cleanup( string $directory ): void {
     rmdir( $directory );
 }
 
+// 清理入口仅接受 uploads 下带有本测试标记的独立目录。
+if ( '--cleanup-files' === ( $argv[2] ?? '' ) ) {
+    $targets = array();
+    foreach ( array_slice( $argv, 3 ) as $name ) {
+        if ( ! preg_match( '/^libre-compress-tests-[A-Za-z0-9]{12}$/D', $name ) ) {
+            throw new RuntimeException( '测试目录名不合法。' );
+        }
+        $directory = $uploads['basedir'] . '/' . $name;
+        $marker = $directory . '/.libre-compress-test';
+        if ( ! is_dir( $directory ) || is_link( $directory ) || is_link( $marker )
+            || ! is_file( $marker ) || "LibreCompress regression fixtures\n" !== file_get_contents( $marker )
+            || realpath( dirname( $directory ) ) !== realpath( $uploads['basedir'] ) ) {
+            throw new RuntimeException( '目录不是可清理的测试目录。' );
+        }
+        $targets[] = $directory;
+    }
+    foreach ( $targets as $directory ) {
+        $test_dir = $directory;
+        lc_cleanup( $directory );
+        echo '已清理：' . basename( $directory ) . "\n";
+    }
+    exit( 0 );
+}
+
 // 插件会更改这些表，非事务表会让测试数据无法可靠回滚。
 foreach ( array( $wpdb->posts, $wpdb->postmeta, $wpdb->options, $plugin->database->get_records_table(), $plugin->database->get_backups_table() ) as $table ) {
     $status = $wpdb->get_row( $wpdb->prepare( 'SHOW TABLE STATUS WHERE Name = %s', $table ) );
@@ -138,6 +162,7 @@ foreach ( array( $wpdb->posts, $wpdb->postmeta, $wpdb->options, $plugin->databas
     }
 }
 wp_mkdir_p( $test_dir );
+file_put_contents( $test_dir . '/.libre-compress-test', "LibreCompress regression fixtures\n" );
 $upload_filter = static function ( $value ) use ( $test_dir, $test_url ) {
     $value['basedir'] = $value['path'] = $test_dir;
     $value['baseurl'] = $value['url'] = $test_url;
@@ -150,8 +175,10 @@ $exit_code = 0;
 
 try {
     $settings = new Libre_Compress_Settings();
+    $expected_defaults = array( 'pngquant_speed' => 4, 'oxipng_level' => 2, 'webp_method' => 4, 'webp_lossless_level' => 6, 'gif2webp_method' => 4, 'avif_speed' => 6, 'gifsicle_level' => 2 );
     foreach ( Libre_Compress_Settings::SPEED_SETTINGS as $key => $range ) {
         list( $min, $max, $default ) = $range;
+        lc_check( $expected_defaults[ $key ] === $default, $key . ' 均衡默认档位' );
         foreach ( array( null, array( 1 ), new stdClass(), '1;whoami', '1.5', true ) as $invalid ) {
             lc_check( $default === Libre_Compress_Settings::normalize_speed( $key, $invalid ), $key . ' 拒绝非法速度' );
         }
@@ -250,6 +277,9 @@ try {
             lc_check( 1 === substr_count( $filtered, '<picture>' ), $hook . ' 回退' );
         }
         $wrapped = $fallback->filter_content( $raw );
+        lc_options( array( 'backup_enabled' => false ) );
+        lc_check( $raw === $fallback->filter_content( $raw ), '关闭备份后即使历史备份存在也不回退' );
+        lc_options();
         lc_check( $wrapped === $fallback->filter_content( $wrapped ), '重复过滤幂等' );
         $existing = '<picture><source type="image/' . $target . '" srcset="' . esc_url( $converted_url ) . '">' . $raw . '</picture>';
         lc_check( $existing === $fallback->filter_content( $existing ), '已有 picture 保持完整' );
@@ -357,6 +387,16 @@ try {
     lc_check( ! empty( $plugin->output_processor->get_output_entries( $id ) ), '清理备份保留转换映射' );
     lc_check( ! $plugin->backup->create_backup( $id, __FILE__ ), '拒绝上传目录外备份' );
 
+    // 从未启用备份的转换附件不能输出回退。
+    lc_options( array( 'backup_enabled' => false, 'output_png' => true ) );
+    list( $no_backup_id ) = lc_fixture( 'png', false );
+    lc_check( 'success' === $plugin->processor->compress_attachment( $no_backup_id )['status'], '无备份转换成功' );
+    lc_check( ! $plugin->backup->has_backup( $no_backup_id ), '未生成原图备份' );
+    $no_backup_html = '<img class="wp-image-' . $no_backup_id . '" src="' . esc_url( wp_get_attachment_url( $no_backup_id ) ) . '">';
+    lc_check( $no_backup_html === $fallback->filter_content( $no_backup_html ), '没有原图备份的转换图片不回退' );
+    lc_options();
+    lc_check( $no_backup_html === $fallback->filter_content( $no_backup_html ), '之后开启备份也不能凭空生成旧格式回退' );
+
     // 备份索引受到篡改时，不能把上传目录内普通文件公开为备份。
     list( $tamper_id, $tamper_path ) = lc_fixture( 'png', false );
     lc_check( $plugin->backup->create_backup( $tamper_id, $tamper_path ), '创建安全校验备份' );
@@ -375,6 +415,21 @@ try {
     lc_check( Libre_Compress_Tool_Base::run_command( $native_chain[0], 30 )['success'], '准备原生 WebP' );
     lc_check( $plugin->backup->create_backup( $native_id, $native_webp ), '备份原生 WebP' );
     lc_check( '' === $plugin->backup->get_original_url( $native_id, $native_webp ), '原生 WebP 不能作为旧格式回退' );
+    foreach ( array( 'webp', 'avif' ) as $native_format ) {
+        list( $native_id, $native_source ) = lc_fixture( 'png', false );
+        $native_path = $native_source . '.' . $native_format;
+        $chain = lc_call( $plugin->output_processor, 'build_encode_command', array( $native_source, $native_path, $native_format ) );
+        lc_check( Libre_Compress_Tool_Base::run_command( $chain[0], 30 )['success'], '创建原生 ' . $native_format );
+        update_attached_file( $native_id, $native_path );
+        $wpdb->update( $wpdb->posts, array( 'post_mime_type' => 'image/' . $native_format ), array( 'ID' => $native_id ) );
+        clean_post_cache( $native_id );
+        wp_update_attachment_metadata( $native_id, array( 'file' => basename( $native_path ), 'width' => 96, 'height' => 72, 'sizes' => array() ) );
+        lc_check( 'success' === $plugin->processor->compress_attachment( $native_id )['status'], '原生 ' . $native_format . ' 同格式压缩' );
+        lc_check( $plugin->backup->has_backup( $native_id ), '原生新格式具有备份' );
+        lc_check( empty( $plugin->output_processor->get_output_entries( $native_id ) ), '同格式压缩没有转换映射' );
+        $native_html = '<img class="wp-image-' . $native_id . '" src="' . esc_url( wp_get_attachment_url( $native_id ) ) . '">';
+        lc_check( $native_html === $fallback->filter_content( $native_html ), '原生新格式同格式压缩不提供旧格式回退' );
+    }
 
     list( $unsafe_svg_id, $unsafe_svg_path ) = lc_fixture( 'svg', false );
     file_put_contents( $unsafe_svg_path, '<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>' );
@@ -403,7 +458,9 @@ try {
         $page = ob_get_clean();
         if ( 'general' === $tab ) {
             lc_check( strpos( $page, '[backup_retention_days]' ) < strpos( $page, '[original_fallback]' ) && strpos( $page, '[original_fallback]' ) < strpos( $page, '[strip_metadata]' ), '回退设置位于保留时长下方' );
+            lc_check( false !== strpos( $page, '为不支持新格式的浏览器提供备份原图' ) && false === strpos( $page, '为不支持 WebP / AVIF' ), '回退文案使用新格式' );
         } else {
+            lc_check( false === strpos( $page, '<h3>压缩速度</h3>' ), '不再单独提供压缩速度区域' );
             foreach ( Libre_Compress_Settings::SPEED_SETTINGS as $key => $range ) {
                 lc_check( false !== strpos( $page, 'libre_compress_tools[' . $key . ']' ), '设置页包含速度项 ' . $key );
             }
