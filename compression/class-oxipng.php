@@ -54,17 +54,8 @@ class Libre_Compress_Oxipng extends Libre_Compress_Tool_Base {
     protected function build_command_chain( string $file_path, array $options ): array {
         $executable = $this->get_executable_path();
 
-        // 获取压缩设置
-        $settings = get_option( 'libre_compress_tools', array() );
-        $level    = isset( $settings['png_lossless_level'] ) ? absint( $settings['png_lossless_level'] ) : 4;
-
-        // 允许通过选项覆盖设置
-        if ( isset( $options['level'] ) ) {
-            $level = absint( $options['level'] );
-        }
-
-        // 确保无损压缩级别在有效范围内（0-6）
-        $level = max( 0, min( 6, $level ) );
+        // oxipng 压缩级别固定 6（最慢但体积最小），不再允许用户调节
+        $level = 6;
 
         // 构建命令：-o 无损级别，--strip 元数据取舍，--quiet 静默
         return array( array(

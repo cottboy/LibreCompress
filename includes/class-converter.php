@@ -1606,13 +1606,13 @@ class Libre_Compress_Output {
             $quality = isset( $settings['webp_quality'] ) ? absint( $settings['webp_quality'] ) : 80;
             $quality = max( 0, min( 100, $quality ) );
 
-            return array( array( $binary, '-quiet', '-mt', '-q', (string) $quality, $source, '-o', $output ) );
+            return array( array( $binary, '-quiet', '-mt', '-q', (string) $quality, '-m', '6', $source, '-o', $output ) );
         }
 
         $mode = isset( $settings['avif_mode'] ) ? $settings['avif_mode'] : 'lossy';
 
         // avifenc 默认会把输入图片里的 EXIF/XMP 原样搬进 AVIF，而转换结果正是对外访问的那张图
-        $encode = array( $binary, '-j', '4' );
+        $encode = array( $binary, '-j', '4', '-s', '0' );  // 0=最慢但体积最小
 
         if ( Libre_Compress_Settings::strips_metadata() ) {
             $encode[] = '--ignore-exif';
@@ -1819,7 +1819,7 @@ class Libre_Compress_Output {
             '-pix_fmt', 'yuv420p', '-f', 'yuv4mpegpipe', $temp_y4m,
         );
 
-        $encode = array( $avifenc, '-j', '4' );
+        $encode = array( $avifenc, '-j', '4', '-s', '0' );  // 0=最慢但体积最小
 
         if ( 'lossless' === $mode ) {
             $encode[] = '--lossless';

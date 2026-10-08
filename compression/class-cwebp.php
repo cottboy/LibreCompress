@@ -90,6 +90,8 @@ class Libre_Compress_Cwebp extends Libre_Compress_Tool_Base {
             // 有损压缩
             $command_parts[] = '-q';
             $command_parts[] = (string) $quality;
+            $command_parts[] = '-m';
+            $command_parts[] = '6';  // 最彻底的编码速度
         }
 
         // 输入和输出文件
