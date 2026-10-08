@@ -97,6 +97,65 @@ class Libre_Compress_Compressor {
     }
 
     /**
+     * 判断 WebP 是否为动画
+     *
+     * 静态 WebP 压缩由 cwebp 完成，cwebp 不支持动画输入，
+     * 处理动画 WebP 会只保留第一帧。这里在 RIFF 容器的 chunk 序列里
+     * 找 ANIM 或 ANMF 标记：有即为动画，压缩时跳过。
+     *
+     * @param string $file_path 文件绝对路径
+     * @return bool
+     */
+    public static function is_animated_webp( string $file_path ): bool {
+        $handle = @fopen( $file_path, 'rb' );
+
+        if ( false === $handle ) {
+            return false;
+        }
+
+        // RIFF 签名 + 文件大小 + WEBP 签名
+        $header = fread( $handle, 12 );
+
+        if ( 12 !== strlen( $header ) || 'RIFF' !== substr( $header, 0, 4 ) || 'WEBP' !== substr( $header, 8, 4 ) ) {
+            fclose( $handle );
+            return false;
+        }
+
+        $file_size = (int) filesize( $file_path );
+        $offset    = 12;
+
+        while ( $offset + 8 <= $file_size ) {
+            $chunk_header = fread( $handle, 8 );
+
+            if ( 8 !== strlen( $chunk_header ) ) {
+                fclose( $handle );
+                return false;
+            }
+
+            $chunk_size = (int) unpack( 'V', substr( $chunk_header, 4, 4 ) )[1];
+            $chunk_type = substr( $chunk_header, 0, 4 );
+
+            if ( 'ANIM' === $chunk_type || 'ANMF' === $chunk_type ) {
+                fclose( $handle );
+                return true;
+            }
+
+            // chunk 数据按偶数字节对齐
+            $padded = $chunk_size + ( $chunk_size % 2 );
+
+            if ( false === fseek( $handle, $padded, SEEK_CUR ) ) {
+                fclose( $handle );
+                return false;
+            }
+
+            $offset += 8 + $padded;
+        }
+
+        fclose( $handle );
+        return false;
+    }
+
+    /**
      * 判断 PNG 是否为 APNG 动图
      *
      * APNG 向后兼容 PNG，后缀和 MIME 都是 png / image/png，只能靠 acTL 块识别。
@@ -268,6 +327,18 @@ class Libre_Compress_Compressor {
         // APNG 的后缀与 MIME 都是 png，但 pngquant 只会留下第一帧，动图就毁了。
         if ( 'png' === $extension && self::is_apng( $file_path ) ) {
             $message = __( 'APNG 动图不压缩', 'libre-compress' );
+            $this->record_skipped_file( $attachment_id, $file_path, $size_type, $message );
+
+            return array(
+                'success' => false,
+                'message' => $message,
+                'status'  => 'skipped',
+            );
+        }
+
+        // 动画 WebP 同样只保留第一帧，cwebp 不支持多帧输入。
+        if ( 'webp' === $extension && self::is_animated_webp( $file_path ) ) {
+            $message = __( '动画 WebP 不压缩', 'libre-compress' );
             $this->record_skipped_file( $attachment_id, $file_path, $size_type, $message );
 
             return array(
