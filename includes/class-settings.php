@@ -308,11 +308,12 @@ class Libre_Compress_Settings {
                             <input type="checkbox" name="libre_compress_general[strip_metadata]" value="1" <?php checked( $options['strip_metadata'] ?? true ); ?>>
                             <?php esc_html_e( '压缩时删除图片元数据', 'libre-compress' ); ?>
                         </label>
+                        <p class="description"><?php esc_html_e( '删除 EXIF、GPS 拍摄位置、设备型号、作者与软件信息等隐私数据，ICC 色彩配置会保留以免偏色。取消勾选则尽量保留元数据，但 WebP 和经 PNG 中转的 AVIF 由编码工具决定，不保证留得住。', 'libre-compress' ); ?></p>
                         <label style="display:block; margin-top: 6px;">
                             <input type="checkbox" name="libre_compress_general[strip_backup_metadata]" value="1" <?php checked( Libre_Compress_Settings::strips_backup_metadata() ); ?>>
                             <?php esc_html_e( '备份原图也删除元数据', 'libre-compress' ); ?>
                         </label>
-                        <p class="description"><?php esc_html_e( '压缩时删除图片元数据：删除 EXIF、GPS 拍摄位置、设备型号、作者与软件信息等隐私数据，ICC 色彩配置会保留以免偏色；取消勾选则尽量保留元数据，但 WebP 和经 PNG 中转的 AVIF 由编码工具决定，不保证留得住。备份原图也删除元数据：备份目录允许直接访问、浏览器原图回退引用的也是备份，勾选后 JPEG、PNG、GIF、WebP 备份只移除元数据、图像数据原样保留，SVG 备份需安装 svgo，AVIF 备份暂不支持；取消勾选则备份保留完整元数据，恢复原图得到的也是删过元数据的版本。', 'libre-compress' ); ?></p>
+                        <p class="description"><?php esc_html_e( '备份目录允许直接访问，开启浏览器原图回退后备份会被直接提供给浏览器。勾选后 JPEG、PNG、GIF、WebP 备份只移除元数据、图像数据原样保留，SVG 备份需安装 svgo，AVIF 备份暂不支持。代价是恢复原图时得到的也是删过元数据的版本。', 'libre-compress' ); ?></p>
                     </td>
                 </tr>
                 <tr>
