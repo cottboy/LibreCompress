@@ -1575,7 +1575,7 @@ class Libre_Compress_Output {
      * @param string $source     编码输入文件路径
      * @param string $output     编码输出文件路径
      * @param string $target     目标格式 webp|avif
-     * @return string|false 完整命令或 false
+     * @return array|false 命令链（参数数组的数组）或 false
      */
     private function build_encode_command( string $source, string $output, string $target ) {
         $tool_name = isset( $this->target_tools[ $target ] ) ? $this->target_tools[ $target ] : '';
@@ -1600,13 +1600,13 @@ class Libre_Compress_Output {
             $mode = isset( $settings['webp_mode'] ) ? $settings['webp_mode'] : 'lossy';
 
             if ( 'lossless' === $mode ) {
-                return array( $binary, '-quiet', '-lossless', '-z', '9', $source, '-o', $output );
+                return array( array( $binary, '-quiet', '-lossless', '-z', '9', $source, '-o', $output ) );
             }
 
             $quality = isset( $settings['webp_quality'] ) ? absint( $settings['webp_quality'] ) : 80;
             $quality = max( 0, min( 100, $quality ) );
 
-            return array( $binary, '-quiet', '-mt', '-q', (string) $quality, $source, '-o', $output );
+            return array( array( $binary, '-quiet', '-mt', '-q', (string) $quality, $source, '-o', $output ) );
         }
 
         $mode = isset( $settings['avif_mode'] ) ? $settings['avif_mode'] : 'lossy';
@@ -1631,7 +1631,7 @@ class Libre_Compress_Output {
         $encode[] = $source;
         $encode[] = $output;
 
-        return $encode;
+        return array( $encode );
     }
 
     /**
