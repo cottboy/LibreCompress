@@ -99,37 +99,24 @@ class Libre_Compress_Media_Library {
         } elseif ( 'partial' === $state['status'] ) {
             $this->render_partial_status( $attachment_id, $state, $has_backup, $can_restore );
         } elseif ( 'failed' === $state['status'] ) {
-            $this->render_failed_status( $attachment_id, $has_backup, $can_restore );
+            $this->render_failed_status( $attachment_id );
         } else {
-            $this->render_uncompressed_status( $attachment_id, $has_backup, $can_restore );
+            $this->render_uncompressed_status( $attachment_id );
         }
     }
 
     /**
      * 渲染未压缩状态
      *
-     * @param int  $attachment_id 附件 ID
-     * @param bool $has_backup    是否有备份
-     * @param bool $can_restore   是否可恢复
+     * @param int $attachment_id 附件 ID
      */
-    private function render_uncompressed_status( int $attachment_id, bool $has_backup, bool $can_restore ) {
+    private function render_uncompressed_status( int $attachment_id ) {
         ?>
         <div class="libre-compress-status" data-attachment-id="<?php echo esc_attr( $attachment_id ); ?>">
             <span class="status-text"><?php esc_html_e( '未压缩', 'libre-compress' ); ?></span>
             <button type="button" class="button button-small libre-compress-btn" data-action="compress" data-attachment-id="<?php echo esc_attr( $attachment_id ); ?>">
                 <?php esc_html_e( '压缩', 'libre-compress' ); ?>
             </button>
-            <?php if ( $can_restore ) : ?>
-                <br>
-                <button type="button" class="button button-small libre-compress-btn" data-action="restore" data-attachment-id="<?php echo esc_attr( $attachment_id ); ?>">
-                    <?php esc_html_e( '恢复原图', 'libre-compress' ); ?>
-                </button>
-            <?php endif; ?>
-            <?php if ( $has_backup ) : ?>
-                <button type="button" class="button button-small libre-compress-btn" data-action="delete-backup" data-attachment-id="<?php echo esc_attr( $attachment_id ); ?>">
-                    <?php esc_html_e( '删除备份', 'libre-compress' ); ?>
-                </button>
-            <?php endif; ?>
         </div>
         <?php
     }
@@ -137,28 +124,15 @@ class Libre_Compress_Media_Library {
     /**
      * 渲染压缩失败状态
      *
-     * @param int  $attachment_id 附件 ID
-     * @param bool $has_backup    是否有备份
-     * @param bool $can_restore   是否可恢复
+     * @param int $attachment_id 附件 ID
      */
-    private function render_failed_status( int $attachment_id, bool $has_backup, bool $can_restore ) {
+    private function render_failed_status( int $attachment_id ) {
         ?>
         <div class="libre-compress-status" data-attachment-id="<?php echo esc_attr( $attachment_id ); ?>">
             <span class="status-text" style="color: #d63638;"><?php esc_html_e( '压缩失败', 'libre-compress' ); ?></span>
             <button type="button" class="button button-small libre-compress-btn" data-action="compress" data-attachment-id="<?php echo esc_attr( $attachment_id ); ?>">
                 <?php esc_html_e( '重试', 'libre-compress' ); ?>
             </button>
-            <?php if ( $can_restore ) : ?>
-                <br>
-                <button type="button" class="button button-small libre-compress-btn" data-action="restore" data-attachment-id="<?php echo esc_attr( $attachment_id ); ?>">
-                    <?php esc_html_e( '恢复原图', 'libre-compress' ); ?>
-                </button>
-            <?php endif; ?>
-            <?php if ( $has_backup ) : ?>
-                <button type="button" class="button button-small libre-compress-btn" data-action="delete-backup" data-attachment-id="<?php echo esc_attr( $attachment_id ); ?>">
-                    <?php esc_html_e( '删除备份', 'libre-compress' ); ?>
-                </button>
-            <?php endif; ?>
         </div>
         <?php
     }
