@@ -114,10 +114,6 @@ msgstr ""
 msgid "命令为空"
 msgstr ""
 
-#: includes\class-media-library.php:212
-msgid "原图备份已清理，无法恢复原图"
-msgstr ""
-
 #: includes\class-compressor.php:251 includes\class-converter.php:161
 msgid "文件路径不安全"
 msgstr ""
