@@ -321,7 +321,6 @@ function libre_compress_activate() {
         'jpeg_quality'       => 80,
         'png_mode'           => 'lossy',
         'png_lossy_quality'  => 80,
-        'png_lossless_level' => 4,
         'webp_mode'          => 'lossy',
         'webp_quality'       => 80,
         'avif_mode'          => 'lossy',

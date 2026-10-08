@@ -770,14 +770,6 @@ msgstr ""
 msgid "pngquant 质量参数，0-100"
 msgstr ""
 
-#: includes\class-settings.php:598
-msgid "无损压缩级别"
-msgstr ""
-
-#: includes\class-settings.php:602
-msgid "oxipng 无损压缩级别，0-6，数值越高压缩越慢但效果越好"
-msgstr ""
-
 #: includes\class-settings.php:607 includes\class-settings.php:745
 msgid "WEBP 压缩"
 msgstr ""

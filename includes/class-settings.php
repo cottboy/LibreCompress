@@ -592,12 +592,7 @@ class Libre_Compress_Settings {
                         <p class="description"><?php esc_html_e( 'pngquant 质量参数，0-100', 'libre-compress' ); ?></p>
                     </td>
                 </tr>
-                <tr>
-                    <th scope="row"><?php esc_html_e( '无损压缩级别', 'libre-compress' ); ?></th>
-                    <td>
-                        <p class="description"><?php esc_html_e( 'oxipng 固定使用最高压缩级别 6（最慢但体积最小）', 'libre-compress' ); ?></p>
-                    </td>
-                </tr>
+
             </table>
 
             <h3><?php esc_html_e( 'WEBP 压缩', 'libre-compress' ); ?></h3>
