@@ -565,6 +565,9 @@ class Libre_Compress_Backup {
             }
         }
 
+        // 批量操作结束后全量切换缓存命名空间，覆盖异常中断或旧缓存残留。
+        Libre_Compress_Fallback::invalidate_all();
+
         return $count;
     }
 
