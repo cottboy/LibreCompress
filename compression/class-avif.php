@@ -211,7 +211,7 @@ class Libre_Compress_Avif extends Libre_Compress_Tool_Base {
 
         $decode = array( $decoder, $file_path, $temp_png );
 
-        $encode = array( $encoder, '-j', '4', '-s', '0' );  // 0=最慢但体积最小
+        $encode = array( $encoder, '-j', '4', '-s', (string) Libre_Compress_Settings::tool_speed( 'avif_speed' ) );
 
         // avifenc 默认会把输入 PNG 里的 EXIF/XMP 原样搬进 AVIF，而 AVIF 是对外公开访问的文件
         if ( Libre_Compress_Settings::strips_metadata() ) {

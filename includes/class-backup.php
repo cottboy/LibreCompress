@@ -149,19 +149,27 @@ class Libre_Compress_Backup {
     public function ensure_backup_dir(): bool {
         $backup_dir = $this->get_backup_dir();
 
+        if ( '' === $this->upload_basedir() || is_link( $backup_dir ) ) {
+            return false;
+        }
+
         if ( ! is_dir( $backup_dir ) && ! wp_mkdir_p( $backup_dir ) ) {
             return false;
         }
 
-        $protection_files = array(
-            '.htaccess'    => self::protection_htaccess_content(),
-            'index.php'    => '<?php // Silence is golden.',
-            'web.config'   => "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<configuration><system.webServer><authorization><remove users=\"*\" roles=\"\" verbs=\"\"/><add users=\"\" roles=\"\" verbs=\"\" /></authorization></system.webServer></configuration>",
+        // 备份直接用于浏览器回退，改写访问限制文件而不删除已有文件。
+        $directory_files = array(
+            '.htaccess'  => "# 原图备份允许直接访问\nOptions -Indexes\n",
+            'index.php'  => '<?php // 禁止目录列表，原图文件允许访问。',
+            'web.config' => "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<configuration><system.webServer><directoryBrowse enabled=\"false\" /></system.webServer></configuration>",
         );
 
-        foreach ( $protection_files as $filename => $content ) {
+        foreach ( $directory_files as $filename => $content ) {
             $path = $backup_dir . '/' . $filename;
-            if ( file_exists( $path ) ) {
+            if ( is_link( $path ) ) {
+                return false;
+            }
+            if ( is_file( $path ) && file_get_contents( $path ) === $content ) {
                 continue;
             }
 
@@ -299,6 +307,44 @@ class Libre_Compress_Backup {
         }
 
         return $result;
+    }
+
+    /**
+     * 获取仍然存在且可安全公开的原图备份 URL。
+     */
+    public function get_original_url( int $attachment_id, string $original_path, ?array $backups = null ): string {
+        foreach ( $backups ?? $this->get_backups( $attachment_id ) as $backup ) {
+            if ( $this->normalized_path( $backup['original_path'] ) !== $this->normalized_path( $original_path ) ) {
+                continue;
+            }
+
+            $path = $backup['backup_path'];
+            if ( ! $this->is_backup_file_path( $path ) || ! is_file( $path ) || ! is_readable( $path ) ) {
+                return '';
+            }
+
+            if ( ! in_array( strtolower( pathinfo( $path, PATHINFO_EXTENSION ) ), array( 'jpg', 'jpeg', 'png', 'gif', 'svg' ), true ) ) {
+                return '';
+            }
+
+            $mime = wp_get_image_mime( $path );
+            if ( ! in_array( $mime, array( 'image/jpeg', 'image/png', 'image/gif' ), true ) ) {
+                // SVG 原图仅在不含任何需清理内容时公开，防止不安全备份成为脚本入口。
+                if ( 'svg' !== strtolower( pathinfo( $path, PATHINFO_EXTENSION ) ) ) {
+                    return '';
+                }
+                $content = file_get_contents( $path );
+                if ( false === $content || libre_compress_sanitize_svg_content( $content ) !== $content ) {
+                    return '';
+                }
+            }
+
+            $relative = $this->to_relative_path( $path );
+            $uploads  = wp_upload_dir();
+            return '' !== $relative ? trailingslashit( $uploads['baseurl'] ) . implode( '/', array_map( 'rawurlencode', explode( '/', $relative ) ) ) : '';
+        }
+
+        return '';
     }
 
     /**

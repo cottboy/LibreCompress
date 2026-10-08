@@ -152,7 +152,7 @@ class Libre_Compress_Pngquant extends Libre_Compress_Tool_Base {
             '--skip-if-larger',
             sprintf( '--quality=%d-%d', $min_quality, $quality ),
             '--speed',
-            '1',  // 最慢但压缩比最大
+            (string) Libre_Compress_Settings::tool_speed( 'pngquant_speed' ),
         );
 
         // pngquant 只在 macOS 上默认清元数据，其他平台要显式加 --strip

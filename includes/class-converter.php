@@ -1600,19 +1600,19 @@ class Libre_Compress_Output {
             $mode = isset( $settings['webp_mode'] ) ? $settings['webp_mode'] : 'lossy';
 
             if ( 'lossless' === $mode ) {
-                return array( array( $binary, '-quiet', '-lossless', '-z', '9', $source, '-o', $output ) );
+                return array( array( $binary, '-quiet', '-lossless', '-z', (string) Libre_Compress_Settings::tool_speed( 'webp_lossless_level' ), $source, '-o', $output ) );
             }
 
             $quality = isset( $settings['webp_quality'] ) ? absint( $settings['webp_quality'] ) : 80;
             $quality = max( 0, min( 100, $quality ) );
 
-            return array( array( $binary, '-quiet', '-mt', '-q', (string) $quality, '-m', '6', $source, '-o', $output ) );
+            return array( array( $binary, '-quiet', '-mt', '-q', (string) $quality, '-m', (string) Libre_Compress_Settings::tool_speed( 'webp_method' ), $source, '-o', $output ) );
         }
 
         $mode = isset( $settings['avif_mode'] ) ? $settings['avif_mode'] : 'lossy';
 
         // avifenc 默认会把输入图片里的 EXIF/XMP 原样搬进 AVIF，而转换结果正是对外访问的那张图
-        $encode = array( $binary, '-j', '4', '-s', '0' );  // 0=最慢但体积最小
+        $encode = array( $binary, '-j', '4', '-s', (string) Libre_Compress_Settings::tool_speed( 'avif_speed' ) );
 
         if ( Libre_Compress_Settings::strips_metadata() ) {
             $encode[] = '--ignore-exif';
@@ -1783,15 +1783,16 @@ class Libre_Compress_Output {
             }
 
             $mode = isset( $settings['webp_mode'] ) ? $settings['webp_mode'] : 'lossy';
+            $method = (string) Libre_Compress_Settings::tool_speed( 'gif2webp_method' );
 
             // gif2webp 默认即无损编码，有损模式需显式开启并指定质量
             if ( 'lossy' !== $mode ) {
-                $command = array( $binary, $gif_path, '-o', $output );
+                $command = array( $binary, '-m', $method, $gif_path, '-o', $output );
             } else {
                 $quality = isset( $settings['webp_quality'] ) ? absint( $settings['webp_quality'] ) : 80;
                 $quality = max( 0, min( 100, $quality ) );
 
-                $command = array( $binary, '-lossy', '-q', (string) $quality, $gif_path, '-o', $output );
+                $command = array( $binary, '-m', $method, '-lossy', '-q', (string) $quality, $gif_path, '-o', $output );
             }
 
             return array(
@@ -1816,13 +1817,17 @@ class Libre_Compress_Output {
 
         $decode = array(
             $ffmpeg, '-y', '-loglevel', 'error', '-i', $gif_path,
-            '-pix_fmt', 'yuv420p', '-f', 'yuv4mpegpipe', $temp_y4m,
+            '-pix_fmt', 'lossless' === $mode ? 'yuv444p' : 'yuv420p', '-f', 'yuv4mpegpipe', $temp_y4m,
         );
 
-        $encode = array( $avifenc, '-j', '4', '-s', '0' );  // 0=最慢但体积最小
+        $encode = array( $avifenc, '-j', '4', '-s', (string) Libre_Compress_Settings::tool_speed( 'avif_speed' ) );
 
         if ( 'lossless' === $mode ) {
-            $encode[] = '--lossless';
+            // 对 YUV 中间帧使用无损量化，保留其实际色彩矩阵；RGB 无损预设不接受此输入。
+            $encode[] = '-q';
+            $encode[] = '100';
+            $encode[] = '--cicp';
+            $encode[] = '1/13/6';
         } else {
             $encode[] = '-q';
             $encode[] = (string) $quality;

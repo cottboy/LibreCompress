@@ -523,7 +523,71 @@ msgid "压缩时删除图片元数据"
 msgstr ""
 
 #: includes\class-settings.php:254
-msgid "删除 EXIF、GPS 拍摄位置、设备型号、作者与软件信息等隐私数据，ICC 色彩配置会保留以免偏色。取消勾选则尽量保留元数据，但 WebP 和经 PNG 中转的 AVIF 由编码工具决定，不保证留得住。原图备份始终是完整原样，备份目录已禁止直接访问。"
+msgid "删除 EXIF、GPS 拍摄位置、设备型号、作者与软件信息等隐私数据，ICC 色彩配置会保留以免偏色。取消勾选则尽量保留元数据，但 WebP 和经 PNG 中转的 AVIF 由编码工具决定，不保证留得住。原图备份始终是完整原样，备份目录允许直接访问。"
+msgstr ""
+
+#: includes/class-settings.php
+msgid "浏览器原图回退"
+msgstr ""
+
+#: includes/class-settings.php
+msgid "为不支持 WebP / AVIF 的浏览器提供备份原图"
+msgstr ""
+
+#: includes/class-settings.php
+msgid "需要启用原图备份；备份到期或被删除后回退失效。回退原图包含原始元数据，备份目录允许直接访问。"
+msgstr ""
+
+#: includes/class-settings.php
+msgid "压缩速度"
+msgstr ""
+
+#: includes/class-settings.php
+msgid "SVGO 多轮优化"
+msgstr ""
+
+#: includes/class-settings.php
+msgid "启用多轮优化"
+msgstr ""
+
+#: includes/class-settings.php
+msgid "多轮优化压缩更慢，通常文件更小；关闭后只优化一轮，速度更快。"
+msgstr ""
+
+#: includes/class-settings.php
+msgid "pngquant 有损 PNG 速度"
+msgstr ""
+
+#: includes/class-settings.php
+msgid "oxipng 无损 PNG 级别"
+msgstr ""
+
+#: includes/class-settings.php
+msgid "cwebp 有损 WebP 方法"
+msgstr ""
+
+#: includes/class-settings.php
+msgid "cwebp 无损 WebP 级别"
+msgstr ""
+
+#: includes/class-settings.php
+msgid "gif2webp 动画 WebP 方法"
+msgstr ""
+
+#: includes/class-settings.php
+msgid "avifenc AVIF 速度"
+msgstr ""
+
+#: includes/class-settings.php
+msgid "gifsicle GIF 优化级别"
+msgstr ""
+
+#: includes/class-settings.php
+msgid "数值越大速度越快，通常文件越大；数值越小压缩越慢，通常文件越小。"
+msgstr ""
+
+#: includes/class-settings.php
+msgid "数值越大压缩越慢，通常文件越小；数值越小速度越快，通常文件越大。"
 msgstr ""
 
 #: includes\class-settings.php:258

@@ -79,7 +79,7 @@ class Libre_Compress_Gifsicle extends Libre_Compress_Tool_Base {
         // 构建命令
         $command_parts = array(
             $executable,
-            '-O3',  // 最高级别无损压缩
+            '-O' . Libre_Compress_Settings::tool_speed( 'gifsicle_level' ),
         );
 
         if ( ! $lossless ) {

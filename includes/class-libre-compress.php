@@ -132,6 +132,9 @@ class Libre_Compress {
         // 初始化目标格式底层处理器
         $this->output_processor = new Libre_Compress_Output();
 
+        // 前台图片按浏览器能力选择新格式或原图备份。
+        new Libre_Compress_Fallback();
+
         // 初始化统一图片压缩处理器
         $this->processor = new Libre_Compress_Processor();
 

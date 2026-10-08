@@ -85,13 +85,13 @@ class Libre_Compress_Cwebp extends Libre_Compress_Tool_Base {
             // 无损压缩
             $command_parts[] = '-lossless';
             $command_parts[] = '-z';
-            $command_parts[] = '9';  // 最高压缩级别
+            $command_parts[] = (string) Libre_Compress_Settings::tool_speed( 'webp_lossless_level' );
         } else {
             // 有损压缩
             $command_parts[] = '-q';
             $command_parts[] = (string) $quality;
             $command_parts[] = '-m';
-            $command_parts[] = '6';  // 最彻底的编码速度
+            $command_parts[] = (string) Libre_Compress_Settings::tool_speed( 'webp_method' );
         }
 
         // 输入和输出文件

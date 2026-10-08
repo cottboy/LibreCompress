@@ -70,16 +70,19 @@ class Libre_Compress_Svgo extends Libre_Compress_Tool_Base {
         $temp_output = $this->get_temp_output_path( $file_path );
 
         // 构建命令：-q 静默输出，--multipass 多轮压缩更彻底
-        return array( array(
+        $command = array(
             $executable,
             '-q',
-            '--multipass',
             sprintf( '-p%d', $precision ),
             '-i',
             $file_path,
             '-o',
             $temp_output,
-        ) );
+        );
+        if ( in_array( $settings['svg_multipass'] ?? true, array( true, 1, '1' ), true ) ) {
+            $command[] = '--multipass';
+        }
+        return array( $command );
     }
 
     /**

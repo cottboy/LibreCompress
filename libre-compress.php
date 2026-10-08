@@ -10,7 +10,7 @@
  * License URI: https://www.gnu.org/licenses/gpl-2.0.html
  * Text Domain: libre-compress
  * Domain Path: /languages
- * Requires at least: 5.3
+ * Requires at least: 6.2
  * Requires PHP: 7.4
  *
  * @package LibreCompress
@@ -273,6 +273,7 @@ function libre_compress_load_dependencies() {
     // 加载核心类
     require_once LIBRE_COMPRESS_PATH . 'includes/class-database.php';
     require_once LIBRE_COMPRESS_PATH . 'includes/class-backup.php';
+    require_once LIBRE_COMPRESS_PATH . 'includes/class-fallback.php';
     require_once LIBRE_COMPRESS_PATH . 'includes/class-compressor.php';
     require_once LIBRE_COMPRESS_PATH . 'includes/class-converter.php';
     require_once LIBRE_COMPRESS_PATH . 'includes/class-processor.php';
@@ -311,6 +312,7 @@ function libre_compress_activate() {
         'auto_compress'         => false,
         'backup_enabled'        => true,
         'backup_retention_days' => -1,
+        'original_fallback'     => false,
         'strip_metadata'        => true,
         'tool_concurrency'      => 5,
         'output_format'         => 'webp',
@@ -328,7 +330,12 @@ function libre_compress_activate() {
         'gif_mode'           => 'lossy',
         'gif_quality'        => 60,
         'svg_precision'      => 3,
+        'svg_multipass'      => true,
     );
+
+    foreach ( Libre_Compress_Settings::SPEED_SETTINGS as $key => $range ) {
+        $default_tools[ $key ] = $range[2];
+    }
 
     // 只在选项不存在时添加默认值
     if ( false === get_option( 'libre_compress_general' ) ) {

@@ -11,6 +11,32 @@ class Libre_Compress_Settings {
      */
     const RETENTION_PERMANENT = -1;
 
+    // 统一约束保存值与命令参数，防止篡改选项绕过表单范围。
+    const SPEED_SETTINGS = array(
+        'pngquant_speed'     => array( 1, 11, 1 ),
+        'oxipng_level'       => array( 0, 6, 6 ),
+        'webp_method'        => array( 0, 6, 6 ),
+        'webp_lossless_level' => array( 0, 9, 9 ),
+        'gif2webp_method'    => array( 0, 6, 4 ),
+        'avif_speed'         => array( 0, 10, 0 ),
+        'gifsicle_level'     => array( 1, 3, 3 ),
+    );
+
+    public static function normalize_speed( string $key, $value ): int {
+        list( $min, $max, $default ) = self::SPEED_SETTINGS[ $key ];
+
+        if ( ( ! is_int( $value ) && ! is_string( $value ) ) || ! preg_match( '/^-?\d+$/D', (string) $value ) ) {
+            return $default;
+        }
+
+        return (int) max( $min, min( $max, (float) $value ) );
+    }
+
+    public static function tool_speed( string $key ): int {
+        $settings = get_option( 'libre_compress_tools', array() );
+        return self::normalize_speed( $key, $settings[ $key ] ?? null );
+    }
+
     private $current_tab = 'general';
 
     /**
@@ -84,12 +110,14 @@ class Libre_Compress_Settings {
     }
 
     public function sanitize_general_settings( $input ) {
+        $input = is_array( $input ) ? $input : array();
         $sanitized = array();
 
         $current_general = get_option( 'libre_compress_general', array() );
         $sanitized['auto_compress']      = ! empty( $input['auto_compress'] );
         $sanitized['backup_enabled']     = ! empty( $input['backup_enabled'] );
         $sanitized['backup_retention_days'] = self::normalize_retention_days( isset( $input['backup_retention_days'] ) ? $input['backup_retention_days'] : null );
+        $sanitized['original_fallback'] = isset( $input['original_fallback'] ) && '1' === (string) ( is_scalar( $input['original_fallback'] ) ? $input['original_fallback'] : '' );
         $sanitized['strip_metadata']        = ! empty( $input['strip_metadata'] );
         $sanitized['tool_concurrency']   = isset( $input['tool_concurrency'] ) ? absint( $input['tool_concurrency'] ) : 5;
         // 缩略图尺寸：每个尺寸都有隐藏域 0 和复选框 1 两个同名输入，后提交的复选框生效，
@@ -126,7 +154,12 @@ class Libre_Compress_Settings {
     }
 
     public function sanitize_tools_settings( $input ) {
+        $input = is_array( $input ) ? $input : array();
         $sanitized = array();
+
+        foreach ( self::SPEED_SETTINGS as $key => $range ) {
+            $sanitized[ $key ] = self::normalize_speed( $key, $input[ $key ] ?? null );
+        }
 
         $sanitized['jpeg_mode']    = isset( $input['jpeg_mode'] ) && in_array( $input['jpeg_mode'], array( 'lossy', 'lossless' ), true ) ? $input['jpeg_mode'] : 'lossy';
         $sanitized['jpeg_quality'] = isset( $input['jpeg_quality'] ) ? absint( $input['jpeg_quality'] ) : 80;
@@ -144,6 +177,7 @@ class Libre_Compress_Settings {
         $sanitized['gif_quality'] = isset( $input['gif_quality'] ) ? absint( $input['gif_quality'] ) : 60;
 
         $sanitized['svg_precision'] = isset( $input['svg_precision'] ) ? absint( $input['svg_precision'] ) : 3;
+        $sanitized['svg_multipass'] = isset( $input['svg_multipass'] ) && in_array( $input['svg_multipass'], array( true, 1, '1' ), true );
 
         $sanitized['jpeg_quality']       = max( 0, min( 100, $sanitized['jpeg_quality'] ) );
         $sanitized['png_lossy_quality']  = max( 0, min( 100, $sanitized['png_lossy_quality'] ) );
@@ -243,13 +277,23 @@ class Libre_Compress_Settings {
                     </td>
                 </tr>
                 <tr>
+                    <th scope="row"><?php esc_html_e( '浏览器原图回退', 'libre-compress' ); ?></th>
+                    <td>
+                        <label>
+                            <input type="checkbox" name="libre_compress_general[original_fallback]" value="1" <?php checked( ! empty( $options['original_fallback'] ) ); ?>>
+                            <?php esc_html_e( '为不支持 WebP / AVIF 的浏览器提供备份原图', 'libre-compress' ); ?>
+                        </label>
+                        <p class="description"><?php esc_html_e( '需要启用原图备份；备份到期或被删除后回退失效。回退原图包含原始元数据，备份目录允许直接访问。', 'libre-compress' ); ?></p>
+                    </td>
+                </tr>
+                <tr>
                     <th scope="row"><?php esc_html_e( '图片元数据', 'libre-compress' ); ?></th>
                     <td>
                         <label>
                             <input type="checkbox" name="libre_compress_general[strip_metadata]" value="1" <?php checked( $options['strip_metadata'] ?? true ); ?>>
                             <?php esc_html_e( '压缩时删除图片元数据', 'libre-compress' ); ?>
                         </label>
-                        <p class="description"><?php esc_html_e( '删除 EXIF、GPS 拍摄位置、设备型号、作者与软件信息等隐私数据，ICC 色彩配置会保留以免偏色。取消勾选则尽量保留元数据，但 WebP 和经 PNG 中转的 AVIF 由编码工具决定，不保证留得住。原图备份始终是完整原样，备份目录已禁止直接访问。', 'libre-compress' ); ?></p>
+                        <p class="description"><?php esc_html_e( '删除 EXIF、GPS 拍摄位置、设备型号、作者与软件信息等隐私数据，ICC 色彩配置会保留以免偏色。取消勾选则尽量保留元数据，但 WebP 和经 PNG 中转的 AVIF 由编码工具决定，不保证留得住。原图备份始终是完整原样，备份目录允许直接访问。', 'libre-compress' ); ?></p>
                     </td>
                 </tr>
                 <tr>
@@ -681,6 +725,44 @@ class Libre_Compress_Settings {
                         <input type="range" name="libre_compress_tools[svg_precision]" value="<?php echo esc_attr( $options['svg_precision'] ?? 3 ); ?>" min="0" max="8" oninput="this.nextElementSibling.value = this.value">
                         <output><?php echo esc_html( $options['svg_precision'] ?? 3 ); ?></output>
                         <p class="description"><?php esc_html_e( '坐标小数有效位数 0-8，数值越高越保真，文件越大', 'libre-compress' ); ?></p>
+                    </td>
+                </tr>
+            </table>
+
+            <h3><?php esc_html_e( '压缩速度', 'libre-compress' ); ?></h3>
+            <table class="form-table">
+                <?php
+                $speed_labels = array(
+                    'pngquant_speed'      => __( 'pngquant 有损 PNG 速度', 'libre-compress' ),
+                    'oxipng_level'        => __( 'oxipng 无损 PNG 级别', 'libre-compress' ),
+                    'webp_method'         => __( 'cwebp 有损 WebP 方法', 'libre-compress' ),
+                    'webp_lossless_level' => __( 'cwebp 无损 WebP 级别', 'libre-compress' ),
+                    'gif2webp_method'     => __( 'gif2webp 动画 WebP 方法', 'libre-compress' ),
+                    'avif_speed'          => __( 'avifenc AVIF 速度', 'libre-compress' ),
+                    'gifsicle_level'      => __( 'gifsicle GIF 优化级别', 'libre-compress' ),
+                );
+                foreach ( self::SPEED_SETTINGS as $key => $range ) :
+                    $value = self::normalize_speed( $key, $options[ $key ] ?? null );
+                    ?>
+                    <tr>
+                        <th scope="row"><label for="libre-compress-<?php echo esc_attr( $key ); ?>"><?php echo esc_html( $speed_labels[ $key ] ); ?></label></th>
+                        <td>
+                            <input type="range" id="libre-compress-<?php echo esc_attr( $key ); ?>" name="libre_compress_tools[<?php echo esc_attr( $key ); ?>]" value="<?php echo esc_attr( $value ); ?>" min="<?php echo esc_attr( $range[0] ); ?>" max="<?php echo esc_attr( $range[1] ); ?>" step="1" oninput="this.nextElementSibling.value = this.value">
+                            <output><?php echo esc_html( $value ); ?></output>
+                            <p class="description"><?php echo esc_html( in_array( $key, array( 'pngquant_speed', 'avif_speed' ), true )
+                                ? __( '数值越大速度越快，通常文件越大；数值越小压缩越慢，通常文件越小。', 'libre-compress' )
+                                : __( '数值越大压缩越慢，通常文件越小；数值越小速度越快，通常文件越大。', 'libre-compress' ) ); ?></p>
+                        </td>
+                    </tr>
+                <?php endforeach; ?>
+                <tr>
+                    <th scope="row"><?php esc_html_e( 'SVGO 多轮优化', 'libre-compress' ); ?></th>
+                    <td>
+                        <label>
+                            <input type="checkbox" name="libre_compress_tools[svg_multipass]" value="1" <?php checked( in_array( $options['svg_multipass'] ?? true, array( true, 1, '1' ), true ) ); ?>>
+                            <?php esc_html_e( '启用多轮优化', 'libre-compress' ); ?>
+                        </label>
+                        <p class="description"><?php esc_html_e( '多轮优化压缩更慢，通常文件更小；关闭后只优化一轮，速度更快。', 'libre-compress' ); ?></p>
                     </td>
                 </tr>
             </table>
