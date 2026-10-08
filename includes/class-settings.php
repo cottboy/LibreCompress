@@ -13,8 +13,8 @@ class Libre_Compress_Settings {
 
     // 统一约束保存值与命令参数，防止篡改选项绕过表单范围。
     const SPEED_SETTINGS = array(
-        'pngquant_speed'     => array( 1, 11, 4 ),
-        'oxipng_level'       => array( 0, 6, 2 ),
+        'pngquant_speed'     => array( 1, 11, 3 ),
+        'oxipng_level'       => array( 0, 6, 4 ),
         'webp_method'        => array( 0, 6, 4 ),
         'webp_lossless_level' => array( 0, 9, 6 ),
         'gif2webp_method'    => array( 0, 6, 4 ),

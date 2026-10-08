@@ -27,6 +27,14 @@ $wpdb->query( "DROP TABLE IF EXISTS {$backups_table}" );
 delete_option( 'libre_compress_general' );
 delete_option( 'libre_compress_tools' );
 delete_option( 'libre_compress_db_version' );
+delete_option( 'libre_compress_fallback_generation' );
+
+// 清除回退 Transient 的数据及有效期；外部对象缓存中的旧命名空间随有效期淘汰。
+$wpdb->query( $wpdb->prepare(
+    "DELETE FROM {$wpdb->options} WHERE option_name LIKE %s OR option_name LIKE %s",
+    $wpdb->esc_like( '_transient_libre_compress_fallback_' ) . '%',
+    $wpdb->esc_like( '_transient_timeout_libre_compress_fallback_' ) . '%'
+) );
 
 // 删除插件写入的附件处理标记、格式转换映射和恢复中间状态；统一压缩记录已随数据表删除。
 // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery

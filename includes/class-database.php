@@ -360,8 +360,13 @@ class Libre_Compress_Database {
         $format = array( '%d', '%s', '%s' );
 
         $result = $wpdb->insert( $this->backups_table, $insert_data, $format );
+        $insert_id = $wpdb->insert_id;
 
-        return $result ? $wpdb->insert_id : false;
+        if ( $result ) {
+            Libre_Compress_Fallback::invalidate_attachment( $insert_data['attachment_id'] );
+        }
+
+        return $result ? $insert_id : false;
     }
 
     /**
@@ -383,6 +388,28 @@ class Libre_Compress_Database {
             ),
             ARRAY_A
         );
+    }
+
+    /**
+     * 一次读取多个附件的备份，所有 ID 先规范化后绑定 SQL 参数。
+     */
+    public function get_backups_by_attachments( array $attachment_ids ): ?array {
+        global $wpdb;
+
+        $ids = array_values( array_unique( array_filter( array_map( 'absint', $attachment_ids ) ) ) );
+        $rows = array();
+        foreach ( array_chunk( $ids, 200 ) as $batch ) {
+            $placeholders = implode( ',', array_fill( 0, count( $batch ), '%d' ) );
+            $result = $wpdb->get_results(
+                $wpdb->prepare( "SELECT * FROM {$this->backups_table} WHERE attachment_id IN ({$placeholders})", $batch ),
+                ARRAY_A
+            );
+            if ( ! is_array( $result ) || '' !== $wpdb->last_error ) {
+                return null;
+            }
+            $rows = array_merge( $rows, $result );
+        }
+        return $rows;
     }
 
     /**
@@ -428,11 +455,15 @@ class Libre_Compress_Database {
             return false;
         }
 
+        $attachment_id = (int) $wpdb->get_var( $wpdb->prepare( "SELECT attachment_id FROM {$this->backups_table} WHERE id = %d", $backup_id ) );
+
         $result = $wpdb->delete(
             $this->backups_table,
             array( 'id' => $backup_id ),
             array( '%d' )
         );
+
+        Libre_Compress_Fallback::invalidate_attachment( $attachment_id );
 
         return false !== $result;
     }
@@ -457,6 +488,8 @@ class Libre_Compress_Database {
             array( 'attachment_id' => $attachment_id ),
             array( '%d' )
         );
+
+        Libre_Compress_Fallback::invalidate_attachment( $attachment_id );
 
         return false !== $result;
     }

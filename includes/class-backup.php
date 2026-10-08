@@ -309,6 +309,20 @@ class Libre_Compress_Backup {
         return $result;
     }
 
+    public function get_backups_batch( array $attachment_ids ): ?array {
+        $rows = libre_compress()->database->get_backups_by_attachments( $attachment_ids );
+        if ( null === $rows ) {
+            return null;
+        }
+        $result = array();
+        foreach ( $rows as $row ) {
+            $row['original_path'] = $this->to_absolute_path( (string) $row['original_path'] );
+            $row['backup_path'] = $this->to_absolute_path( (string) $row['backup_path'] );
+            $result[ (int) $row['attachment_id'] ][] = $row;
+        }
+        return $result;
+    }
+
     /**
      * 获取仍然存在且可安全公开的原图备份 URL。
      */
@@ -445,6 +459,7 @@ class Libre_Compress_Backup {
      * @return bool 是否全部删除成功
      */
     public function delete_backup( int $attachment_id ): bool {
+        Libre_Compress_Fallback::invalidate_attachment( $attachment_id );
         $database = libre_compress()->database;
         $backups  = $this->get_backups( $attachment_id );
         $success  = true;
@@ -472,6 +487,7 @@ class Libre_Compress_Backup {
             }
         }
 
+        Libre_Compress_Fallback::invalidate_attachment( $attachment_id );
         return $success;
     }
 
