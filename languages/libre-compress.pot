@@ -510,16 +510,28 @@ msgstr ""
 msgid "填 -1 表示永久保留；填天数则备份到期后自动删除，届时这张图将无法再恢复原图。0 无效，步进时会自动跳过 0。"
 msgstr ""
 
-#: includes\class-settings.php:248
+#: includes\class-settings.php:305
 msgid "图片元数据"
 msgstr ""
 
-#: includes\class-settings.php:252
+#: includes\class-settings.php:309
 msgid "压缩时删除图片元数据"
 msgstr ""
 
-#: includes\class-settings.php:254
-msgid "删除 EXIF、GPS 拍摄位置、设备型号、作者与软件信息等隐私数据，ICC 色彩配置会保留以免偏色。取消勾选则尽量保留元数据，但 WebP 和经 PNG 中转的 AVIF 由编码工具决定，不保证留得住。原图备份始终是完整原样，备份目录允许直接访问。"
+#: includes\class-settings.php:311
+msgid "删除 EXIF、GPS 拍摄位置、设备型号、作者与软件信息等隐私数据，ICC 色彩配置会保留以免偏色。取消勾选则尽量保留元数据，但 WebP 和经 PNG 中转的 AVIF 由编码工具决定，不保证留得住。这一项只作用于压缩后的图片，备份原图是否删除元数据由下方选项单独控制。"
+msgstr ""
+
+#: includes\class-settings.php:315
+msgid "备份原图元数据"
+msgstr ""
+
+#: includes\class-settings.php:319
+msgid "备份原图也删除元数据"
+msgstr ""
+
+#: includes\class-settings.php:321
+msgid "备份目录允许直接访问，开启浏览器原图回退后备份会被直接提供给浏览器。勾选后 JPEG、PNG、GIF、WebP 备份只移除元数据、图像数据原样保留，SVG 备份需安装 svgo，AVIF 备份暂不支持。代价是恢复原图时得到的也是删过元数据的版本。"
 msgstr ""
 
 #: includes/class-settings.php
@@ -531,7 +543,7 @@ msgid "为不支持新格式的浏览器提供备份原图"
 msgstr ""
 
 #: includes/class-settings.php
-msgid "仅对转换为新格式且有可用旧格式原图备份的图片生效。关闭原图备份或备份被删除后不再提供回退。同格式压缩不提供回退。回退原图包含原始元数据，备份目录允许直接访问。"
+msgid "仅对转换为新格式且有可用旧格式原图备份的图片生效。关闭原图备份或备份被删除后不再提供回退。同格式压缩不提供回退。回退原图是否带有元数据，取决于下方“备份原图也删除元数据”选项。"
 msgstr ""
 
 #: includes/class-settings.php

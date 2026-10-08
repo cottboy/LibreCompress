@@ -265,6 +265,13 @@ class Libre_Compress_Backup {
             return false;
         }
 
+        // 备份目录允许直接访问、浏览器原图回退引用的也是备份文件，
+        // 按选项先删掉备份里的元数据再落库。清理失败不终止：
+        // 保留带元数据的备份也好过没有备份，恢复功能不受损。
+        if ( Libre_Compress_Settings::strips_backup_metadata() ) {
+            $this->strip_backup_metadata( $backup_path );
+        }
+
         // 保存备份记录；数据库写入失败时删除孤立文件并终止后续破坏性操作。
         $record_id = $database->add_backup(
             array(
@@ -281,6 +288,435 @@ class Libre_Compress_Backup {
         }
 
         return true;
+    }
+
+    /**
+     * 删除备份文件里的元数据
+     *
+     * 备份目录允许直接访问、浏览器原图回退引用的也是备份文件，
+     * EXIF 里的 GPS 位置、设备型号、作者这类隐私数据不能跟着备份一起送出去。
+     *
+     * 只摘除元数据载体，图像数据原样保留；格式不支持或解析失败时返回 false，
+     * 由调用方保留原备份——清理失败不应让备份和压缩整体失败。
+     *
+     * @param string $file_path 备份文件绝对路径
+     * @return bool 是否完成清理
+     */
+    private function strip_backup_metadata( string $file_path ): bool {
+        if ( ! is_file( $file_path ) || ! is_readable( $file_path ) ) {
+            return false;
+        }
+
+        // wp_get_image_mime 认不出 SVG，按扩展名单独分支
+        if ( 'svg' === strtolower( pathinfo( $file_path, PATHINFO_EXTENSION ) ) ) {
+            return $this->strip_svg_metadata( $file_path );
+        }
+
+        switch ( wp_get_image_mime( $file_path ) ) {
+            case 'image/jpeg':
+                return $this->strip_jpeg_metadata( $file_path );
+            case 'image/png':
+                return $this->strip_png_metadata( $file_path );
+            case 'image/gif':
+                return $this->strip_gif_metadata( $file_path );
+            case 'image/webp':
+                return $this->strip_webp_metadata( $file_path );
+            default:
+                return false;
+        }
+    }
+
+    /**
+     * 删除 JPEG 备份的元数据段
+     *
+     * 逐段复制标记结构，只丢弃 APP1（EXIF 与 XMP）、APP13（IPTC）和 COM（注释）；
+     * APP0（JFIF）、APP2（ICC 色彩配置）、量化表、哈夫曼表和帧头一律保留。
+     * 遇到 SOS 说明其后是熵编码数据，剩余字节整体原样复制，图像数据一个字节都不动。
+     *
+     * @param string $file_path JPEG 文件路径
+     * @return bool 是否完成清理
+     */
+    private function strip_jpeg_metadata( string $file_path ): bool {
+        $contents = file_get_contents( $file_path );
+
+        if ( false === $contents || strlen( $contents ) < 4 ) {
+            return false;
+        }
+
+        // SOI 开头才是能按段解析的 JPEG
+        if ( "\xFF\xD8" !== substr( $contents, 0, 2 ) ) {
+            return false;
+        }
+
+        $output = "\xFF\xD8";
+        $offset = 2;
+        $total  = strlen( $contents );
+
+        while ( $offset + 4 <= $total ) {
+            if ( "\xFF" !== $contents[ $offset ] ) {
+                return false;
+            }
+
+            $marker = ord( $contents[ $offset + 1 ] );
+
+            // SOS 后的熵编码流里任何字节序列都不再解析，连同剩余部分原样带走
+            if ( 0xDA === $marker ) {
+                return $this->replace_stripped_file( $file_path, $output . substr( $contents, $offset ) );
+            }
+
+            // 段前允许 FF 填充字节，逐个跳过
+            if ( 0xFF === $marker ) {
+                $offset++;
+                continue;
+            }
+
+            // SOI、EOI、C8、RST、TEM 这类无长度标记出现在段区间即视为损坏
+            if ( $marker < 0xC0 || in_array( $marker, array( 0xC8, 0xD8, 0xD9 ), true ) ) {
+                return false;
+            }
+
+            $segment_length = unpack( 'n', substr( $contents, $offset + 2, 2 ) )[1];
+
+            if ( $segment_length < 2 || $offset + 2 + $segment_length > $total ) {
+                return false;
+            }
+
+            if ( ! in_array( $marker, array( 0xE1, 0xED, 0xFE ), true ) ) {
+                $output .= substr( $contents, $offset, 2 + $segment_length );
+            }
+
+            $offset += 2 + $segment_length;
+        }
+
+        // 没遇到 SOS 就是异常结构，保留原备份
+        return false;
+    }
+
+    /**
+     * 删除 PNG 备份的元数据文本块
+     *
+     * 只丢弃 tEXt、zTXt、iTXt、eXIf、tIME 这些承载文字、时间与 EXIF 的辅助块；
+     * ICC 色彩配置（iCCP）、尺寸、调色板、透明通道与 APNG 动图块全部保留，
+     * IDAT 里的图像数据连同 CRC 原样不动。
+     *
+     * @param string $file_path PNG 文件路径
+     * @return bool 是否完成清理
+     */
+    private function strip_png_metadata( string $file_path ): bool {
+        $contents = file_get_contents( $file_path );
+
+        if ( false === $contents || strlen( $contents ) < 8 ) {
+            return false;
+        }
+
+        $signature = "\x89PNG\r\n\x1a\n";
+
+        if ( 0 !== substr_compare( $contents, $signature, 0, 8 ) ) {
+            return false;
+        }
+
+        $output   = $signature;
+        $offset   = 8;
+        $total    = strlen( $contents );
+        $stripped = false;
+
+        // 每个块都是 4 字节长度 + 4 字节类型 + 数据 + 4 字节 CRC
+        while ( $offset + 12 <= $total ) {
+            $chunk_length = unpack( 'N', substr( $contents, $offset, 4 ) )[1];
+            $chunk_type   = substr( $contents, $offset + 4, 4 );
+            $chunk_total  = 12 + $chunk_length;
+
+            if ( $offset + $chunk_total > $total ) {
+                return false;
+            }
+
+            if ( in_array( $chunk_type, array( 'tEXt', 'zTXt', 'iTXt', 'eXIf', 'tIME' ), true ) ) {
+                $stripped = true;
+            } else {
+                $output .= substr( $contents, $offset, $chunk_total );
+            }
+
+            $offset += $chunk_total;
+        }
+
+        // 必须正好以 IEND 收尾且确实删掉了块，否则不动原备份
+        if ( ! $stripped || $offset !== $total || 'IEND' !== substr( $output, -8, 4 ) ) {
+            return false;
+        }
+
+        return $this->replace_stripped_file( $file_path, $output );
+    }
+
+    /**
+     * 删除 GIF 备份的注释扩展块
+     *
+     * GIF 的元数据主要放在注释扩展（0x21 0xFE）里，常见作者与制作工具信息；
+     * 注释扩展由若干数据子块加 0x00 结束符组成，整段摘除即可。
+     * 图形控制、应用程序（含 NETSCAPE 循环标记）和图像数据块全部保留。
+     *
+     * @param string $file_path GIF 文件路径
+     * @return bool 是否完成清理
+     */
+    private function strip_gif_metadata( string $file_path ): bool {
+        $contents = file_get_contents( $file_path );
+
+        if ( false === $contents || strlen( $contents ) < 13 ) {
+            return false;
+        }
+
+        $header = substr( $contents, 0, 6 );
+
+        if ( 'GIF87a' !== $header && 'GIF89a' !== $header ) {
+            return false;
+        }
+
+        $output   = $header;
+        $offset   = 6;
+        $total    = strlen( $contents );
+        $stripped = false;
+
+        // 逻辑屏幕描述符 7 字节；全局调色板按 2^(色深+1) 项、每项 3 字节
+        $output .= substr( $contents, 6, 7 );
+        $offset  = 13;
+
+        $global_packed = ord( $contents[ 10 ] );
+
+        if ( $global_packed & 0x80 ) {
+            $global_table_size = 3 * ( 1 << ( ( $global_packed & 0x07 ) + 1 ) );
+
+            if ( $offset + $global_table_size > $total ) {
+                return false;
+            }
+
+            $output .= substr( $contents, $offset, $global_table_size );
+            $offset += $global_table_size;
+        }
+
+        while ( $offset < $total ) {
+            $block_type = ord( $contents[ $offset ] );
+
+            // 0x3B 是文件结束符，连同剩余字节原样带走并收尾
+            if ( 0x3B === $block_type ) {
+                $output .= substr( $contents, $offset );
+                $offset  = $total;
+                break;
+            }
+
+            if ( 0x21 === $block_type ) {
+                if ( $offset + 2 > $total ) {
+                    return false;
+                }
+
+                $label    = ord( $contents[ $offset + 1 ] );
+                $position = $offset + 2;
+
+                // 扩展块由若干数据子块加结束符组成，逐个跳过定位结束位置
+                while ( $position < $total && 0x00 !== ord( $contents[ $position ] ) ) {
+                    $sub_length = ord( $contents[ $position ] );
+
+                    if ( $position + 1 + $sub_length > $total ) {
+                        return false;
+                    }
+
+                    $position += 1 + $sub_length;
+                }
+
+                if ( $position >= $total ) {
+                    return false;
+                }
+
+                $block_end = $position + 1;
+
+                if ( 0xFE === $label ) {
+                    $stripped = true;
+                } else {
+                    $output .= substr( $contents, $offset, $block_end - $offset );
+                }
+
+                $offset = $block_end;
+                continue;
+            }
+
+            if ( 0x2C === $block_type ) {
+                if ( $offset + 10 > $total ) {
+                    return false;
+                }
+
+                $local_packed = ord( $contents[ $offset + 9 ] );
+                $position     = $offset + 10;
+
+                // 局部调色板按同样的公式跳过
+                if ( $local_packed & 0x80 ) {
+                    $position += 3 * ( 1 << ( ( $local_packed & 0x07 ) + 1 ) );
+                }
+
+                // LZW 最小码长字节 + 图像数据子块
+                if ( $position >= $total ) {
+                    return false;
+                }
+
+                $position++;
+
+                while ( $position < $total && 0x00 !== ord( $contents[ $position ] ) ) {
+                    $sub_length = ord( $contents[ $position ] );
+
+                    if ( $position + 1 + $sub_length > $total ) {
+                        return false;
+                    }
+
+                    $position += 1 + $sub_length;
+                }
+
+                if ( $position >= $total ) {
+                    return false;
+                }
+
+                $block_end = $position + 1;
+                $output   .= substr( $contents, $offset, $block_end - $offset );
+                $offset    = $block_end;
+                continue;
+            }
+
+            // 无法识别的块类型：无法安全判断边界，保留原备份
+            return false;
+        }
+
+        if ( ! $stripped || 0x3B !== ord( substr( $output, -1 ) ) ) {
+            return false;
+        }
+
+        return $this->replace_stripped_file( $file_path, $output );
+    }
+
+    /**
+     * 删除 WebP 备份的元数据 chunk
+     *
+     * RIFF 容器里 EXIF 与 XMP 是两个独立 chunk，整块摘除即可；
+     * VP8/VP8L/VP8X、ANIM/ANMF、ALPH、ICCP 等图像与调色 chunk 全部保留。
+     *
+     * @param string $file_path WebP 文件路径
+     * @return bool 是否完成清理
+     */
+    private function strip_webp_metadata( string $file_path ): bool {
+        $contents = file_get_contents( $file_path );
+
+        if ( false === $contents || strlen( $contents ) < 12 ) {
+            return false;
+        }
+
+        if ( 'RIFF' !== substr( $contents, 0, 4 ) || 'WEBP' !== substr( $contents, 8, 4 ) ) {
+            return false;
+        }
+
+        $output   = substr( $contents, 0, 12 );
+        $offset   = 12;
+        $total    = strlen( $contents );
+        $stripped = false;
+
+        // 每个 chunk 是 4 字节类型 + 4 字节长度 + 数据，数据按偶数字节对齐
+        while ( $offset + 8 <= $total ) {
+            $chunk_type   = substr( $contents, $offset, 4 );
+            $chunk_length = unpack( 'V', substr( $contents, $offset + 4, 4 ) )[1];
+            $chunk_total  = 8 + $chunk_length + ( $chunk_length % 2 );
+
+            if ( $offset + $chunk_total > $total ) {
+                return false;
+            }
+
+            if ( 'EXIF' === $chunk_type || 'XMP ' === $chunk_type ) {
+                $stripped = true;
+            } else {
+                $output .= substr( $contents, $offset, $chunk_total );
+            }
+
+            $offset += $chunk_total;
+        }
+
+        if ( ! $stripped || $offset !== $total ) {
+            return false;
+        }
+
+        // RIFF 头里的总长度要按清理后的实际大小重写
+        $stripped_contents = substr( $output, 0, 4 ) . pack( 'V', strlen( $output ) - 8 ) . substr( $output, 8 );
+
+        return $this->replace_stripped_file( $file_path, $stripped_contents );
+    }
+
+    /**
+     * 删除 SVG 备份的元数据
+     *
+     * SVG 的元数据散在 <metadata>、注释和编辑器私有属性里，手写 XML 清理容易破坏文件；
+     * 直接复用压缩用的 svgo，其默认预设就会移除这些内容。svgo 不可用时保留原备份。
+     *
+     * @param string $file_path SVG 文件路径
+     * @return bool 是否完成清理
+     */
+    private function strip_svg_metadata( string $file_path ): bool {
+        $tools = libre_compress()->compressor->get_tools();
+
+        if ( ! isset( $tools['svgo'] ) || ! $tools['svgo']->is_tool_available() ) {
+            return false;
+        }
+
+        $result = $tools['svgo']->compress( $file_path );
+
+        return ! empty( $result['success'] );
+    }
+
+    /**
+     * 用清理后的内容替换备份文件
+     *
+     * 清理只会让文件变小；结果反而变大、变空或不再是同格式图片，
+     * 都说明解析出了问题，这时必须保留原备份——拿错结果覆盖原图比留着元数据更糟。
+     *
+     * @param string $file_path 备份文件绝对路径
+     * @param string $contents  清理后的文件内容
+     * @return bool 是否完成替换
+     */
+    private function replace_stripped_file( string $file_path, string $contents ): bool {
+        clearstatcache( true, $file_path );
+
+        if ( '' === $contents || ! is_file( $file_path ) || strlen( $contents ) >= filesize( $file_path ) ) {
+            return false;
+        }
+
+        $temp_path = $file_path . '.lc-strip-' . wp_generate_password( 12, false, false );
+
+        // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents
+        if ( false === file_put_contents( $temp_path, $contents ) ) {
+            if ( file_exists( $temp_path ) ) {
+                // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
+                unlink( $temp_path );
+            }
+
+            return false;
+        }
+
+        // 清理结果必须仍是同格式图片，防止把不完整的结果落成备份
+        if ( wp_get_image_mime( $temp_path ) !== wp_get_image_mime( $file_path ) ) {
+            // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
+            unlink( $temp_path );
+
+            return false;
+        }
+
+        if ( file_exists( $file_path ) && ! unlink( $file_path ) ) {
+            // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
+            unlink( $temp_path );
+
+            return false;
+        }
+
+        if ( ! rename( $temp_path, $file_path ) ) {
+            // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
+            unlink( $temp_path );
+
+            return false;
+        }
+
+        clearstatcache( true, $file_path );
+
+        return filesize( $file_path ) === strlen( $contents );
     }
 
     /**

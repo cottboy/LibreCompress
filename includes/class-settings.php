@@ -76,6 +76,20 @@ class Libre_Compress_Settings {
         return ! isset( $general['strip_metadata'] ) || (bool) $general['strip_metadata'];
     }
 
+    /**
+     * 创建原图备份时是否也删除备份文件里的元数据
+     *
+     * 备份目录允许直接访问，浏览器原图回退引用的也是备份文件；
+     * 选项缺失时按删除处理：默认保留等于默认把 GPS 位置送出去。
+     *
+     * @return bool
+     */
+    public static function strips_backup_metadata(): bool {
+        $general = get_option( 'libre_compress_general', array() );
+
+        return ! isset( $general['strip_backup_metadata'] ) || (bool) $general['strip_backup_metadata'];
+    }
+
     public function __construct() {
         $this->init_hooks();
     }
@@ -119,6 +133,7 @@ class Libre_Compress_Settings {
         $sanitized['backup_retention_days'] = self::normalize_retention_days( isset( $input['backup_retention_days'] ) ? $input['backup_retention_days'] : null );
         $sanitized['original_fallback'] = isset( $input['original_fallback'] ) && '1' === (string) ( is_scalar( $input['original_fallback'] ) ? $input['original_fallback'] : '' );
         $sanitized['strip_metadata']        = ! empty( $input['strip_metadata'] );
+        $sanitized['strip_backup_metadata'] = ! empty( $input['strip_backup_metadata'] );
         $sanitized['tool_concurrency']   = isset( $input['tool_concurrency'] ) ? absint( $input['tool_concurrency'] ) : 5;
         // 缩略图尺寸：每个尺寸都有隐藏域 0 和复选框 1 两个同名输入，后提交的复选框生效，
         // 所以未勾选时也会带上 0；表单里没有这组字段时保留原状态。
@@ -283,7 +298,7 @@ class Libre_Compress_Settings {
                             <input type="checkbox" name="libre_compress_general[original_fallback]" value="1" <?php checked( ! empty( $options['original_fallback'] ) ); ?>>
                             <?php esc_html_e( '为不支持新格式的浏览器提供备份原图', 'libre-compress' ); ?>
                         </label>
-                        <p class="description"><?php esc_html_e( '仅对转换为新格式且有可用旧格式原图备份的图片生效。关闭原图备份或备份被删除后不再提供回退。同格式压缩不提供回退。回退原图包含原始元数据，备份目录允许直接访问。', 'libre-compress' ); ?></p>
+                        <p class="description"><?php esc_html_e( '仅对转换为新格式且有可用旧格式原图备份的图片生效。关闭原图备份或备份被删除后不再提供回退。同格式压缩不提供回退。回退原图是否带有元数据，取决于下方“备份原图也删除元数据”选项。', 'libre-compress' ); ?></p>
                     </td>
                 </tr>
                 <tr>
@@ -293,7 +308,17 @@ class Libre_Compress_Settings {
                             <input type="checkbox" name="libre_compress_general[strip_metadata]" value="1" <?php checked( $options['strip_metadata'] ?? true ); ?>>
                             <?php esc_html_e( '压缩时删除图片元数据', 'libre-compress' ); ?>
                         </label>
-                        <p class="description"><?php esc_html_e( '删除 EXIF、GPS 拍摄位置、设备型号、作者与软件信息等隐私数据，ICC 色彩配置会保留以免偏色。取消勾选则尽量保留元数据，但 WebP 和经 PNG 中转的 AVIF 由编码工具决定，不保证留得住。原图备份始终是完整原样，备份目录允许直接访问。', 'libre-compress' ); ?></p>
+                        <p class="description"><?php esc_html_e( '删除 EXIF、GPS 拍摄位置、设备型号、作者与软件信息等隐私数据，ICC 色彩配置会保留以免偏色。取消勾选则尽量保留元数据，但 WebP 和经 PNG 中转的 AVIF 由编码工具决定，不保证留得住。这一项只作用于压缩后的图片，备份原图是否删除元数据由下方选项单独控制。', 'libre-compress' ); ?></p>
+                    </td>
+                </tr>
+                <tr>
+                    <th scope="row"><?php esc_html_e( '备份原图元数据', 'libre-compress' ); ?></th>
+                    <td>
+                        <label>
+                            <input type="checkbox" name="libre_compress_general[strip_backup_metadata]" value="1" <?php checked( Libre_Compress_Settings::strips_backup_metadata() ); ?>>
+                            <?php esc_html_e( '备份原图也删除元数据', 'libre-compress' ); ?>
+                        </label>
+                        <p class="description"><?php esc_html_e( '备份目录允许直接访问，开启浏览器原图回退后备份会被直接提供给浏览器。勾选后 JPEG、PNG、GIF、WebP 备份只移除元数据、图像数据原样保留，SVG 备份需安装 svgo，AVIF 备份暂不支持。代价是恢复原图时得到的也是删过元数据的版本。', 'libre-compress' ); ?></p>
                     </td>
                 </tr>
                 <tr>
