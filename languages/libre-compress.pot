@@ -518,20 +518,12 @@ msgstr ""
 msgid "压缩时删除图片元数据"
 msgstr ""
 
-#: includes\class-settings.php:311
-msgid "删除 EXIF、GPS 拍摄位置、设备型号、作者与软件信息等隐私数据，ICC 色彩配置会保留以免偏色。取消勾选则尽量保留元数据，但 WebP 和经 PNG 中转的 AVIF 由编码工具决定，不保证留得住。这一项只作用于压缩后的图片，备份原图是否删除元数据由下方选项单独控制。"
-msgstr ""
-
-#: includes\class-settings.php:315
-msgid "备份原图元数据"
-msgstr ""
-
-#: includes\class-settings.php:319
+#: includes\class-settings.php:313
 msgid "备份原图也删除元数据"
 msgstr ""
 
-#: includes\class-settings.php:321
-msgid "备份目录允许直接访问，开启浏览器原图回退后备份会被直接提供给浏览器。勾选后 JPEG、PNG、GIF、WebP 备份只移除元数据、图像数据原样保留，SVG 备份需安装 svgo，AVIF 备份暂不支持。代价是恢复原图时得到的也是删过元数据的版本。"
+#: includes\class-settings.php:315
+msgid "压缩时删除图片元数据：删除 EXIF、GPS 拍摄位置、设备型号、作者与软件信息等隐私数据，ICC 色彩配置会保留以免偏色；取消勾选则尽量保留元数据，但 WebP 和经 PNG 中转的 AVIF 由编码工具决定，不保证留得住。备份原图也删除元数据：备份目录允许直接访问、浏览器原图回退引用的也是备份，勾选后 JPEG、PNG、GIF、WebP 备份只移除元数据、图像数据原样保留，SVG 备份需安装 svgo，AVIF 备份暂不支持；取消勾选则备份保留完整元数据，恢复原图得到的也是删过元数据的版本。"
 msgstr ""
 
 #: includes/class-settings.php
