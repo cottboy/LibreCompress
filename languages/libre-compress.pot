@@ -166,8 +166,8 @@ msgstr ""
 msgid "该格式未配置格式转换"
 msgstr ""
 
-#: includes/class-converter.php:195
-msgid "同名目标文件过多，无法分配新文件名"
+#: includes/class-converter.php:213
+msgid "无法为源文件分配新文件名，已保留原文件"
 msgstr ""
 
 #: includes/class-converter.php:216
@@ -226,10 +226,6 @@ msgstr ""
 msgid "文章图片链接替换失败，已保留原文件"
 msgstr ""
 
-#: includes/class-converter.php:449
-msgid "原文件删除失败，已退回原文件引用"
-msgstr ""
-
 #: includes\class-libre-compress.php:116
 msgid "不允许反序列化单例实例"
 msgstr ""
@@ -264,6 +260,18 @@ msgstr ""
 
 #: includes\class-libre-compress.php:224 includes\class-media-library.php:217
 msgid "删除备份"
+msgstr ""
+
+#: includes\class-libre-compress.php:227
+msgid "确定要删除此图片的兼容格式回退吗？删除后不支持新格式的浏览器将直接加载新格式图片，此操作不可撤销。"
+msgstr ""
+
+#: includes\class-libre-compress.php:228
+msgid "确定要删除所有兼容格式回退吗？删除后不支持新格式的浏览器将直接加载新格式图片，此操作不可撤销。"
+msgstr ""
+
+#: includes\class-libre-compress.php:230 includes\class-media-library.php:178 includes\class-media-library.php:233
+msgid "删除兼容格式回退"
 msgstr ""
 
 #: includes\class-libre-compress.php:225
@@ -336,6 +344,18 @@ msgstr ""
 
 #: includes\class-libre-compress.php:251
 msgid "处理中断，再次执行可继续处理剩余附件。"
+msgstr ""
+
+#: includes\class-libre-compress.php:259
+msgid "删除完成"
+msgstr ""
+
+#: includes\class-libre-compress.php:261
+msgid "删除中断：已完成 %d 个附件，再次执行可继续删除剩余附件的兼容格式回退。"
+msgstr ""
+
+#: includes\class-libre-compress.php:263
+msgid "已删除 %1$d 个附件上的 %2$d 个兼容格式回退文件，替换了 %3$d 个图片链接"
 msgstr ""
 
 #: includes\class-libre-compress.php:271
@@ -416,6 +436,18 @@ msgstr ""
 
 #: includes\class-media-library.php:407
 msgid "已删除 %d 个备份文件"
+msgstr ""
+
+#: includes\class-media-library.php:459
+msgid "没有可删除的兼容格式回退"
+msgstr ""
+
+#: includes\class-media-library.php:463
+msgid "部分兼容格式回退删除失败，请重试"
+msgstr ""
+
+#: includes\class-media-library.php:466
+msgid "兼容格式回退已删除"
 msgstr ""
 
 #: includes\class-media-library.php:460
@@ -518,28 +550,8 @@ msgstr ""
 msgid "压缩时删除图片元数据"
 msgstr ""
 
-#: includes/class-settings.php:353
-msgid "备份原图也删除元数据"
-msgstr ""
-
 #: includes/class-settings.php:351
 msgid "删除 EXIF、GPS 拍摄位置、设备型号、作者与软件信息等隐私数据，ICC 色彩配置会保留以免偏色。取消勾选则尽量保留元数据，但 WebP 和经 PNG 中转的 AVIF 由编码工具决定，不保证留得住。"
-msgstr ""
-
-#: includes/class-settings.php:356
-msgid "备份目录允许直接访问，开启浏览器原图回退后备份会被直接提供给浏览器。勾选后 JPEG、PNG、GIF、WebP 备份只移除元数据、图像数据原样保留，SVG 备份需安装 svgo，AVIF 备份暂不支持。代价是恢复原图时得到的也是删过元数据的版本。"
-msgstr ""
-
-#: includes/class-settings.php
-msgid "浏览器原图回退"
-msgstr ""
-
-#: includes/class-settings.php
-msgid "为不支持新格式的浏览器提供备份原图"
-msgstr ""
-
-#: includes/class-settings.php
-msgid "仅对转换为新格式且有可用旧格式原图备份的图片生效。关闭原图备份或备份被删除后不再提供回退。同格式压缩不提供回退。回退原图是否带有元数据，取决于下方“备份原图也删除元数据”选项。"
 msgstr ""
 
 #: includes/class-settings.php
@@ -716,6 +728,14 @@ msgstr ""
 
 #: includes/class-settings.php:429
 msgid "删除所有备份文件，释放磁盘空间"
+msgstr ""
+
+#: includes/class-settings.php:466
+msgid "删除所有兼容格式回退"
+msgstr ""
+
+#: includes/class-settings.php:470
+msgid "删除媒体库中与新格式同名的旧格式文件，并把文章里指向它们的图片链接改到新格式；删除后不支持新格式的浏览器将直接加载新格式图片"
 msgstr ""
 
 #: includes/class-settings.php:435

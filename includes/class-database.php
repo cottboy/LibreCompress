@@ -362,10 +362,6 @@ class Libre_Compress_Database {
         $result = $wpdb->insert( $this->backups_table, $insert_data, $format );
         $insert_id = $wpdb->insert_id;
 
-        if ( $result ) {
-            Libre_Compress_Fallback::invalidate_attachment( $insert_data['attachment_id'] );
-        }
-
         return $result ? $insert_id : false;
     }
 
@@ -390,32 +386,6 @@ class Libre_Compress_Database {
         );
     }
 
-    /**
-     * 一次读取多个附件的备份，所有 ID 先规范化后绑定 SQL 参数。
-     */
-    public function get_backups_by_attachments( array $attachment_ids ): ?array {
-        global $wpdb;
-
-        $ids = array_values( array_unique( array_filter( array_map( 'absint', $attachment_ids ) ) ) );
-        $rows = array();
-        foreach ( array_chunk( $ids, 200 ) as $batch ) {
-            $placeholders = implode( ',', array_fill( 0, count( $batch ), '%d' ) );
-            $result = $wpdb->get_results(
-                $wpdb->prepare( "SELECT * FROM {$this->backups_table} WHERE attachment_id IN ({$placeholders})", $batch ),
-                ARRAY_A
-            );
-            if ( ! is_array( $result ) || '' !== $wpdb->last_error ) {
-                return null;
-            }
-            $rows = array_merge( $rows, $result );
-        }
-        return $rows;
-    }
-
-    /**
-     * 根据附件 ID 和原始路径获取备份
-     *
-     * 必须同时限定附件：WordPress 的重复媒体会让多个附件指向同一个文件，
      * 只按路径匹配会让后一个附件白拿前一个附件的备份，
      * 结果它自己恢复不了，而清理前一个附件时又把它唯一的恢复依据一起删掉。
      *
@@ -455,15 +425,11 @@ class Libre_Compress_Database {
             return false;
         }
 
-        $attachment_id = (int) $wpdb->get_var( $wpdb->prepare( "SELECT attachment_id FROM {$this->backups_table} WHERE id = %d", $backup_id ) );
-
         $result = $wpdb->delete(
             $this->backups_table,
             array( 'id' => $backup_id ),
             array( '%d' )
         );
-
-        Libre_Compress_Fallback::invalidate_attachment( $attachment_id );
 
         return false !== $result;
     }
@@ -488,8 +454,6 @@ class Libre_Compress_Database {
             array( 'attachment_id' => $attachment_id ),
             array( '%d' )
         );
-
-        Libre_Compress_Fallback::invalidate_attachment( $attachment_id );
 
         return false !== $result;
     }
@@ -535,6 +499,42 @@ class Libre_Compress_Database {
         );
 
         return array_map( 'absint', (array) $ids );
+    }
+
+    /**
+     * 按附件 ID 游标获取留有兼容格式回退的附件
+     *
+     * 以格式转换映射为准：只有转换过的附件才在媒体库里留下同名旧格式文件。
+     * 文件是否还在磁盘上由调用方逐个确认，这里只负责把候选范围缩到最小。
+     *
+     * @param int $after_id 上一批最后处理的附件 ID
+     * @param int $limit    本批数量
+     * @return int[]
+     */
+    public function get_fallback_attachment_ids_after( $after_id = 0, $limit = 20 ): array {
+        global $wpdb;
+
+        $after_id = absint( $after_id );
+        $limit    = max( 1, min( 100, absint( $limit ) ) );
+
+        // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+        $ids = $wpdb->get_col(
+            $wpdb->prepare(
+                "SELECT m.post_id FROM {$wpdb->postmeta} m
+                INNER JOIN {$wpdb->posts} p ON p.ID = m.post_id
+                WHERE m.meta_key = %s
+                  AND m.post_id > %d
+                  AND p.post_type = 'attachment'
+                  AND p.post_status <> 'trash'
+                ORDER BY m.post_id ASC
+                LIMIT %d",
+                Libre_Compress_Output::OUTPUT_META_KEY,
+                $after_id,
+                $limit
+            )
+        );
+
+        return array_map( 'absint', $ids );
     }
 
     /**

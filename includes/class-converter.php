@@ -14,12 +14,15 @@ if ( ! defined( 'ABSPATH' ) ) {
  * 目标格式输出处理器
  *
  * 将勾选格式的图片（PNG/JPG/GIF/SVG）压缩输出为 WebP 或 AVIF，是统一压缩入口
- * 的一部分：结果小于源文件时生成真实的新文件并替换源文件，同步附件路径、元数据、
- * MIME 和文章内已固化的图片链接；结果没有变小时保留原图，按节省 0% 记为已压缩。
+ * 的一部分：结果小于源文件时生成真实的新文件并接管附件引用，同步附件路径、元数据、
+ * MIME 和文章内已固化的图片链接。
+ *
+ * 新旧格式严格同名不同后缀：旧格式文件留在原地并同样经过压缩，作为前台
+ * <picture> 的兼容格式回退，回退地址只靠换后缀拼接，不查询数据库。
  *
  * 单文件处理分成准备和提交两步。准备阶段只写目标文件和映射，提交阶段负责引用、
- * 链接和源文件清理，任何一步失败都会把引用退回源文件并记录失败，下次执行凭映射
- * 接管已有结果继续提交，不会重复编码。
+ * 链接，任何一步失败都会把引用退回源文件并记录失败，下次执行凭映射接管已有结果
+ * 继续提交，不会重复编码。
  */
 class Libre_Compress_Output {
 
@@ -38,7 +41,7 @@ class Libre_Compress_Output {
     const REFERENCE_BATCH_SIZE = 100;
 
     /**
-     * 目标文件名分配的最大尝试次数
+     * 文件名分配的最大尝试次数
      *
      * @var int
      */
@@ -82,6 +85,16 @@ class Libre_Compress_Output {
         'gif' => 'image/gif',
         'svg' => 'image/svg+xml',
     );
+
+    /**
+     * 参与同名判断的扩展名
+     *
+     * 覆盖插件会读写的一切图片后缀：这些后缀里只要出现同名文件，新旧格式就不再是
+     * 唯一的一对，回退地址可能取到别人的图片。
+     *
+     * @var array
+     */
+    private $name_conflict_extensions = array( 'jpg', 'jpeg', 'png', 'gif', 'svg', 'webp', 'avif' );
 
     /**
      * 获取目标格式输出设置
@@ -132,8 +145,12 @@ class Libre_Compress_Output {
     /**
      * 将单个文件压缩为目标格式（准备阶段）
      *
-     * 只生成目标文件、压缩记录和恢复映射，不改动附件引用；引用同步和源文件清理
-     * 由提交阶段统一完成，因此结果不更小或备份失败时源文件必然完好。
+     * 流程固定为：目标名重名时先给源文件改名 → 备份原图 → 转换生成新格式 →
+     * 单独压缩旧格式。备份必须早于改名和转换，否则备份下来的是动过的文件；
+     * 旧格式必须在转换之后再压缩，否则压缩损失会叠加到转换质量上。
+     *
+     * 只生成目标文件、压缩记录和恢复映射，不改动附件引用；引用同步由提交阶段
+     * 统一完成，因此结果不更小或备份失败时源文件必然完好。
      *
      * @param int    $attachment_id 附件 ID
      * @param string $file_path     源文件绝对路径
@@ -174,28 +191,60 @@ class Libre_Compress_Output {
 
         $original_size = (int) filesize( $file_path );
         $tool_name     = $target;
-        $target_path   = '';
 
         // 已有映射说明插件此前确实把该文件转换过一次，可能是上次提交中断。
         // 只认映射，不能凭同名文件或大小猜测，否则会误把无关图片当作压缩结果接管。
-        $entry = $this->find_output_entry( $attachment_id, $size_type );
+        $entry          = $this->find_output_entry( $attachment_id, $size_type );
+        $natural_target = $this->natural_target_path( $file_path, $target );
 
-        if ( $entry && $this->is_safe_destination_path( $entry['to'] ) ) {
-            if ( $this->is_safe_path( $entry['to'] ) && (int) filesize( $entry['to'] ) < $original_size ) {
-                return $this->prepare_existing_output( $attachment_id, $file_path, $entry['to'], $size_type, $original_size, $tool_name );
-            }
-
-            // 结果文件缺失或已不再比源文件小时，重新编码到同一目标名，不另起新名字留下多余文件。
-            $target_path = $entry['to'];
-        } else {
-            $target_path = $this->allocate_target_path( $file_path, $target );
+        if ( null !== $entry && $this->normalized_path( $entry['to'] ) !== $this->normalized_path( $natural_target ) ) {
+            // 映射指向旧方案分配的名字，与"新旧格式同名"的回退规则不符，按新规则重新开始。
+            $this->remove_output_entry( $attachment_id, $size_type );
+            $entry = null;
         }
 
-        if ( '' === $target_path ) {
-            $result_template['message']       = __( '同名目标文件过多，无法分配新文件名', 'libre-compress' );
+        // 同名不同格式的文件已存在时先给源文件改名：目标名被占用会覆盖别人的图，
+        // 只是后缀不同的同名文件则会让回退地址取到不属于本附件的图片。
+        // 改名后新旧格式才是唯一的一对，回退地址只靠换后缀就能拼出来。
+        if ( null === $entry && $this->has_name_conflict( $file_path ) ) {
+            $renamed = $this->rename_source_for_target( $attachment_id, $file_path );
+
+            if ( null === $renamed ) {
+                $result_template['message']       = __( '无法为源文件分配新文件名，已保留原文件', 'libre-compress' );
+                $result_template['original_size'] = $original_size;
+                return $result_template;
+            }
+
+            $file_path                   = $renamed;
+            $natural_target              = $this->natural_target_path( $file_path, $target );
+            $result_template['file_path'] = $file_path;
+            $result_template['from']     = $file_path;
+        }
+
+        // 备份先于任何改动：备份的必须是还没被压缩和转换动过的原图。
+        $settings_general = get_option( 'libre_compress_general', array() );
+        $backup_enabled   = isset( $settings_general['backup_enabled'] ) ? (bool) $settings_general['backup_enabled'] : true;
+
+        if ( $backup_enabled && ! libre_compress()->backup->create_backup( $attachment_id, $file_path ) ) {
+            $result_template['message']       = __( '无法创建原图备份，已停止压缩', 'libre-compress' );
             $result_template['original_size'] = $original_size;
             return $result_template;
         }
+
+        if ( null !== $entry && $this->is_safe_path( $entry['to'] ) && (int) filesize( $entry['to'] ) < $original_size ) {
+            // 上次已生成的转换结果仍然有效，直接接管，不重复编码。
+            $adopted = $this->prepare_existing_output( $attachment_id, $file_path, $entry['to'], $size_type, $original_size, $tool_name );
+
+            if ( isset( $adopted['status'] ) && 'success' === $adopted['status'] ) {
+                // 上次可能中断在旧格式压缩之前：这里补上兼容格式回退的压缩。
+                $this->compress_fallback_file( $attachment_id, $file_path, $size_type );
+            }
+
+            return $adopted;
+        }
+
+        // 没有可接管的结果时重新编码；复用了旧映射的目标名，避免另起新名字留下多余文件。
+        $target_path = null !== $entry ? $entry['to'] : $natural_target;
 
         $temp_token  = wp_generate_password( 12, false, false );
         $temp_output = $file_path . '.lc-compress-' . $temp_token . '.' . $target;
@@ -330,17 +379,6 @@ class Libre_Compress_Output {
             return $result_template;
         }
 
-        // 只在确定要提交替换时创建备份；备份失败必须终止。
-        $settings_general = get_option( 'libre_compress_general', array() );
-        $backup_enabled   = isset( $settings_general['backup_enabled'] ) ? (bool) $settings_general['backup_enabled'] : true;
-        if ( $backup_enabled
-            && ! libre_compress()->backup->create_backup( $attachment_id, $file_path ) ) {
-            // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
-            unlink( $temp_output );
-            $result_template['message'] = __( '无法创建原图备份，已停止压缩', 'libre-compress' );
-            return $result_template;
-        }
-
         // 先写入目标文件并保留临时文件，状态写入失败时源文件仍然完好。
         // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_copy
         if ( ! copy( $temp_output, $target_path ) || ! file_exists( $target_path ) || (int) filesize( $target_path ) !== $compressed_size ) {
@@ -375,6 +413,10 @@ class Libre_Compress_Output {
 
         // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
         unlink( $temp_output );
+
+        // 旧格式压缩成兼容格式回退：新格式已从未被压缩过的原图生成，这里再单独压缩旧格式。
+        // 顺序不能反——先压缩旧格式再转换会让转换质量受损。
+        $this->compress_fallback_file( $attachment_id, $file_path, $size_type );
 
         return array(
             'file_path'       => $target_path,
@@ -432,9 +474,10 @@ class Libre_Compress_Output {
     /**
      * 提交格式转换结果
      *
-     * 顺序固定为：附件路径与元数据 → MIME → 文章内图片链接 → 删除源文件。
-     * 任一步失败都把引用退回源文件并把记录写成失败，源文件和转换结果都留在磁盘上，
-     * 下次执行凭映射继续提交，不会留下指向已删除文件的引用。
+     * 顺序固定为：附件路径与元数据 → MIME → 文章内图片链接。
+     * 旧格式文件按同名规则留在原地作为兼容格式回退，提交不删除任何源文件。
+     * 任一步失败都把引用退回源文件并把记录写成失败，下次执行凭映射继续提交，
+     * 不会留下指向已删除文件的引用。
      *
      * @param int   $attachment_id 附件 ID
      * @param array $output_map    size_type => array( from, to )
@@ -460,10 +503,6 @@ class Libre_Compress_Output {
 
         if ( ! $this->update_content_references( $this->reference_pairs( $entries, false ) ) ) {
             return $this->abort_commit( $attachment_id, $snapshot, $entries, __( '文章图片链接替换失败，已保留原文件', 'libre-compress' ) );
-        }
-
-        if ( ! $this->remove_replaced_files( $entries ) ) {
-            return $this->abort_commit( $attachment_id, $snapshot, $entries, __( '原文件删除失败，已退回原文件引用', 'libre-compress' ) );
         }
 
         return true;
@@ -493,38 +532,13 @@ class Libre_Compress_Output {
      * @return bool 恒为 false
      */
     private function abort_commit( int $attachment_id, array $snapshot, array $entries, string $message ): bool {
-        // 源文件是逐条删除的，失败时可能只删掉一部分。此时把引用全量退回快照，
-        // 会让附件引用和正文链接指向已经被删除的源文件，全站图片直接 404。
-        // 因此只对仍然存在的源文件做退回，已删除的就让引用留在转换结果上。
-        $restorable = array();
+        // 源文件按同名规则留在原地，回退引用永远有文件可指。
+        $this->restore_reference_snapshot( $attachment_id, $snapshot );
+        $this->update_content_references( $this->reference_pairs( $entries, true ) );
 
         foreach ( $entries as $entry ) {
-            if ( file_exists( $entry['from'] ) ) {
-                $restorable[] = $entry;
-            }
-        }
-
-        // 主文件源文件已被删除时，退回附件路径同样会指向不存在的文件；
-        // 转换结果还在，引用应当留在转换结果上。
-        $full_alive = true;
-
-        if ( isset( $entries['full'] ) && ! file_exists( $entries['full']['from'] ) ) {
-            $full_alive = false;
-        }
-
-        if ( $full_alive ) {
-            $this->restore_reference_snapshot( $attachment_id, $snapshot );
-        }
-
-        if ( ! empty( $restorable ) ) {
-            $this->update_content_references( $this->reference_pairs( $restorable, true ) );
-        }
-
-        foreach ( $entries as $entry ) {
-            // 源文件已删时记录要指向仍在使用的转换结果，否则记录会指向不存在的文件。
-            $record_path = file_exists( $entry['from'] ) ? $entry['from'] : $entry['to'];
-            $size        = file_exists( $record_path ) ? (int) filesize( $record_path ) : 0;
-            $saved       = $this->save_record( $attachment_id, $record_path, $entry['size_type'], $size, $size, 'target-output', 'failed', $message );
+            $size  = file_exists( $entry['from'] ) ? (int) filesize( $entry['from'] ) : 0;
+            $saved = $this->save_record( $attachment_id, $entry['from'], $entry['size_type'], $size, $size, 'target-output', 'failed', $message );
 
             if ( ! $saved ) {
                 // 连失败记录都写不进去时，绝不能留下成功记录造成误判。
@@ -1174,60 +1188,313 @@ class Libre_Compress_Output {
     }
 
     /**
-     * 删除已被替换掉的源文件
+     * 新旧格式同名规则下，同目录是否已有同名不同后缀的文件
      *
-     * @param array $entries 条目集合
-     * @return bool 是否全部删除成功
+     * 目标名被占用会直接覆盖别人的图片；哪怕只是后缀不同的同名文件，回退地址也会
+     * 按后缀顺序取到不属于本附件的图片。两种情况都必须先给源文件改名。
+     *
+     * @param string $file_path 源文件绝对路径
+     * @return bool
      */
-    private function remove_replaced_files( array $entries ): bool {
-        foreach ( $entries as $entry ) {
-            if ( ! file_exists( $entry['from'] ) ) {
+    private function has_name_conflict( string $file_path ): bool {
+        $directory = dirname( $file_path );
+        $basename  = pathinfo( $file_path, PATHINFO_FILENAME );
+        $extension = strtolower( pathinfo( $file_path, PATHINFO_EXTENSION ) );
+
+        foreach ( $this->name_conflict_extensions as $candidate ) {
+            if ( $candidate === $extension ) {
                 continue;
             }
 
-            if ( ! $this->is_safe_path( $entry['from'] ) || is_link( $entry['from'] ) ) {
-                return false;
-            }
-
-            // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
-            if ( ! unlink( $entry['from'] ) ) {
-                return false;
-            }
-
-            if ( file_exists( $entry['from'] ) ) {
-                return false;
+            if ( file_exists( $directory . '/' . $basename . '.' . $candidate ) ) {
+                return true;
             }
         }
 
-        return true;
+        return false;
     }
 
     /**
-     * 分配未被占用的目标文件路径
-     *
-     * 同名目标文件属于谁无法凭名字和大小判断，因此一律换新名字，不覆盖任何文件。
+     * 新旧格式同名规则下的目标文件路径
      *
      * @param string $file_path 源文件绝对路径
      * @param string $target    目标格式
-     * @return string 无法分配时返回空字符串
+     * @return string
      */
-    private function allocate_target_path( string $file_path, string $target ): string {
-        $directory = dirname( $file_path );
-        $name      = pathinfo( $file_path, PATHINFO_FILENAME );
-        $candidate = $directory . '/' . $name . '.' . $target;
-        $attempt   = 0;
+    private function natural_target_path( string $file_path, string $target ): string {
+        return dirname( $file_path ) . '/' . pathinfo( $file_path, PATHINFO_FILENAME ) . '.' . $target;
+    }
 
-        while ( file_exists( $candidate ) ) {
-            $attempt++;
+    /**
+     * 目标名被占用时给源文件改一个独一无二的名字
+     *
+     * 顺序固定为：正文链接 → 元数据与附件路径 → 磁盘改名。正文链接先改，失败时还没有
+     * 动过任何文件；任一步失败都会把已完成的步骤退回原状，绝不留下引用不到的图片。
+     *
+     * @param int    $attachment_id 附件 ID
+     * @param string $file_path     源文件绝对路径
+     * @return string|null 改名后的绝对路径，失败返回 null
+     */
+    private function rename_source_for_target( int $attachment_id, string $file_path ): ?string {
+        $new_path = $this->allocate_unique_source_path( $file_path );
 
-            if ( $attempt > self::MAX_NAME_ATTEMPTS ) {
-                return '';
-            }
-
-            $candidate = $directory . '/' . $name . '-' . $attempt . '.' . $target;
+        if ( '' === $new_path ) {
+            return null;
         }
 
-        return $candidate;
+        // 正文里固化的旧地址先改到新名字，失败时磁盘和元数据都还没动。
+        if ( ! $this->update_content_references(
+            array(
+                array(
+                    'from' => $file_path,
+                    'to'   => $new_path,
+                ),
+            )
+        ) ) {
+            return null;
+        }
+
+        $metadata = wp_get_attachment_metadata( $attachment_id );
+        $attached = (string) get_post_meta( $attachment_id, '_wp_attached_file', true );
+        $updated  = is_array( $metadata ) ? $this->apply_renamed_metadata( $metadata, $file_path, $new_path ) : $metadata;
+
+        // 只有附件路径本来就指向这个文件时才跟着改名，缩略图文件不能写进附件路径。
+        $is_source = '' !== $attached
+            && $this->normalized_path( $attached ) === $this->normalized_path( $this->get_relative_upload_path( $file_path ) );
+
+        // 元数据没跟上就把元数据和正文退回原名字，文件一个字节都没动。
+        if ( ! $this->write_metadata( $attachment_id, is_array( $updated ) ? $updated : array() )
+            || ( $is_source && ! $this->write_attached_file( $attachment_id, $new_path ) ) ) {
+            if ( is_array( $metadata ) ) {
+                $this->write_metadata( $attachment_id, $metadata );
+            }
+            if ( $is_source ) {
+                $this->write_attached_file( $attachment_id, $file_path );
+            }
+            $this->update_content_references(
+                array(
+                    array(
+                        'from' => $new_path,
+                        'to'   => $file_path,
+                    ),
+                )
+            );
+
+            return null;
+        }
+
+        // phpcs:ignore WordPress.WP.AlternativeFunctions.rename_rename
+        if ( ! rename( $file_path, $new_path ) || ! is_file( $new_path ) ) {
+            // 改名失败：元数据、附件路径和正文全部退回原名，磁盘保持原样。
+            if ( is_array( $metadata ) ) {
+                $this->write_metadata( $attachment_id, $metadata );
+            }
+            if ( $is_source ) {
+                $this->write_attached_file( $attachment_id, $file_path );
+            }
+            $this->update_content_references(
+                array(
+                    array(
+                        'from' => $new_path,
+                        'to'   => $file_path,
+                    ),
+                )
+            );
+
+            return null;
+        }
+
+        return $new_path;
+    }
+
+    /**
+     * 分配未被占用的源文件名
+     *
+     * 与 WordPress 上传时的避让规则一致：依次追加 -1、-2 等数字后缀。
+     *
+     * @param string $file_path 源文件绝对路径
+     * @return string 无法分配时返回空字符串
+     */
+    private function allocate_unique_source_path( string $file_path ): string {
+        $directory = dirname( $file_path );
+        $name      = pathinfo( $file_path, PATHINFO_FILENAME );
+        $extension = pathinfo( $file_path, PATHINFO_EXTENSION );
+
+        for ( $attempt = 1; $attempt <= self::MAX_NAME_ATTEMPTS; $attempt++ ) {
+            $candidate = $directory . '/' . $name . '-' . $attempt . '.' . $extension;
+
+            if ( ! file_exists( $candidate ) ) {
+                return $this->is_safe_destination_path( $candidate ) ? $candidate : '';
+            }
+        }
+
+        return '';
+    }
+
+    /**
+     * 按改名后的路径更新元数据中的文件名
+     *
+     * @param array  $metadata 现有元数据
+     * @param string $old_path 改名前的绝对路径
+     * @param string $new_path 改名后的绝对路径
+     * @return array
+     */
+    private function apply_renamed_metadata( array $metadata, string $old_path, string $new_path ): array {
+        $old_relative = $this->get_relative_upload_path( $old_path );
+        $new_relative = $this->get_relative_upload_path( $new_path );
+        $old_name     = basename( $old_relative );
+        $new_name     = basename( $new_relative );
+
+        if ( ! empty( $metadata['file'] )
+            && $this->normalized_path( (string) $metadata['file'] ) === $this->normalized_path( $old_relative ) ) {
+            $metadata['file'] = $new_relative;
+        }
+
+        if ( ! empty( $metadata['original_image'] ) && (string) $metadata['original_image'] === $old_name ) {
+            $metadata['original_image'] = $new_name;
+        }
+
+        if ( ! empty( $metadata['sizes'] ) && is_array( $metadata['sizes'] ) ) {
+            foreach ( $metadata['sizes'] as $size_name => $size_data ) {
+                if ( ! is_array( $size_data ) || empty( $size_data['file'] ) ) {
+                    continue;
+                }
+
+                if ( (string) $size_data['file'] === $old_name ) {
+                    $metadata['sizes'][ $size_name ]['file'] = $new_name;
+                }
+            }
+        }
+
+        return $metadata;
+    }
+
+    /**
+     * 把旧格式文件压缩成兼容格式回退文件
+     *
+     * 转换此时已从没有被压缩过的原图生成新格式，旧格式再单独压缩：先压缩旧格式再转换
+     * 会让转换质量受损，顺序不能反。压缩记录写在后缀区分的尺寸类型下，
+     * 避免与新格式文件的记录争用同一行。
+     *
+     * @param int    $attachment_id 附件 ID
+     * @param string $file_path     旧格式文件绝对路径
+     * @param string $size_type     尺寸类型
+     */
+    private function compress_fallback_file( int $attachment_id, string $file_path, string $size_type ): void {
+        $fallback_size_type = $this->fallback_size_type( $size_type );
+        $record             = libre_compress()->database->get_record( $attachment_id, $fallback_size_type );
+
+        // 已经按同样大小压缩过就跳过：接管旧结果时重复压缩没有收益。
+        if ( $this->record_matches_file( $record, $file_path ) ) {
+            return;
+        }
+
+        libre_compress()->compressor->compress_file( $attachment_id, $file_path, $fallback_size_type );
+    }
+
+    /**
+     * 兼容格式回退文件专用的记录尺寸类型
+     *
+     * 压缩记录表以 (attachment_id, size_type) 唯一：新旧格式文件同属一个尺寸，
+     * 回退文件必须落在另一个键下，否则会顶掉新格式文件的记录。
+     *
+     * @param string $size_type 尺寸类型
+     * @return string
+     */
+    private function fallback_size_type( string $size_type ): string {
+        return substr( 'fallback_' . $size_type, 0, 50 );
+    }
+
+    /**
+     * 压缩记录是否与当前文件完全匹配
+     *
+     * @param array|null $record    压缩记录
+     * @param string     $file_path 文件绝对路径
+     * @return bool
+     */
+    private function record_matches_file( $record, string $file_path ): bool {
+        if ( ! is_array( $record ) || 'success' !== ( isset( $record['status'] ) ? (string) $record['status'] : '' ) || empty( $record['file_path'] ) ) {
+            return false;
+        }
+
+        clearstatcache( true, $file_path );
+
+        if ( ! is_file( $file_path ) ) {
+            return false;
+        }
+
+        return $this->normalized_path( (string) $record['file_path'] ) === $this->normalized_path( $this->get_relative_upload_path( $file_path ) )
+            && (int) $record['compressed_size'] === (int) filesize( $file_path );
+    }
+
+    /**
+     * 获取附件可以删除的兼容格式回退条目
+     *
+     * 仍在使用的文件、磁盘上已不存在的文件和没有新格式对应的文件都不删：
+     * 删掉任何一个都会让附件或正文失去可用的图片。
+     *
+     * @param int $attachment_id 附件 ID
+     * @return array 每项包含 from、to 和 size_type
+     */
+    public function get_fallback_entries( int $attachment_id ): array {
+        $live = array();
+
+        foreach ( libre_compress()->compressor->get_attachment_files( $attachment_id ) as $file ) {
+            $live[] = $this->normalized_path( $file['file_path'] );
+        }
+
+        $entries = array();
+
+        foreach ( $this->get_output_entries( $attachment_id ) as $entry ) {
+            if ( in_array( $this->normalized_path( $entry['from'] ), $live, true ) ) {
+                continue;
+            }
+
+            if ( ! is_file( $entry['from'] ) || ! is_file( $entry['to'] ) ) {
+                continue;
+            }
+
+            $entries[] = $entry;
+        }
+
+        return $entries;
+    }
+
+    /**
+     * 删除附件在媒体库里的旧格式回退文件
+     *
+     * 旧格式文件按同名规则留在原地，不写进附件元数据，WordPress 删除附件时不会带走
+     * 它们，只能由插件按映射清理，否则会一直占着磁盘。
+     *
+     * @param int $attachment_id 附件 ID
+     */
+    public function delete_fallback_files( int $attachment_id ): void {
+        foreach ( $this->get_output_entries( $attachment_id ) as $entry ) {
+            if ( is_link( $entry['from'] ) || ! is_file( $entry['from'] ) ) {
+                continue;
+            }
+
+            // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
+            unlink( $entry['from'] );
+        }
+    }
+
+    /**
+     * 删除兼容格式回退文件的压缩记录
+     *
+     * 回退文件已删除，记录指向的文件不再存在，留着只会让状态与实际不符。
+     *
+     * @param int   $attachment_id 附件 ID
+     * @param array $size_types    已删除回退文件对应的尺寸类型
+     */
+    public function forget_fallback_records( int $attachment_id, array $size_types ): void {
+        foreach ( $size_types as $size_type ) {
+            $record = libre_compress()->database->get_record( $attachment_id, $this->fallback_size_type( (string) $size_type ) );
+
+            if ( is_array( $record ) && ! empty( $record['id'] ) ) {
+                libre_compress()->database->delete_record( (int) $record['id'] );
+            }
+        }
     }
 
     /**

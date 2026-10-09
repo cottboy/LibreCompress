@@ -132,8 +132,8 @@ class Libre_Compress {
         // 初始化目标格式底层处理器
         $this->output_processor = new Libre_Compress_Output();
 
-        // 前台图片按浏览器能力选择新格式或原图备份。
-        new Libre_Compress_Fallback();
+        // 前台图片按浏览器能力选择新格式或同名的旧格式回退文件。
+        new Libre_Compress_Compatible_Fallback();
 
         // 初始化统一图片压缩处理器
         $this->processor = new Libre_Compress_Processor();
@@ -224,7 +224,10 @@ class Libre_Compress {
                     'confirmGenerateThumbnails' => __( '确定要为已勾选但缺失的尺寸补生成缩略图吗？这可能需要一些时间。', 'libre-compress' ),
                     'confirmDeleteBackup'     => __( '确定要删除此图片的备份吗？删除后将无法恢复原图。', 'libre-compress' ),
                     'confirmDeleteAllBackups' => __( '确定要删除所有原图备份吗？删除后将无法恢复原图。', 'libre-compress' ),
+                    'confirmDeleteFallback'   => __( '确定要删除此图片的兼容格式回退吗？删除后不支持新格式的浏览器将直接加载新格式图片，此操作不可撤销。', 'libre-compress' ),
+                    'confirmDeleteAllFallbacks' => __( '确定要删除所有兼容格式回退吗？删除后不支持新格式的浏览器将直接加载新格式图片，此操作不可撤销。', 'libre-compress' ),
                     'deleteBackup'            => __( '删除备份', 'libre-compress' ),
+                    'deleteFallback'          => __( '删除兼容格式回退', 'libre-compress' ),
                     'noCompressItems'         => __( '没有需要压缩的图片', 'libre-compress' ),
                     'processing'              => __( '处理中...', 'libre-compress' ),
                     'batchProgress'           => __( '已处理 %d 个图片', 'libre-compress' ),
@@ -252,6 +255,13 @@ class Libre_Compress {
                     'thumbnailGenerateSummary' => __( '已为 %1$d 个附件补生成 %2$d 个缩略图（%3$d 个无需处理或已跳过，%4$d 个失败）', 'libre-compress' ),
                     'thumbnailContentFailed'  => __( '部分正文链接未更新成功，可再次执行本操作继续处理。', 'libre-compress' ),
                     'thumbnailInterrupted'    => __( '处理中断，再次执行可继续处理剩余附件。', 'libre-compress' ),
+                    'fallbackProgress'        => __( '已处理 %d 个附件', 'libre-compress' ),
+                    'fallbackFinished'        => __( '删除完成', 'libre-compress' ),
+                    /* translators: %d: 已处理附件数 */
+                    'fallbackInterrupted'     => __( '删除中断：已完成 %d 个附件，再次执行可继续删除剩余附件的兼容格式回退。', 'libre-compress' ),
+                    /* translators: 1: 涉及的附件数, 2: 删除的回退文件数, 3: 替换的链接数 */
+                    'fallbackSummary'         => __( '已删除 %1$d 个附件上的 %2$d 个兼容格式回退文件，替换了 %3$d 个图片链接', 'libre-compress' ),
+                    'fallbackContentFailed'   => __( '部分正文链接未更新成功，可再次执行本操作继续处理。', 'libre-compress' ),
                 ),
             )
         );

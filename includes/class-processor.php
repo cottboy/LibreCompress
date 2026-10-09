@@ -76,6 +76,11 @@ class Libre_Compress_Processor {
     const BACKUP_PRUNE_PAGE_SIZE = 20;
 
     /**
+     * 删除兼容格式回退时单批处理的附件数量
+     */
+    const FALLBACK_PAGE_SIZE = 20;
+
+    /**
      * 单次定时任务最多清理的附件数量，剩余积压延后到补排的任务
      */
     const BACKUP_PRUNE_LIMIT = 200;
@@ -683,16 +688,18 @@ class Libre_Compress_Processor {
         $restored = 0;
 
         foreach ( $backups as $backup ) {
-            $original  = (string) $backup['original_path'];
-            $mapped    = $this->entry_of_source( $revertible, $original );
-            $is_live   = in_array( $this->normalized_path( $original ), $live, true );
+            $original = (string) $backup['original_path'];
+            $mapped   = $this->entry_of_source( $revertible, $original );
+            $is_live  = in_array( $this->normalized_path( $original ), $live, true );
 
             if ( null === $mapped && ! $is_live ) {
                 // 既不是现用文件也不属于本次要退回的源文件，写回只会凭空多出无引用的图片。
                 continue;
             }
 
-            if ( ! $this->restore_backup_row( $backup, $is_live ) ) {
+            // 旧格式文件按同名规则留在原地作为兼容格式回退，恢复时该路径上很可能是
+            // 已压缩的旧格式文件：它同样是本次要退回的源文件，必须允许备份覆盖。
+            if ( ! $this->restore_backup_row( $backup, $is_live || null !== $mapped ) ) {
                 return false;
             }
 
@@ -721,10 +728,11 @@ class Libre_Compress_Processor {
      * 写回单个备份文件，已还原过的情况视为成功
      *
      * @param array $backup       备份索引行
-     * @param bool  $is_live      原路径是否是该附件当前引用的文件
+     * @param bool  $allow_existing 原路径已有文件时是否允许覆盖；该文件不是本附件现用
+     *                              文件、又不是本次要退回的源文件时必须为 false
      * @return bool
      */
-    private function restore_backup_row( array $backup, bool $is_live ): bool {
+    private function restore_backup_row( array $backup, bool $allow_existing ): bool {
         $original = (string) $backup['original_path'];
 
         if ( ! file_exists( $backup['backup_path'] ) ) {
@@ -732,7 +740,7 @@ class Libre_Compress_Processor {
             return file_exists( $original );
         }
 
-        return libre_compress()->backup->restore_backup_file( $backup, $is_live );
+        return libre_compress()->backup->restore_backup_file( $backup, $allow_existing );
     }
 
     /**
@@ -1164,6 +1172,132 @@ class Libre_Compress_Processor {
     }
 
     /**
+     * 删除附件的兼容格式回退文件
+     *
+     * 只删除仍有对应新格式文件的旧格式文件，并把正文里指向旧格式的链接改到新格式，
+     * 删除后不支持新格式的浏览器也统一加载新格式图片。
+     *
+     * @param int $attachment_id 附件 ID
+     * @return array deleted_files、replaced、failed
+     */
+    public function delete_fallback( int $attachment_id ): array {
+        $result = array(
+            'deleted_files' => 0,
+            'replaced'      => 0,
+            'failed'        => false,
+        );
+
+        if ( ! $attachment_id ) {
+            $result['failed'] = true;
+            return $result;
+        }
+
+        $lock = $this->acquire_attachment_lock( $attachment_id );
+
+        if ( false === $lock ) {
+            $result['failed'] = true;
+            return $result;
+        }
+
+        $global_lock = $this->acquire_global_lock( false );
+
+        if ( false === $global_lock ) {
+            $this->release_attachment_lock( $lock );
+            $result['failed'] = true;
+            return $result;
+        }
+
+        try {
+            $pairs   = array();
+            $deleted = array();
+
+            foreach ( libre_compress()->output_processor->get_fallback_entries( $attachment_id ) as $entry ) {
+                // 回退文件必须位于 uploads 内且不是符号链接，否则一律不动。
+                if ( ! $this->is_inside_upload_dir( $entry['from'] ) || is_link( $entry['from'] ) ) {
+                    $result['failed'] = true;
+                    continue;
+                }
+
+                // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
+                if ( ! unlink( $entry['from'] ) || file_exists( $entry['from'] ) ) {
+                    $result['failed'] = true;
+                    continue;
+                }
+
+                $deleted[] = $entry['size_type'];
+                $pairs[]   = array(
+                    'from' => $entry['from'],
+                    'to'   => $entry['to'],
+                );
+
+                $result['deleted_files']++;
+            }
+
+            if ( empty( $pairs ) ) {
+                return $result;
+            }
+
+            // 删除后正文里固化的旧格式地址会 404，必须改到新格式。
+            $replaced              = 0;
+            $updated               = libre_compress()->output_processor->update_content_references( $pairs, $replaced );
+            $result['replaced']    = $replaced;
+            $result['failed']      = $result['failed'] || ! $updated;
+
+            // 回退文件已删除，指向它的压缩记录不再描述任何真实文件。
+            libre_compress()->output_processor->forget_fallback_records( $attachment_id, $deleted );
+
+            return $result;
+        } finally {
+            $this->release_attachment_lock( $global_lock );
+            $this->release_attachment_lock( $lock );
+        }
+    }
+
+    /**
+     * 分页删除所有附件的兼容格式回退
+     *
+     * @param int $after_id 上一批最后处理的附件 ID
+     * @return array processed、deleted_files、replaced、failed_ids、next_after、has_more
+     */
+    public function delete_fallbacks_page( int $after_id = 0 ): array {
+        $ids      = libre_compress()->database->get_fallback_attachment_ids_after( $after_id, self::FALLBACK_PAGE_SIZE + 1 );
+        $has_more = count( $ids ) > self::FALLBACK_PAGE_SIZE;
+
+        if ( $has_more ) {
+            array_pop( $ids );
+        }
+
+        $deleted_files = 0;
+        $replaced      = 0;
+        $processed     = 0;
+        $failed        = array();
+
+        foreach ( $ids as $attachment_id ) {
+            $result = $this->delete_fallback( $attachment_id );
+
+            $deleted_files += (int) $result['deleted_files'];
+            $replaced      += (int) $result['replaced'];
+
+            if ( (int) $result['deleted_files'] > 0 ) {
+                $processed++;
+            }
+
+            if ( ! empty( $result['failed'] ) ) {
+                $failed[] = $attachment_id;
+            }
+        }
+
+        return array(
+            'processed'     => $processed,
+            'deleted_files' => $deleted_files,
+            'replaced'      => $replaced,
+            'failed_ids'    => $failed,
+            'next_after'    => empty( $ids ) ? $after_id : (int) max( $ids ),
+            'has_more'      => $has_more,
+        );
+    }
+
+    /**
      * 删除附件备份
      *
      * @param int $attachment_id 附件 ID
@@ -1425,6 +1559,9 @@ class Libre_Compress_Processor {
         }
 
         try {
+            // 旧格式回退文件不写进附件元数据，WordPress 删附件时不会带走它们，先按映射删掉。
+            libre_compress()->output_processor->delete_fallback_files( $attachment_id );
+
             $this->clear_attachment_history( $attachment_id );
         } finally {
             $this->release_attachment_lock( $global_lock );

@@ -3,7 +3,7 @@
  * Plugin Name: LibreCompress
  * Plugin URI: https://github.com/cottboy/libre-compress
  * Description: 免费的 WordPress 图片压缩插件。
- * Version: 1.2.0
+ * Version: 1.3.0
  * Author: cottboy
  * Author URI: https://github.com/cottboy
  * License: GPL v2 or later
@@ -24,7 +24,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 /**
  * 插件版本号
  */
-define( 'LIBRE_COMPRESS_VERSION', '1.2.0' );
+define( 'LIBRE_COMPRESS_VERSION', '1.3.0' );
 
 /**
  * 插件文件路径
@@ -273,7 +273,7 @@ function libre_compress_load_dependencies() {
     // 加载核心类
     require_once LIBRE_COMPRESS_PATH . 'includes/class-database.php';
     require_once LIBRE_COMPRESS_PATH . 'includes/class-backup.php';
-    require_once LIBRE_COMPRESS_PATH . 'includes/class-fallback.php';
+    require_once LIBRE_COMPRESS_PATH . 'includes/class-compatible-fallback.php';
     require_once LIBRE_COMPRESS_PATH . 'includes/class-compressor.php';
     require_once LIBRE_COMPRESS_PATH . 'includes/class-converter.php';
     require_once LIBRE_COMPRESS_PATH . 'includes/class-processor.php';
@@ -312,9 +312,7 @@ function libre_compress_activate() {
         'auto_compress'         => false,
         'backup_enabled'        => true,
         'backup_retention_days' => -1,
-        'original_fallback'     => false,
         'strip_metadata'        => true,
-        'strip_backup_metadata' => true,
         'image_size_threshold'  => 2560,
         'tool_concurrency'      => 5,
         'output_format'         => 'webp',

@@ -41,6 +41,8 @@ class Libre_Compress_Media_Library {
         add_action( 'wp_ajax_libre_compress_clear_records', array( $this, 'ajax_clear_records' ) );
         add_action( 'wp_ajax_libre_compress_delete_backup', array( $this, 'ajax_delete_backup' ) );
         add_action( 'wp_ajax_libre_compress_delete_all_backups', array( $this, 'ajax_delete_all_backups' ) );
+        add_action( 'wp_ajax_libre_compress_delete_fallback', array( $this, 'ajax_delete_fallback' ) );
+        add_action( 'wp_ajax_libre_compress_delete_all_fallbacks', array( $this, 'ajax_delete_all_fallbacks' ) );
     }
 
     /**
@@ -91,13 +93,16 @@ class Libre_Compress_Media_Library {
         $state      = $processor->get_attachment_state( $attachment_id );
         $has_backup = libre_compress()->backup->has_backup( $attachment_id );
 
+        // 只有转换过的附件才会在媒体库里留下同名旧格式文件，且必须仍有对应的新格式文件。
+        $has_fallback = ! empty( libre_compress()->output_processor->get_fallback_entries( $attachment_id ) );
+
         // 引用已还原但残留尚未清理时，恢复按钮仍要可用，否则用户无法重试收尾。
         $can_restore = $has_backup || $processor->has_pending_restore( $attachment_id );
 
         if ( 'complete' === $state['status'] ) {
-            $this->render_compressed_status( $attachment_id, $state, $has_backup, $can_restore );
+            $this->render_compressed_status( $attachment_id, $state, $has_backup, $can_restore, $has_fallback );
         } elseif ( 'partial' === $state['status'] ) {
-            $this->render_partial_status( $attachment_id, $state, $has_backup, $can_restore );
+            $this->render_partial_status( $attachment_id, $state, $has_backup, $can_restore, $has_fallback );
         } elseif ( 'failed' === $state['status'] ) {
             $this->render_failed_status( $attachment_id );
         } else {
@@ -144,8 +149,9 @@ class Libre_Compress_Media_Library {
      * @param array $state         统一状态
      * @param bool  $has_backup    是否有备份
      * @param bool  $can_restore   是否可恢复
+     * @param bool  $has_fallback  是否有兼容格式回退
      */
-    private function render_partial_status( int $attachment_id, array $state, bool $has_backup, bool $can_restore ) {
+    private function render_partial_status( int $attachment_id, array $state, bool $has_backup, bool $can_restore, bool $has_fallback ) {
         ?>
         <div class="libre-compress-status" data-attachment-id="<?php echo esc_attr( $attachment_id ); ?>">
             <span class="status-text" style="color: #dba617;">
@@ -167,6 +173,11 @@ class Libre_Compress_Media_Library {
                     <?php esc_html_e( '恢复原图', 'libre-compress' ); ?>
                 </button>
             <?php endif; ?>
+            <?php if ( $has_fallback ) : ?>
+                <button type="button" class="button button-small libre-compress-btn" data-action="delete-fallback" data-attachment-id="<?php echo esc_attr( $attachment_id ); ?>">
+                    <?php esc_html_e( '删除兼容格式回退', 'libre-compress' ); ?>
+                </button>
+            <?php endif; ?>
             <?php if ( $has_backup ) : ?>
                 <button type="button" class="button button-small libre-compress-btn" data-action="delete-backup" data-attachment-id="<?php echo esc_attr( $attachment_id ); ?>">
                     <?php esc_html_e( '删除备份', 'libre-compress' ); ?>
@@ -183,8 +194,9 @@ class Libre_Compress_Media_Library {
      * @param array $stats         压缩统计
      * @param bool  $has_backup    是否有备份
      * @param bool  $can_restore   是否可恢复
+     * @param bool  $has_fallback  是否有兼容格式回退
      */
-    private function render_compressed_status( int $attachment_id, array $stats, bool $has_backup, bool $can_restore ) {
+    private function render_compressed_status( int $attachment_id, array $stats, bool $has_backup, bool $can_restore, bool $has_fallback ) {
         $original_size   = isset( $stats['total_original_size'] ) ? max( 0, absint( $stats['total_original_size'] ) ) : 0;
         $compressed_size = isset( $stats['total_compressed_size'] ) ? max( 0, absint( $stats['total_compressed_size'] ) ) : 0;
         $saved_bytes     = max( 0, $original_size - $compressed_size );
@@ -216,6 +228,11 @@ class Libre_Compress_Media_Library {
                 <button type="button" class="button button-small libre-compress-btn" data-action="restore" data-attachment-id="<?php echo esc_attr( $attachment_id ); ?>">
                     <?php esc_html_e( '恢复原图', 'libre-compress' ); ?>
                 </button>
+                <?php if ( $has_fallback ) : ?>
+                    <button type="button" class="button button-small libre-compress-btn" data-action="delete-fallback" data-attachment-id="<?php echo esc_attr( $attachment_id ); ?>">
+                        <?php esc_html_e( '删除兼容格式回退', 'libre-compress' ); ?>
+                    </button>
+                <?php endif; ?>
                 <?php if ( $has_backup ) : ?>
                     <button type="button" class="button button-small libre-compress-btn" data-action="delete-backup" data-attachment-id="<?php echo esc_attr( $attachment_id ); ?>">
                         <?php esc_html_e( '删除备份', 'libre-compress' ); ?>
@@ -413,6 +430,66 @@ class Libre_Compress_Media_Library {
                     $count
                 ),
                 'deleted_count' => $count,
+            )
+        );
+    }
+
+    /**
+     * AJAX: 删除单张图片的兼容格式回退
+     */
+    public function ajax_delete_fallback() {
+        // 验证 nonce
+        check_ajax_referer( 'libre_compress_nonce', 'nonce' );
+
+        // 验证权限
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( array( 'message' => __( '权限不足', 'libre-compress' ) ) );
+        }
+
+        // 获取参数
+        $attachment_id = isset( $_POST['attachment_id'] ) ? absint( $_POST['attachment_id'] ) : 0;
+
+        if ( ! libre_compress()->processor->is_valid_attachment( $attachment_id ) ) {
+            wp_send_json_error( array( 'message' => __( '无效的图片附件', 'libre-compress' ) ) );
+        }
+
+        $result = libre_compress()->processor->delete_fallback( $attachment_id );
+
+        if ( empty( $result['deleted_files'] ) ) {
+            wp_send_json_error( array( 'message' => __( '没有可删除的兼容格式回退', 'libre-compress' ) ) );
+        }
+
+        if ( ! empty( $result['failed'] ) ) {
+            wp_send_json_error( array( 'message' => __( '部分兼容格式回退删除失败，请重试', 'libre-compress' ) ) );
+        }
+
+        wp_send_json_success( array( 'message' => __( '兼容格式回退已删除', 'libre-compress' ) ) );
+    }
+
+    /**
+     * AJAX: 分页删除所有兼容格式回退
+     */
+    public function ajax_delete_all_fallbacks() {
+        // 验证 nonce
+        check_ajax_referer( 'libre_compress_nonce', 'nonce' );
+
+        // 验证权限
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( array( 'message' => __( '权限不足', 'libre-compress' ) ) );
+        }
+
+        $after_id = isset( $_POST['after'] ) ? absint( $_POST['after'] ) : 0;
+        $page     = libre_compress()->processor->delete_fallbacks_page( $after_id );
+
+        wp_send_json_success(
+            array(
+                'processed'     => $page['processed'],
+                'deleted_files' => $page['deleted_files'],
+                'replaced'      => $page['replaced'],
+                'failed_count'  => count( $page['failed_ids'] ),
+                'failed_ids'    => $page['failed_ids'],
+                'next_after'    => $page['next_after'],
+                'has_more'      => $page['has_more'],
             )
         );
     }

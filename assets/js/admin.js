@@ -38,6 +38,7 @@
             $('#libre-compress-generate-thumbnails').on('click', this.handleGenerateMissingThumbnails.bind(this));
             $('#libre-compress-bulk-compress').on('click', this.handleBulkCompress.bind(this));
             $('#libre-compress-delete-all-backups').on('click', this.handleDeleteAllBackups.bind(this));
+            $('#libre-compress-delete-all-fallbacks').on('click', this.handleDeleteAllFallbacks.bind(this));
 
             // 原图备份保留时长不接受 0，步进跨过 0 时按方向落到 1 或 -1
             $(document).on('input change', '#libre-compress-retention-days', this.skipRetentionZero.bind(this));
@@ -88,6 +89,8 @@
                 this.restoreSingle(attachmentId, $btn);
             } else if (action === 'delete-backup') {
                 this.deleteBackup(attachmentId, $btn);
+            } else if (action === 'delete-fallback') {
+                this.deleteFallback(attachmentId, $btn);
             }
         },
 
@@ -189,6 +192,40 @@
                 error: function() {
                     alert(self.i18n.error);
                     $btn.prop('disabled', false).text(self.i18n.deleteBackup);
+                }
+            });
+        },
+
+        /**
+         * 删除单张图片的兼容格式回退
+         */
+        deleteFallback: function(attachmentId, $btn) {
+            var self = this;
+
+            if (!confirm(this.i18n.confirmDeleteFallback)) {
+                $btn.prop('disabled', false).text(self.i18n.deleteFallback);
+                return;
+            }
+
+            $.ajax({
+                url: this.ajaxUrl,
+                type: 'POST',
+                data: {
+                    action: 'libre_compress_delete_fallback',
+                    nonce: this.nonce,
+                    attachment_id: attachmentId
+                },
+                success: function(response) {
+                    if (response.success) {
+                        location.reload();
+                    } else {
+                        alert(response.data.message || self.i18n.error);
+                        $btn.prop('disabled', false).text(self.i18n.deleteFallback);
+                    }
+                },
+                error: function() {
+                    alert(self.i18n.error);
+                    $btn.prop('disabled', false).text(self.i18n.deleteFallback);
                 }
             });
         },
@@ -714,6 +751,106 @@
                     $btn.prop('disabled', false);
                 }
             });
+        },
+
+        /**
+         * 删除所有兼容格式回退（按附件游标分页，避免大媒体库单次请求超时）
+         */
+        handleDeleteAllFallbacks: function(e) {
+            e.preventDefault();
+
+            if (!confirm(this.i18n.confirmDeleteAllFallbacks)) {
+                return;
+            }
+
+            var self = this;
+            var $btn = $(e.currentTarget);
+
+            $btn.prop('disabled', true).text(this.i18n.processing);
+
+            var after = 0;
+            var done = 0;
+            var pageErrors = 0;
+            var acc = {
+                processed: 0, deleted: 0, replaced: 0,
+                failed: 0, failedIds: [], contentFailed: false
+            };
+
+            function finish(interrupted) {
+                var summary = self.i18n.fallbackSummary
+                    .replace('%1$d', acc.processed)
+                    .replace('%2$d', acc.deleted)
+                    .replace('%3$d', acc.replaced);
+
+                if (acc.contentFailed) {
+                    summary += ' ' + self.i18n.fallbackContentFailed;
+                }
+
+                summary += self.formatFailedIds(acc.failedIds);
+
+                if (interrupted) {
+                    summary += '\n' + self.i18n.fallbackInterrupted.replace('%d', done);
+                } else {
+                    summary += '\n' + self.i18n.fallbackFinished;
+                }
+
+                alert(summary);
+                $btn.prop('disabled', false);
+                location.reload();
+            }
+
+            function loadPage() {
+                $.ajax({
+                    url: self.ajaxUrl,
+                    type: 'POST',
+                    data: {
+                        action: 'libre_compress_delete_all_fallbacks',
+                        nonce: self.nonce,
+                        after: after
+                    },
+                    success: function(response) {
+                        pageErrors = 0;
+
+                        if (!response.success) {
+                            finish(true);
+                            return;
+                        }
+
+                        var d = response.data || {};
+                        done += parseInt(d.processed, 10) || 0;
+                        acc.processed += parseInt(d.processed, 10) || 0;
+                        acc.deleted += parseInt(d.deleted_files, 10) || 0;
+                        acc.replaced += parseInt(d.replaced, 10) || 0;
+
+                        if (parseInt(d.failed_count, 10) > 0) {
+                            acc.contentFailed = true;
+                        }
+
+                        acc.failed += (d.failed_ids || []).length;
+                        acc.failedIds = acc.failedIds.concat(d.failed_ids || []);
+                        $btn.text(self.i18n.fallbackProgress.replace('%d', done));
+
+                        if (d.has_more && parseInt(d.next_after, 10) > after) {
+                            after = parseInt(d.next_after, 10);
+                            loadPage();
+                        } else {
+                            finish(false);
+                        }
+                    },
+                    error: function() {
+                        pageErrors++;
+
+                        if (pageErrors <= 3) {
+                            loadPage();
+                            return;
+                        }
+
+                        finish(true);
+                    }
+                });
+            }
+
+            loadPage();
         },
 
     };
