@@ -1663,22 +1663,26 @@ class Libre_Compress_Output {
      *
      * 同一个文件在 srcset 里可能出现多次，按出现次数计更接近用户看到的“替换了多少链接”。
      *
+     * 必须按新地址统计：新文件名是旧文件名再加一段扩展名（photo.jpg → photo.jpg.webp），
+     * 旧地址是新地址的前缀，用旧地址做子串统计时改写后的正文里仍能匹配到同名前缀，
+     * 一减永远是 0。
+     *
      * @param string $before       改写前的正文
      * @param string $after        改写后的正文
-     * @param array  $replacements 每项包含 from 绝对路径
+     * @param array  $replacements 每项包含 from、to 绝对路径
      * @return int
      */
     private function count_missing_references( string $before, string $after, array $replacements ): int {
         $count = 0;
 
         foreach ( $replacements as $replacement ) {
-            $needle = $this->content_path_of( $replacement['from'] );
+            $needle = $this->content_path_of( $replacement['to'] );
 
             if ( '' === $needle ) {
                 continue;
             }
 
-            $count += max( 0, substr_count( $before, $needle ) - substr_count( $after, $needle ) );
+            $count += max( 0, substr_count( $after, $needle ) - substr_count( $before, $needle ) );
         }
 
         return $count;
