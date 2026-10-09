@@ -42,11 +42,14 @@ class Libre_Compress_Image_Tag_Processor extends WP_HTML_Tag_Processor {
 class Libre_Compress_Compatible_Fallback {
 
     /**
-     * 新格式后缀对应的候选旧格式后缀（按常见程度排序）
+     * 新格式后缀对应的候选旧格式后缀
+     *
+     * 顺序即前台的探测顺序：同名文件哪个先存在就用哪个，所以顺序本身也是优先级。
+     * 转换前的同名判断要用它算出"排在本文件之前"的候选，两边必须保持一致。
      *
      * @var array
      */
-    private $fallback_extensions = array( 'jpg', 'jpeg', 'png', 'gif', 'svg' );
+    const FALLBACK_EXTENSIONS = array( 'jpg', 'jpeg', 'png', 'gif', 'svg' );
 
     /**
      * 构造函数
@@ -242,7 +245,7 @@ class Libre_Compress_Compatible_Fallback {
         $basename  = pathinfo( $relative, PATHINFO_FILENAME );
         $prefix    = ( '.' === $directory ? '' : $directory . '/' );
 
-        foreach ( $this->fallback_extensions as $extension ) {
+        foreach ( self::FALLBACK_EXTENSIONS as $extension ) {
             $candidate = $prefix . $basename . '.' . $extension;
 
             if ( $this->fallback_file_exists( $candidate ) ) {

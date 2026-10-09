@@ -193,7 +193,7 @@ class Libre_Compress_Output {
             $entry = null;
         }
 
-        // 目标名已被占用时先给源文件改名，否则会直接覆盖掉那个文件。
+        // 同目录已有会让回退地址出错的同名不同后缀文件时，先给源文件改一个独一无二的名字。
         if ( null === $entry && $this->has_name_conflict( $file_path, $target ) ) {
             $renamed = $this->rename_source_for_target( $attachment_id, $file_path );
 
@@ -1176,17 +1176,33 @@ class Libre_Compress_Output {
     }
 
     /**
-     * 同目录是否已有同名不同后缀的目标格式文件
+     * 同目录是否已有同名不同后缀的文件会让回退地址出错
      *
-     * 转换要落地的名字是新旧格式同名换后缀，目标名已被占用就直接覆盖别人的图片，
-     * 因此必须先给源文件改一个独一无二的名字。
+     * 前台按 FALLBACK_EXTENSIONS 的顺序探测回退文件，排在本文件后缀之前的候选一旦存在，
+     * 探到的就是别人的图片；目标后缀被占用则会直接覆盖掉那个文件。两种情况都必须先给
+     * 源文件改一个独一无二的名字，改名后新旧格式才是唯一的一对。
      *
      * @param string $file_path 源文件绝对路径
      * @param string $target    目标格式
      * @return bool
      */
     private function has_name_conflict( string $file_path, string $target ): bool {
-        return file_exists( $this->natural_target_path( $file_path, $target ) );
+        $directory = dirname( $file_path );
+        $basename  = pathinfo( $file_path, PATHINFO_FILENAME );
+        $extension = strtolower( pathinfo( $file_path, PATHINFO_EXTENSION ) );
+
+        // 只可能压过本文件的候选才需要避开；排在自己后面的候选探测不到，与本文件无关。
+        $probe = Libre_Compress_Compatible_Fallback::FALLBACK_EXTENSIONS;
+        $rank  = array_search( $extension, $probe, true );
+        $ahead = false === $rank ? $probe : array_slice( $probe, 0, (int) $rank );
+
+        foreach ( array_merge( $ahead, array( $target ) ) as $candidate ) {
+            if ( file_exists( $directory . '/' . $basename . '.' . $candidate ) ) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
