@@ -186,6 +186,9 @@ class Libre_Compress_Settings {
         $sanitized['output_svg'] = ! empty( $input['output_svg'] );
         $sanitized['output_format'] = ( isset( $input['output_format'] ) && in_array( $input['output_format'], array( 'webp', 'avif' ), true ) ) ? $input['output_format'] : 'webp';
 
+        // 兼容格式回退开关
+        $sanitized['fallback_enabled'] = ! empty( $input['fallback_enabled'] );
+
         // SVG 上传开关
         $sanitized['allow_svg_upload'] = ! empty( $input['allow_svg_upload'] );
 
@@ -371,6 +374,16 @@ class Libre_Compress_Settings {
                             <span class="seg-thumb"></span>
                         </span>
                         <p class="description"><?php esc_html_e( '选择目标格式：AVIF 压缩率更高但压缩更慢，WebP 兼容性更好。', 'libre-compress' ); ?></p>
+                    </td>
+                </tr>
+                <tr>
+                    <th scope="row"><?php esc_html_e( '兼容格式回退', 'libre-compress' ); ?></th>
+                    <td>
+                        <label style="display:block;">
+                            <input type="checkbox" name="libre_compress_general[fallback_enabled]" value="1" <?php checked( $options['fallback_enabled'] ?? true ); ?>>
+                            <?php esc_html_e( '为转换后的图片提供旧格式回退', 'libre-compress' ); ?>
+                        </label>
+                        <p class="description"><?php esc_html_e( '格式转换后，旧格式文件与新的 WebP/AVIF 同名不同后缀留在媒体库原地。开启后前台用 <picture> 输出：支持新格式的浏览器加载新格式，不支持的浏览器加载同样压缩过的旧格式。关闭后只输出新格式，旧格式文件仍留在磁盘上，可用下方的“删除所有兼容格式回退”清理。', 'libre-compress' ); ?></p>
                     </td>
                 </tr>
                 <tr>

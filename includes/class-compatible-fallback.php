@@ -64,12 +64,21 @@ class Libre_Compress_Compatible_Fallback {
     }
 
     /**
-     * 后台不参与：媒体库列表和编辑器预览没有必要包一层 picture
+     * 是否输出兼容格式回退
+     *
+     * 后台不参与：媒体库列表和编辑器预览没有必要包一层 picture。
+     * 前台还要看设置里的开关，关掉后只输出新格式，不支持新格式的浏览器直接加载新格式图。
      *
      * @return bool
      */
     private function enabled(): bool {
-        return ! is_admin();
+        if ( is_admin() ) {
+            return false;
+        }
+
+        $general = get_option( 'libre_compress_general', array() );
+
+        return ! empty( $general['fallback_enabled'] );
     }
 
     /**

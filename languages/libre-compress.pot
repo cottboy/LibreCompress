@@ -662,6 +662,18 @@ msgstr ""
 msgid "选择目标格式：AVIF 压缩率更高但压缩更慢，WebP 兼容性更好。"
 msgstr ""
 
+#: includes/class-settings.php:380
+msgid "兼容格式回退"
+msgstr ""
+
+#: includes/class-settings.php:384
+msgid "为转换后的图片提供旧格式回退"
+msgstr ""
+
+#: includes/class-settings.php:386
+msgid "格式转换后，旧格式文件与新的 WebP/AVIF 同名不同后缀留在媒体库原地。开启后前台用 <picture> 输出：支持新格式的浏览器加载新格式，不支持的浏览器加载同样压缩过的旧格式。关闭后只输出新格式，旧格式文件仍留在磁盘上，可用下方的“删除所有兼容格式回退”清理。"
+msgstr ""
+
 #: includes/class-settings.php:408
 msgid "大图缩放阈值"
 msgstr ""
