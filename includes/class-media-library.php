@@ -65,6 +65,12 @@ class Libre_Compress_Media_Library {
             .wp-list-table .column-libre_compress {
                 width: 160px;
             }
+
+            /* 按钮换行时上下留出间距，避免行与行贴在一起 */
+            .wp-list-table .column-libre_compress .libre-compress-status .libre-compress-btn {
+                margin-top: 6px;
+                margin-bottom: 6px;
+            }
         </style>
         <?php
     }
