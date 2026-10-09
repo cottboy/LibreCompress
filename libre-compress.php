@@ -313,7 +313,7 @@ function libre_compress_activate() {
         'backup_enabled'        => true,
         'backup_retention_days' => -1,
         'strip_metadata'        => true,
-        'fallback_enabled'      => true,
+        'fallback_enabled'      => false,
         'image_size_threshold'  => 2560,
         'tool_concurrency'      => 5,
         'output_format'         => 'webp',

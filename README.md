@@ -121,7 +121,7 @@ PNG 严格按当前有损/无损设置选择工具，不会静默切换压缩模
 - **SVG 上传**：允许受信任用户上传 SVG，并清理危险内容。
 - **格式转换**：勾选需要输出为 WebP/AVIF 的源格式；未勾选格式只做同格式压缩。
 - **目标格式**：WebP 或 AVIF 二选一。
-- **兼容格式回退**：默认开启。控制前台是否为转换后的图片包 `<picture>` 输出旧格式回退，关闭后只输出新格式；磁盘上的旧格式文件不受影响，仍可用删除入口清理。
+- **兼容格式回退**：默认关闭。控制前台是否为转换后的图片包 `<picture>` 输出旧格式回退，关闭后只输出新格式；磁盘上的旧格式文件不受影响，仍可用删除入口清理。
 - **大图缩放阈值**：默认 2560，与 WordPress 默认一致。上传图片的宽或高超过此阈值会重新编码出一张 `-scaled` 缩放图并接管原文件位置，未缩放的源文件仍留在磁盘上；填 0 关闭自动缩放，原图文件直接投入使用。压缩未压缩的图片时同样按此阈值处理：主文件超出就生成新的 `-scaled` 接管主文件，未缩放源文件按 WordPress 原生机制保留并写入 `original_image` 元数据，正文里固化的旧图片地址会被一并改写，已压缩的图片不再改动。SVG、动画 GIF、动画 WebP 与 APNG 不参与缩放。
 - **缩略图尺寸**：一行一个列出当前注册的全部缩略图尺寸，默认全部勾选。取消勾选的尺寸在上传图片时不再生成，已经存在的历史文件用“删除未勾选尺寸的缩略图”清理；以后主题或插件新注册的尺寸默认勾选。APNG 动图不参与压缩与转换，也不会被补生成缩略图。
 
@@ -241,7 +241,7 @@ LibreCompress/
 └── languages/libre-compress.pot
 ```
 
-## 开发者接口
+## 接口
 
 自定义同格式压缩工具可继承 `Libre_Compress_Tool_Base`，实现 `get_name()`、`get_supported_formats()`、`get_executable_name()`、`build_command()` 等方法，然后通过以下钩子注册：
 
@@ -256,7 +256,3 @@ add_action( 'libre_compress_register_tools', function ( $compressor ) {
 - `libre_compress_register_tools`：注册同格式压缩工具；
 - `libre_compress_before_compress`：每个文件压缩前触发；
 - `libre_compress_after_compress`：每个文件压缩成功后触发。
-
-## 许可证
-
-GPL v2 or later。详见 [LICENSE](LICENSE)。
