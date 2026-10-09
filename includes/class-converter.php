@@ -1389,11 +1389,14 @@ class Libre_Compress_Output {
      * 压缩记录表以 (attachment_id, size_type) 唯一：新旧格式文件同属一个尺寸，
      * 回退文件必须落在另一个键下，否则会顶掉新格式文件的记录。
      *
+     * 截断长度与记录表的 size_type 列宽保持一致：列宽之内不可能写失败，
+     * 而两个尺寸名要撞车得前 91 个字符完全相同，实际不存在。
+     *
      * @param string $size_type 尺寸类型
      * @return string
      */
     private function fallback_size_type( string $size_type ): string {
-        return substr( 'fallback_' . $size_type, 0, 50 );
+        return substr( 'fallback_' . $size_type, 0, 100 );
     }
 
     /**
