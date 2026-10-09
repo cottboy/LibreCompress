@@ -35,21 +35,11 @@ class Libre_Compress_Image_Tag_Processor extends WP_HTML_Tag_Processor {
 /**
  * 兼容格式回退
  *
- * 格式转换后旧格式文件按"同名不同后缀"留在媒体库原地：新格式是对外使用的主文件，
- * 旧格式是同样经过压缩的回退文件。前台输出新格式图片时，把链接里的后缀换成旧格式即可，
- * 不需要查询数据库——同名文件在不在磁盘上一测便知。
+ * 格式转换后新格式文件以"源文件名.目标格式"的双扩展名生成（photo.jpg → photo.jpg.webp），
+ * 源文件原地不动并同样经过压缩，作为回退文件。前台输出新格式图片时，把链接去掉最后一段
+ * 扩展名就得到回退地址，是确定性推导而非探头猜测，不需要查询数据库。
  */
 class Libre_Compress_Compatible_Fallback {
-
-    /**
-     * 新格式后缀对应的候选旧格式后缀
-     *
-     * 顺序即前台的探测顺序：同名文件哪个先存在就用哪个，所以顺序本身也是优先级。
-     * 转换前的同名判断要用它算出"排在本文件之前"的候选，两边必须保持一致。
-     *
-     * @var array
-     */
-    const FALLBACK_EXTENSIONS = array( 'jpg', 'jpeg', 'png', 'gif', 'svg' );
 
     /**
      * 构造函数
@@ -234,7 +224,12 @@ class Libre_Compress_Compatible_Fallback {
     }
 
     /**
-     * 按同名不同后缀规则拼接旧格式回退地址
+     * 按双扩展名规则推导旧格式回退地址
+     *
+     * 不是探头猜：新格式文件名 = 源文件名 + "." + 目标格式，去掉最后一段扩展名剩下的
+     * 就是回退文件，确定性推导，没有候选列表和优先级。去掉后剩下的部分必须自己带一个
+     * 非空扩展名，否则说明这是用户直接上传的 webp/avif，不是插件转换的产物，没有对应
+     * 的旧格式原图，不能包 <picture>。
      *
      * @param string $relative 新格式文件在 uploads 内的相对路径
      * @return string 回退地址，没有对应旧格式文件时返回空字符串
@@ -244,29 +239,31 @@ class Libre_Compress_Compatible_Fallback {
             return '';
         }
 
-        $format = strtolower( pathinfo( $relative, PATHINFO_EXTENSION ) );
+        // 取原始大小写的扩展名做截断：先 lower 再算长度会让 .WEBP 少截一个字符。
+        $extension = pathinfo( $relative, PATHINFO_EXTENSION );
 
-        if ( ! in_array( $format, array( 'webp', 'avif' ), true ) ) {
+        if ( ! in_array( strtolower( $extension ), array( 'webp', 'avif' ), true ) ) {
             return '';
         }
 
-        $directory = dirname( $relative );
-        $basename  = pathinfo( $relative, PATHINFO_FILENAME );
-        $prefix    = ( '.' === $directory ? '' : $directory . '/' );
+        // 去掉最后一段（扩展名加前面的点）得到回退文件名。
+        $stem = substr( $relative, 0, strlen( $relative ) - strlen( $extension ) - 1 );
 
-        foreach ( self::FALLBACK_EXTENSIONS as $extension ) {
-            $candidate = $prefix . $basename . '.' . $extension;
-
-            if ( $this->fallback_file_exists( $candidate ) ) {
-                return $this->url_of( $candidate );
-            }
+        // 回退文件名必须自己带一个非空扩展名：photo.jpg.webp → photo.jpg 合法；
+        // banner.webp → banner 没有扩展名，是直接上传的新格式，没有旧格式原图。
+        if ( '' === pathinfo( $stem, PATHINFO_EXTENSION ) ) {
+            return '';
         }
 
-        return '';
+        if ( ! $this->fallback_file_exists( $stem ) ) {
+            return '';
+        }
+
+        return $this->url_of( $stem );
     }
 
     /**
-     * 判断同名旧格式文件是否存在于磁盘
+     * 判断推导出的旧格式回退文件是否存在于磁盘
      *
      * @param string $relative uploads 内的相对路径
      * @return bool

@@ -17,8 +17,9 @@ if ( ! defined( 'ABSPATH' ) ) {
  * 的一部分：结果小于源文件时生成真实的新文件并接管附件引用，同步附件路径、元数据、
  * MIME 和文章内已固化的图片链接。
  *
- * 新旧格式严格同名不同后缀：旧格式文件留在原地并同样经过压缩，作为前台
- * <picture> 的兼容格式回退，回退地址只靠换后缀拼接，不查询数据库。
+ * 新格式以"源文件名.目标格式"的双扩展名生成（photo.jpg → photo.jpg.webp），旧格式文件
+ * 留在原地并同样经过压缩，作为前台 <picture> 的兼容格式回退，回退地址由新格式名去掉最后
+ * 一段扩展名确定性推导，不查询数据库。
  *
  * 单文件处理分成准备和提交两步。准备阶段只写目标文件和映射，提交阶段负责引用、
  * 链接，任何一步失败都会把引用退回源文件并记录失败，下次执行凭映射接管已有结果
@@ -188,13 +189,20 @@ class Libre_Compress_Output {
         $natural_target = $this->natural_target_path( $file_path, $target );
 
         if ( null !== $entry && $this->normalized_path( $entry['to'] ) !== $this->normalized_path( $natural_target ) ) {
-            // 映射指向旧方案分配的名字，与"新旧格式同名"的回退规则不符，按新规则重新开始。
-            $this->remove_output_entry( $attachment_id, $size_type );
+            // 映射指向旧的命名规则，按新规则从头再来：先把引用退回源文件、清掉残留文件，
+            // 否则附件路径谁都不认识，这次转换会被当成失败。
+            if ( ! $this->discard_stale_output_entry( $attachment_id, $entry ) ) {
+                $result_template['message']       = __( '无法清理旧的转换结果，已保留原文件', 'libre-compress' );
+                $result_template['original_size'] = $original_size;
+                return $result_template;
+            }
             $entry = null;
         }
 
-        // 同目录已有主名相同的任何文件时，先给源文件改一个独一无二的名字。
-        if ( null === $entry && $this->has_name_conflict( $file_path ) ) {
+        // 目标名已被占用时，先给源文件改一个独一无二的名字。新规则下唯一可能的冲突就是
+        // 目标文件本身已存在（上次转换中断的残留，或同名文件）：photo.jpg 与 photo.jpg.webp
+        // 不可能互相撞名，不必再扫目录比主名。
+        if ( null === $entry && file_exists( $natural_target ) ) {
             $renamed = $this->rename_source_for_target( $attachment_id, $file_path );
 
             if ( null === $renamed ) {
@@ -463,7 +471,7 @@ class Libre_Compress_Output {
      * 提交格式转换结果
      *
      * 顺序固定为：附件路径与元数据 → MIME → 文章内图片链接。
-     * 旧格式文件按同名规则留在原地作为兼容格式回退，提交不删除任何源文件。
+     * 旧格式文件原地保留作为兼容格式回退，提交不删除任何源文件。
      * 任一步失败都把引用退回源文件并把记录写成失败，下次执行凭映射继续提交，
      * 不会留下指向已删除文件的引用。
      *
@@ -520,7 +528,7 @@ class Libre_Compress_Output {
      * @return bool 恒为 false
      */
     private function abort_commit( int $attachment_id, array $snapshot, array $entries, string $message ): bool {
-        // 源文件按同名规则留在原地，回退引用永远有文件可指。
+        // 源文件原地保留，回退引用永远有文件可指。
         $this->restore_reference_snapshot( $attachment_id, $snapshot );
         $this->update_content_references( $this->reference_pairs( $entries, true ) );
 
@@ -1176,57 +1184,66 @@ class Libre_Compress_Output {
     }
 
     /**
-     * 同目录是否已有主名相同的文件（不看后缀）
+     * 双扩展名规则下的目标文件路径
      *
-     * 直接扫目录比主名：不管对方是什么后缀，哪怕是 .sb 这种插件根本不认识的后缀，
-     * 只要主名相同就必须先给源文件改名。按固定后缀列表排查会漏掉意外后缀，
-     * 而 WordPress 上传时只按完整文件名避让，同名不同后缀完全可以共存。
-     *
-     * @param string $file_path 源文件绝对路径
-     * @return bool
-     */
-    private function has_name_conflict( string $file_path ): bool {
-        $directory = dirname( $file_path );
-        $basename  = pathinfo( $file_path, PATHINFO_FILENAME );
-        $source    = $this->normalized_path( $file_path );
-
-        if ( ! is_dir( $directory ) ) {
-            return false;
-        }
-
-        $files = @scandir( $directory );
-
-        if ( ! is_array( $files ) ) {
-            return false;
-        }
-
-        foreach ( $files as $file ) {
-            // 主名不相干的直接跳过：字符串比较远比 stat 便宜，目录里几千个文件也扛得住。
-            if ( ! is_string( $file ) || '.' === $file || '..' === $file
-                || pathinfo( $file, PATHINFO_FILENAME ) !== $basename ) {
-                continue;
-            }
-
-            $candidate = $this->normalized_path( $directory . '/' . $file );
-
-            // 源文件自己不算冲突；其余同主名的一律算，含没有后缀的同名文件。
-            if ( $candidate !== $source ) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    /**
-     * 新旧格式同名规则下的目标文件路径
+     * 新格式文件名 = 源文件完整文件名 + "." + 目标格式，如 photo.jpg → photo.jpg.webp。
+     * 源文件原地不动仍作回退，前台去掉最后一段扩展名即可确定性推导回退地址。
      *
      * @param string $file_path 源文件绝对路径
      * @param string $target    目标格式
      * @return string
      */
     private function natural_target_path( string $file_path, string $target ): string {
-        return dirname( $file_path ) . '/' . pathinfo( $file_path, PATHINFO_FILENAME ) . '.' . $target;
+        return dirname( $file_path ) . '/' . basename( $file_path ) . '.' . $target;
+    }
+
+    /**
+     * 丢弃指向旧命名规则的转换映射，按新规则从头再来
+     *
+     * 映射的 to 与新规则算出的目标名不一致，说明它是旧方案留下的。要真的"重新开始"，
+     * 必须先把附件引用和正文链接退回源文件、删掉磁盘上残留的旧目标文件，最后才删映射；
+     * 只删映射会让 _wp_attached_file 既不认识源文件也不认识新目标，同步直接失败。
+     * 任一步失败都返回 false，保留原映射等下次重试。
+     *
+     * @param int   $attachment_id 附件 ID
+     * @param array $entry         映射条目（get_output_entries 的形式）
+     * @return bool 是否清理成功
+     */
+    private function discard_stale_output_entry( int $attachment_id, array $entry ): bool {
+        $source = isset( $entry['from'] ) ? (string) $entry['from'] : '';
+        $stale  = isset( $entry['to'] ) ? (string) $entry['to'] : '';
+
+        // 源文件（要退回并留作回退的那个）已经不在了：旧目标就是仅存的图片，删掉会让附件
+        // 失去全部文件。保留映射等下次重试，前台也会因去掉扩展名后无后缀而不包 <picture>。
+        if ( '' === $source || ! is_file( $source ) ) {
+            return false;
+        }
+
+        // 先把附件路径、元数据、MIME 和正文链接退回源文件，否则删掉旧目标后引用会悬空。
+        if ( ! $this->revert_attachment_format( $attachment_id, array( $entry ) ) ) {
+            return false;
+        }
+
+        clearstatcache( true, $stale );
+
+        // 删除残留的旧目标文件：路径安全、是普通文件、不是符号链接，且不能就是源文件本身，
+        // 全部满足才 unlink，宁可不删也不能误伤。文件已经不在了（上次清理过）时不阻塞。
+        if ( '' !== $stale
+            && $this->normalized_path( $stale ) !== $this->normalized_path( $source )
+            && is_file( $stale ) ) {
+            if ( ! $this->is_safe_path( $stale ) || is_link( $stale ) ) {
+                return false;
+            }
+
+            // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
+            if ( ! unlink( $stale ) ) {
+                return false;
+            }
+        }
+
+        $this->remove_output_entry( $attachment_id, isset( $entry['size_type'] ) ? (string) $entry['size_type'] : 'full' );
+
+        return true;
     }
 
     /**
@@ -1479,7 +1496,7 @@ class Libre_Compress_Output {
     /**
      * 删除附件在媒体库里的旧格式回退文件
      *
-     * 旧格式文件按同名规则留在原地，不写进附件元数据，WordPress 删除附件时不会带走
+     * 旧格式文件原地保留，不写进附件元数据，WordPress 删除附件时不会带走
      * 它们，只能由插件按映射清理，否则会一直占着磁盘。
      *
      * @param int $attachment_id 附件 ID
