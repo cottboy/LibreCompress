@@ -55,7 +55,7 @@ define( 'LIBRE_COMPRESS_BIN_PATH', WP_CONTENT_DIR . '/LibreCompress-bin/' );
 /**
  * 数据库版本号
  */
-define( 'LIBRE_COMPRESS_DB_VERSION', '1.5.0' );
+define( 'LIBRE_COMPRESS_DB_VERSION', '1.6.0' );
 
 /**
  * 加载插件文本域

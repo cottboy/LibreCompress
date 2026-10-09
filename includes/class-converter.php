@@ -1402,15 +1402,23 @@ class Libre_Compress_Output {
      * 压缩记录表以 (attachment_id, size_type) 唯一：新旧格式文件同属一个尺寸，
      * 回退文件必须落在另一个键下，否则会顶掉新格式文件的记录。
      *
-     * 截断长度与 size_type 列宽一致，纯粹是写入兜底：列宽之内不可能因超长
-     * 写入失败，而 WordPress 的尺寸名到不了这个量级，正常路径永远不截断，
-     * 也就不会出现两个尺寸名撞到同一个键上。
+     * 截断长度与 size_type 列宽一致，纯粹是写入兜底。列宽 189 是这个复合索引在
+     * 最老环境下的安全上限：InnoDB 的 REDUNDANT/COMPACT 行格式只给索引键 767
+     * 字节，扣掉 attachment_id 的 8 字节，utf8mb4 每字符最多 4 字节，得到
+     * (767 - 8) / 4 = 189。WordPress 自己声明的最低 MySQL 版本是 5.5.5，默认
+     * 行格式正是 COMPACT，所以按这个数取值，不去赌用户开了 DYNAMIC。
+     *
+     * WordPress 核心常用的 VARCHAR(191) 是给单列索引算的（191×4 = 764 < 767），
+     * 放进这个带 8 字节 BIGINT 的复合索引会变成 772 字节，反而超限。
+     *
+     * 实际尺寸名最长的是 medium_large（12 字符），加前缀也才 21，189 的额度
+     * 正常路径永远走不到截断，也就不存在两个尺寸名撞到同一个键上。
      *
      * @param string $size_type 尺寸类型
      * @return string
      */
     private function fallback_size_type( string $size_type ): string {
-        return substr( 'fallback_' . $size_type, 0, 255 );
+        return substr( 'fallback_' . $size_type, 0, 189 );
     }
 
     /**
