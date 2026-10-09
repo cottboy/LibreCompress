@@ -370,7 +370,7 @@ class Libre_Compress_Settings {
                             <input type="checkbox" name="libre_compress_general[fallback_enabled]" value="1" <?php checked( $options['fallback_enabled'] ?? false ); ?>>
                             <?php esc_html_e( '为转换后的图片提供旧格式回退', 'libre-compress' ); ?>
                         </label>
-                        <p class="description"><?php esc_html_e( '格式转换后旧格式文件原地保留，新的 WebP/AVIF 以“原文件名.webp”“原文件名.avif”的双扩展名形式生成，前台用 <picture> 输出：支持新格式的浏览器加载新格式，不支持的浏览器加载同样压缩过的旧格式。关闭后只输出新格式，旧格式文件仍留在磁盘上，可用下方的“删除所有兼容格式回退”清理。', 'libre-compress' ); ?></p>
+                        <p class="description"><?php esc_html_e( '开启后，格式转换会把旧格式文件原地留下并同样压缩，新的 WebP/AVIF 以“原文件名.webp”“原文件名.avif”的双扩展名形式生成，前台用 <picture> 输出：支持新格式的浏览器加载新格式，不支持的浏览器加载同样压缩过的旧格式。关闭后转换不再保留旧格式文件，新格式直接替换源文件，前台也只输出新格式。此前已转换的图片仍留着旧格式文件，可用下方的“删除所有兼容格式回退”清理。', 'libre-compress' ); ?></p>
                     </td>
                 </tr>
                 <tr>

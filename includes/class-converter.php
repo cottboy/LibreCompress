@@ -17,9 +17,10 @@ if ( ! defined( 'ABSPATH' ) ) {
  * 的一部分：结果小于源文件时生成真实的新文件并接管附件引用，同步附件路径、元数据、
  * MIME 和文章内已固化的图片链接。
  *
- * 新格式以"源文件名.目标格式"的双扩展名生成（photo.jpg → photo.jpg.webp），旧格式文件
- * 留在原地并同样经过压缩，作为前台 <picture> 的兼容格式回退，回退地址由新格式名去掉最后
- * 一段扩展名确定性推导，不查询数据库。
+ * 新格式以"源文件名.目标格式"的双扩展名生成（photo.jpg → photo.jpg.webp）。旧格式文件
+ * 是否留下由兼容格式回退开关决定：开启时原地保留并同样经过压缩，作为前台 <picture> 的
+ * 兼容格式回退，回退地址由新格式名去掉最后一段扩展名确定性推导，不查询数据库；关闭时
+ * 提交成功后直接删除源文件，新格式完整替换旧格式，磁盘上不留没人引用的副本。
  *
  * 单文件处理分成准备和提交两步。准备阶段只写目标文件和映射，提交阶段负责引用、
  * 链接，任何一步失败都会把引用退回源文件并记录失败，下次执行凭映射接管已有结果
@@ -134,6 +135,21 @@ class Libre_Compress_Output {
     }
 
     /**
+     * 是否在转换后保留旧格式文件作为兼容格式回退
+     *
+     * 与前台输出共用同一个开关，但看的不是同一件事：这里决定转换要不要把旧格式文件留下。
+     * 关掉时旧格式文件没有任何用处——前台不包 <picture>，正文链接也已改到新格式，
+     * 留着只是一份既不被引用也没有浏览器会加载的磁盘垃圾，所以提交后直接删除。
+     *
+     * @return bool
+     */
+    public function fallback_retained(): bool {
+        $general = get_option( 'libre_compress_general', array() );
+
+        return ! empty( $general['fallback_enabled'] );
+    }
+
+    /**
      * 将单个文件压缩为目标格式（准备阶段）
      *
      * 流程固定为：目标名重名时先给源文件改名 → 备份原图 → 转换生成新格式 →
@@ -231,7 +247,7 @@ class Libre_Compress_Output {
             // 上次已生成的转换结果仍然有效，直接接管，不重复编码。
             $adopted = $this->prepare_existing_output( $attachment_id, $file_path, $entry['to'], $size_type, $original_size, $tool_name );
 
-            if ( isset( $adopted['status'] ) && 'success' === $adopted['status'] ) {
+            if ( isset( $adopted['status'] ) && 'success' === $adopted['status'] && $this->fallback_retained() ) {
                 // 上次可能中断在旧格式压缩之前：这里补上兼容格式回退的压缩。
                 $this->compress_fallback_file( $attachment_id, $file_path, $size_type );
             }
@@ -411,8 +427,11 @@ class Libre_Compress_Output {
         unlink( $temp_output );
 
         // 旧格式压缩成兼容格式回退：新格式已从未被压缩过的原图生成，这里再单独压缩旧格式。
-        // 顺序不能反——先压缩旧格式再转换会让转换质量受损。
-        $this->compress_fallback_file( $attachment_id, $file_path, $size_type );
+        // 顺序不能反——先压缩旧格式再转换会让转换质量受损。关闭兼容格式回退时不必压缩，
+        // 这个文件马上就会在提交成功后删除。
+        if ( $this->fallback_retained() ) {
+            $this->compress_fallback_file( $attachment_id, $file_path, $size_type );
+        }
 
         return array(
             'file_path'       => $target_path,
@@ -471,9 +490,9 @@ class Libre_Compress_Output {
      * 提交格式转换结果
      *
      * 顺序固定为：附件路径与元数据 → MIME → 文章内图片链接。
-     * 旧格式文件原地保留作为兼容格式回退，提交不删除任何源文件。
-     * 任一步失败都把引用退回源文件并把记录写成失败，下次执行凭映射继续提交，
-     * 不会留下指向已删除文件的引用。
+     * 旧格式文件是否保留由兼容格式回退开关决定：开启时原地留作回退，提交不删除任何源文件；
+     * 关闭时提交成功后删除源文件，新格式完整替换。任一步失败都把引用退回源文件并把记录写成
+     * 失败，下次执行凭映射继续提交，不会留下指向已删除文件的引用。
      *
      * @param int   $attachment_id 附件 ID
      * @param array $output_map    size_type => array( from, to )
@@ -501,7 +520,56 @@ class Libre_Compress_Output {
             return $this->abort_commit( $attachment_id, $snapshot, $entries, __( '文章图片链接替换失败，已保留原文件', 'libre-compress' ) );
         }
 
+        // 引用和正文链接都已指向新格式，这时删除旧格式源文件才不会留下任何悬空引用。
+        $this->discard_replaced_sources( $attachment_id, $entries );
+
         return true;
+    }
+
+    /**
+     * 删除已被新格式替换掉的旧格式源文件
+     *
+     * 只在关闭兼容格式回退时执行：此时旧格式文件前台不输出、正文链接也已改写，留着只是
+     * 没人会加载的磁盘垃圾。原图备份在提交前就已单独存过，恢复原图不受影响。
+     *
+     * 删除失败不阻断提交：转换结果已经接管全部引用，残留文件只是垃圾，仍可由媒体库和
+     * 设置页的删除入口清理，为它把整个转换判失败反而会让图片退回旧格式。
+     *
+     * @param int   $attachment_id 附件 ID
+     * @param array $entries       转换条目
+     */
+    private function discard_replaced_sources( int $attachment_id, array $entries ): void {
+        if ( $this->fallback_retained() ) {
+            return;
+        }
+
+        $discarded = array();
+
+        foreach ( $entries as $entry ) {
+            $source = $entry['from'];
+
+            // 上次提交已经删掉过的源文件不会再次出现；符号链接一律不当文件删。
+            if ( ! is_file( $source ) || is_link( $source ) || ! $this->is_safe_path( $source ) ) {
+                continue;
+            }
+
+            // 路径由映射读出，仍按不可信数据校验：绝不能删到转换结果自己头上。
+            if ( $this->normalized_path( $source ) === $this->normalized_path( $entry['to'] ) ) {
+                continue;
+            }
+
+            // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
+            if ( ! unlink( $source ) ) {
+                continue;
+            }
+
+            $discarded[] = $entry['size_type'];
+        }
+
+        // 回退文件已不存在，指向它的压缩记录只会让状态与实际不符。
+        if ( $discarded ) {
+            $this->forget_fallback_records( $attachment_id, $discarded );
+        }
     }
 
     /**
@@ -1559,7 +1627,8 @@ class Libre_Compress_Output {
     /**
      * 分页更新文章中的图片链接
      *
-     * 转换后源文件会被删除，正文里已固化的旧地址必须持久改写；写入前比较原内容，
+     * 新格式接管附件引用，正文里已固化的旧地址必须一并改写，否则读者点的还是旧格式图；
+     * 关闭兼容格式回退时源文件随后即被删除，不改写更会直接 404。写入前比较原内容，
      * 避免覆盖用户在编辑器和别处同时做出的修改。
      *
      * @param array $replacements 每项包含 from 和 to 绝对路径
