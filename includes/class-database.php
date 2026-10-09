@@ -78,7 +78,7 @@ class Libre_Compress_Database {
             id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
             attachment_id BIGINT UNSIGNED NOT NULL,
             file_path VARCHAR(500) NOT NULL,
-            size_type VARCHAR(100) NOT NULL DEFAULT 'full',
+            size_type VARCHAR(766) NOT NULL DEFAULT 'full',
             original_size BIGINT UNSIGNED NOT NULL DEFAULT 0,
             compressed_size BIGINT UNSIGNED NOT NULL DEFAULT 0,
             compression_ratio DECIMAL(5,2) NOT NULL DEFAULT 0.00,
