@@ -11,6 +11,16 @@ class Libre_Compress_Settings {
      */
     const RETENTION_PERMANENT = -1;
 
+    /**
+     * 大图缩放阈值：与 WordPress 默认值保持一致
+     */
+    const IMAGE_SIZE_THRESHOLD_DEFAULT = 2560;
+
+    /**
+     * 大图缩放阈值上限，防止误填夸张数值
+     */
+    const IMAGE_SIZE_THRESHOLD_MAX = 20000;
+
     // 统一约束保存值与命令参数，防止篡改选项绕过表单范围。
     const SPEED_SETTINGS = array(
         'pngquant_speed'     => array( 1, 11, 3 ),
@@ -60,6 +70,35 @@ class Libre_Compress_Settings {
         }
 
         return $days < 0 ? self::RETENTION_PERMANENT : $days;
+    }
+
+    /**
+     * 归一化大图缩放阈值
+     *
+     * 对应 WordPress 的 big_image_size_threshold：上传图片的宽或高超过此值时会生成
+     * -scaled 缩放图并接管原文件位置；0 表示关闭自动缩放。非数字按默认值处理，
+     * 负数一律按关闭缩放。
+     *
+     * @param mixed $value 待归一化的原始值
+     * @return int
+     */
+    public static function normalize_image_size_threshold( $value ): int {
+        if ( ! is_numeric( $value ) ) {
+            return self::IMAGE_SIZE_THRESHOLD_DEFAULT;
+        }
+
+        return (int) max( 0, min( self::IMAGE_SIZE_THRESHOLD_MAX, (int) $value ) );
+    }
+
+    /**
+     * 大图缩放阈值
+     *
+     * @return int 像素值，0 表示关闭自动缩放
+     */
+    public static function image_size_threshold(): int {
+        $general = get_option( 'libre_compress_general', array() );
+
+        return self::normalize_image_size_threshold( $general['image_size_threshold'] ?? null );
     }
 
     /**
@@ -131,6 +170,7 @@ class Libre_Compress_Settings {
         $sanitized['auto_compress']      = ! empty( $input['auto_compress'] );
         $sanitized['backup_enabled']     = ! empty( $input['backup_enabled'] );
         $sanitized['backup_retention_days'] = self::normalize_retention_days( isset( $input['backup_retention_days'] ) ? $input['backup_retention_days'] : null );
+        $sanitized['image_size_threshold']   = self::normalize_image_size_threshold( isset( $input['image_size_threshold'] ) ? $input['image_size_threshold'] : null );
         $sanitized['original_fallback'] = isset( $input['original_fallback'] ) && '1' === (string) ( is_scalar( $input['original_fallback'] ) ? $input['original_fallback'] : '' );
         $sanitized['strip_metadata']        = ! empty( $input['strip_metadata'] );
         $sanitized['strip_backup_metadata'] = ! empty( $input['strip_backup_metadata'] );
@@ -362,6 +402,14 @@ class Libre_Compress_Settings {
                             <span class="seg-thumb"></span>
                         </span>
                         <p class="description"><?php esc_html_e( '选择目标格式：AVIF 压缩率更高但压缩更慢，WebP 兼容性更好。', 'libre-compress' ); ?></p>
+                    </td>
+                </tr>
+                <tr>
+                    <th scope="row"><label for="libre-compress-image-threshold"><?php esc_html_e( '大图缩放阈值', 'libre-compress' ); ?></label></th>
+                    <td>
+                        <input type="number" id="libre-compress-image-threshold" name="libre_compress_general[image_size_threshold]" value="<?php echo esc_attr( Libre_Compress_Settings::image_size_threshold() ); ?>" min="0" max="20000" step="1" class="small-text">
+                        <?php esc_html_e( '像素', 'libre-compress' ); ?>
+                        <p class="description"><?php esc_html_e( 'WordPress 上传新图片时，宽或高超过此阈值会重新编码出一张 -scaled 缩放图并接管原文件位置，未缩放的源文件仍留在磁盘上。填 0 表示关闭自动缩放，原图文件直接投入使用。默认 2560，与 WordPress 默认一致，仅影响之后上传的图片。', 'libre-compress' ); ?></p>
                     </td>
                 </tr>
                 <tr>

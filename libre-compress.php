@@ -315,6 +315,7 @@ function libre_compress_activate() {
         'original_fallback'     => false,
         'strip_metadata'        => true,
         'strip_backup_metadata' => true,
+        'image_size_threshold'  => 2560,
         'tool_concurrency'      => 5,
         'output_format'         => 'webp',
     );

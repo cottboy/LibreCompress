@@ -13,7 +13,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 /**
  * 缩略图管理类
  *
- * 按设置决定生成哪些尺寸的缩略图，并负责清理未勾选尺寸的旧文件、补生成缺失的尺寸
+ * 按设置决定生成哪些尺寸的缩略图、调整大图缩放阈值，并负责清理未勾选尺寸的旧文件、补生成缺失的尺寸
  */
 class Libre_Compress_Thumbnail_Manager {
 
@@ -38,6 +38,9 @@ class Libre_Compress_Thumbnail_Manager {
     private function init_hooks() {
         // 按设置跳过未勾选的缩略图尺寸
         add_filter( 'intermediate_image_sizes_advanced', array( $this, 'filter_sizes_for_generation' ), 10, 3 );
+
+        // 按设置调整大图缩放阈值
+        add_filter( 'big_image_size_threshold', array( $this, 'filter_big_image_size_threshold' ) );
 
         // 注册 AJAX 接口
         add_action( 'wp_ajax_libre_compress_thumbnail_action', array( $this, 'ajax_thumbnail_action' ) );
@@ -97,6 +100,19 @@ class Libre_Compress_Thumbnail_Manager {
         }
 
         return $sizes;
+    }
+
+    /**
+     * 按设置覆盖 WordPress 的大图缩放阈值
+     *
+     * 接的是 WordPress 生成 -scaled 缩放图时用的那个阈值，官方默认 2560；
+     * 0 与 false 一样会被核心当作“不缩放”处理。
+     *
+     * @param int|false $threshold WordPress 当前阈值
+     * @return int 设置中的阈值，0 表示关闭自动缩放
+     */
+    public function filter_big_image_size_threshold( $threshold ) {
+        return Libre_Compress_Settings::image_size_threshold();
     }
 
     /**
