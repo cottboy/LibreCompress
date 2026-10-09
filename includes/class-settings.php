@@ -370,7 +370,7 @@ class Libre_Compress_Settings {
                             <input type="checkbox" name="libre_compress_general[fallback_enabled]" value="1" <?php checked( $options['fallback_enabled'] ?? false ); ?>>
                             <?php esc_html_e( '为转换后的图片提供旧格式回退', 'libre-compress' ); ?>
                         </label>
-                        <p class="description"><?php esc_html_e( '格式转换后，旧格式文件与新的 WebP/AVIF 同名不同后缀留在媒体库原地。开启后前台用 <picture> 输出：支持新格式的浏览器加载新格式，不支持的浏览器加载同样压缩过的旧格式。关闭后只输出新格式，旧格式文件仍留在磁盘上，可用下方的“删除所有兼容格式回退”清理。', 'libre-compress' ); ?></p>
+                        <p class="description"><?php esc_html_e( '格式转换后旧格式文件原地保留，新的 WebP/AVIF 以“原文件名.webp”“原文件名.avif”的双扩展名形式生成，前台用 <picture> 输出：支持新格式的浏览器加载新格式，不支持的浏览器加载同样压缩过的旧格式。关闭后只输出新格式，旧格式文件仍留在磁盘上，可用下方的“删除所有兼容格式回退”清理。', 'libre-compress' ); ?></p>
                     </td>
                 </tr>
                 <tr>
@@ -480,7 +480,7 @@ class Libre_Compress_Settings {
                     </button>
                 </td>
                 <td style="padding: 10px 0;">
-                    <span class="description"><?php esc_html_e( '删除媒体库中与新格式同名的旧格式文件，并把文章里指向它们的图片链接改到新格式；删除后不支持新格式的浏览器将直接加载新格式图片', 'libre-compress' ); ?></span>
+                    <span class="description"><?php esc_html_e( '删除媒体库中转换后保留的旧格式回退文件，并把文章里指向它们的图片链接改到新格式；删除后不支持新格式的浏览器将直接加载新格式图片', 'libre-compress' ); ?></span>
                 </td>
             </tr>
             <tr>

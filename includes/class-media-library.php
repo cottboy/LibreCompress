@@ -93,7 +93,7 @@ class Libre_Compress_Media_Library {
         $state      = $processor->get_attachment_state( $attachment_id );
         $has_backup = libre_compress()->backup->has_backup( $attachment_id );
 
-        // 只有转换过的附件才会在媒体库里留下同名旧格式文件，且必须仍有对应的新格式文件。
+        // 只有转换过的附件才会在媒体库里留下旧格式回退文件，且必须仍有对应的新格式文件。
         $has_fallback = ! empty( libre_compress()->output_processor->get_fallback_entries( $attachment_id ) );
 
         // 引用已还原但残留尚未清理时，恢复按钮仍要可用，否则用户无法重试收尾。

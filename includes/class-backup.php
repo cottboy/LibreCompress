@@ -157,7 +157,7 @@ class Libre_Compress_Backup {
             return false;
         }
 
-        // 备份目录不对外提供任何文件：回退用的是媒体库里的同名旧格式文件，
+        // 备份目录不对外提供任何文件：回退用的是媒体库里的旧格式回退文件，
         // 备份只服务于"恢复原图"，因此与二进制工具目录同样禁止直接访问。
         $directory_files = array(
             '.htaccess'  => self::protection_htaccess_content(),

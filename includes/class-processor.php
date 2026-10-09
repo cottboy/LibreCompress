@@ -697,7 +697,7 @@ class Libre_Compress_Processor {
                 continue;
             }
 
-            // 旧格式文件按同名规则留在原地作为兼容格式回退，恢复时该路径上很可能是
+            // 旧格式文件原地保留作为兼容格式回退，恢复时该路径上很可能是
             // 已压缩的旧格式文件：它同样是本次要退回的源文件，必须允许备份覆盖。
             if ( ! $this->restore_backup_row( $backup, $is_live || null !== $mapped ) ) {
                 return false;
