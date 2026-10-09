@@ -87,16 +87,6 @@ class Libre_Compress_Output {
     );
 
     /**
-     * 参与同名判断的扩展名
-     *
-     * 覆盖插件会读写的一切图片后缀：这些后缀里只要出现同名文件，新旧格式就不再是
-     * 唯一的一对，回退地址可能取到别人的图片。
-     *
-     * @var array
-     */
-    private $name_conflict_extensions = array( 'jpg', 'jpeg', 'png', 'gif', 'svg', 'webp', 'avif' );
-
-    /**
      * 获取目标格式输出设置
      *
      * @return array target: webp|avif, formats: 已勾选的源格式列表
@@ -203,10 +193,8 @@ class Libre_Compress_Output {
             $entry = null;
         }
 
-        // 同名不同格式的文件已存在时先给源文件改名：目标名被占用会覆盖别人的图，
-        // 只是后缀不同的同名文件则会让回退地址取到不属于本附件的图片。
-        // 改名后新旧格式才是唯一的一对，回退地址只靠换后缀就能拼出来。
-        if ( null === $entry && $this->has_name_conflict( $file_path ) ) {
+        // 目标名已被占用时先给源文件改名，否则会直接覆盖掉那个文件。
+        if ( null === $entry && $this->has_name_conflict( $file_path, $target ) ) {
             $renamed = $this->rename_source_for_target( $attachment_id, $file_path );
 
             if ( null === $renamed ) {
@@ -1188,30 +1176,17 @@ class Libre_Compress_Output {
     }
 
     /**
-     * 新旧格式同名规则下，同目录是否已有同名不同后缀的文件
+     * 同目录是否已有同名不同后缀的目标格式文件
      *
-     * 目标名被占用会直接覆盖别人的图片；哪怕只是后缀不同的同名文件，回退地址也会
-     * 按后缀顺序取到不属于本附件的图片。两种情况都必须先给源文件改名。
+     * 转换要落地的名字是新旧格式同名换后缀，目标名已被占用就直接覆盖别人的图片，
+     * 因此必须先给源文件改一个独一无二的名字。
      *
      * @param string $file_path 源文件绝对路径
+     * @param string $target    目标格式
      * @return bool
      */
-    private function has_name_conflict( string $file_path ): bool {
-        $directory = dirname( $file_path );
-        $basename  = pathinfo( $file_path, PATHINFO_FILENAME );
-        $extension = strtolower( pathinfo( $file_path, PATHINFO_EXTENSION ) );
-
-        foreach ( $this->name_conflict_extensions as $candidate ) {
-            if ( $candidate === $extension ) {
-                continue;
-            }
-
-            if ( file_exists( $directory . '/' . $basename . '.' . $candidate ) ) {
-                return true;
-            }
-        }
-
-        return false;
+    private function has_name_conflict( string $file_path, string $target ): bool {
+        return file_exists( $this->natural_target_path( $file_path, $target ) );
     }
 
     /**
