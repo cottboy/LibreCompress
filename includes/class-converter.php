@@ -206,7 +206,7 @@ class Libre_Compress_Output {
 
         if ( 'gif' === $format ) {
             // 动画 GIF 使用专用工具，静态 GIF 先由 GD 解码为 PNG。
-            if ( $this->is_animated_gif( $file_path ) ) {
+            if ( Libre_Compress_Compressor::is_animated_gif( $file_path ) ) {
                 $animated = $this->build_animated_gif_command( $file_path, $temp_output, $target );
 
                 if ( false === $animated ) {
@@ -1678,87 +1678,6 @@ class Libre_Compress_Output {
         clearstatcache( true, $png_path );
 
         return $exec_result['success'] && file_exists( $png_path ) && filesize( $png_path ) > 0;
-    }
-
-    /**
-     * 检测 GIF 是否为动画（解析 GIF 块结构统计图像帧数）
-     *
-     * @param string $gif_path GIF 文件路径
-     * @return bool 是否为动画
-     */
-    private function is_animated_gif( string $gif_path ): bool {
-        $size = filesize( $gif_path );
-
-        if ( false === $size ) {
-            return false;
-        }
-
-        // 超大 GIF 基本都是动画，跳过解析
-        if ( $size > 30 * 1024 * 1024 ) {
-            return true;
-        }
-
-        // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_get_contents
-        $data = file_get_contents( $gif_path );
-
-        if ( false === $data || strlen( $data ) < 14 || 'GIF' !== substr( $data, 0, 3 ) ) {
-            return false;
-        }
-
-        // 跳过文件头（签名 6 字节 + 逻辑屏幕描述符 7 字节）与全局调色板
-        $pos   = 13;
-        $flags = ord( $data[10] );
-
-        if ( $flags & 0x80 ) {
-            $pos += 3 * ( 2 << ( $flags & 0x07 ) );
-        }
-
-        $length = strlen( $data );
-        $frames = 0;
-
-        while ( $pos < $length ) {
-            $block = ord( $data[ $pos ] );
-
-            if ( 0x21 === $block ) {
-                // 扩展块：跳过子块序列（长度前缀，0 结束）
-                $pos += 2;
-                while ( $pos < $length ) {
-                    $chunk = ord( $data[ $pos ] );
-                    $pos++;
-                    if ( 0 === $chunk ) {
-                        break;
-                    }
-                    $pos += $chunk;
-                }
-            } elseif ( 0x2C === $block ) {
-                // 图像描述符：一帧
-                $frames++;
-                if ( $frames > 1 ) {
-                    return true;
-                }
-                $pos += 9;
-                $local_flags = ord( $data[ $pos ] );
-                $pos++;
-                if ( $local_flags & 0x80 ) {
-                    $pos += 3 * ( 2 << ( $local_flags & 0x07 ) );
-                }
-                // LZW 最小码长字节，其后才是数据子块序列
-                $pos++;
-                while ( $pos < $length ) {
-                    $chunk = ord( $data[ $pos ] );
-                    $pos++;
-                    if ( 0 === $chunk ) {
-                        break;
-                    }
-                    $pos += $chunk;
-                }
-            } else {
-                // 块结束符或未知结构，停止解析
-                break;
-            }
-        }
-
-        return $frames > 1;
     }
 
     /**

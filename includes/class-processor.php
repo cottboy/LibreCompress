@@ -271,14 +271,23 @@ class Libre_Compress_Processor {
                 return $this->empty_result( __( '未找到可压缩的图片文件', 'libre-compress' ), 'failed' );
             }
 
-            $pending = array();
-
-            foreach ( $files as $file ) {
-                $record = libre_compress()->database->get_record( $attachment_id, $file['size_type'] );
-                if ( ! $this->is_complete_record( $file['file_path'], $record ) ) {
-                    $pending[] = $file;
-                }
+            // 只对待压缩的图片生效：已全部压缩的附件在这里直接返回，
+            // 不会对同一张图反复缩放，也不会动已压缩文件的大小。
+            if ( empty( $this->collect_pending_files( $attachment_id, $files ) ) ) {
+                return $this->empty_result( __( '图片已经压缩', 'libre-compress' ), 'skipped' );
             }
+
+            // 超阈值的主文件先按大图缩放阈值重整为 -scaled 文件，再按新文件列表重算待办。
+            $this->scale_oversized_if_needed( $attachment_id );
+
+            $metadata = wp_get_attachment_metadata( $attachment_id );
+            $files    = libre_compress()->compressor->get_attachment_files( $attachment_id, is_array( $metadata ) ? $metadata : null );
+
+            if ( empty( $files ) ) {
+                return $this->empty_result( __( '未找到可压缩的图片文件', 'libre-compress' ), 'failed' );
+            }
+
+            $pending = $this->collect_pending_files( $attachment_id, $files );
 
             if ( empty( $pending ) ) {
                 return $this->empty_result( __( '图片已经压缩', 'libre-compress' ), 'skipped' );
@@ -386,6 +395,217 @@ class Libre_Compress_Processor {
             $this->release_attachment_lock( $global_lock );
             $this->release_attachment_lock( $lock );
         }
+    }
+
+    /**
+     * 收集本次需要压缩的文件
+     *
+     * @param int   $attachment_id 附件 ID
+     * @param array $files         候选文件列表
+     * @return array 待压缩文件列表
+     */
+    private function collect_pending_files( int $attachment_id, array $files ): array {
+        $pending = array();
+
+        foreach ( $files as $file ) {
+            $record = libre_compress()->database->get_record( $attachment_id, $file['size_type'] );
+
+            if ( ! $this->is_complete_record( $file['file_path'], $record ) ) {
+                $pending[] = $file;
+            }
+        }
+
+        return $pending;
+    }
+
+    /**
+     * 压缩前把超过大图缩放阈值的主文件重整为 -scaled 文件
+     *
+     * 只在压缩待压缩的图片时执行，完全沿用 WordPress 上传时的做法：
+     * 用 WP 自带的图片编辑器缩到阈值内、另存为 xxx-scaled 文件、
+     * 未缩放的源文件保留原名并写进 original_image，附件主文件指向缩放结果。
+     * 已压缩的图片不会走到这里，因此不会反复缩放或改动已压缩文件。
+     *
+     * 任意一步失败都直接放弃：文件仍是原来那个，压缩照常继续，不留半成品状态。
+     */
+    private function scale_oversized_if_needed( int $attachment_id ): void {
+        $threshold = Libre_Compress_Settings::image_size_threshold();
+
+        if ( $threshold <= 0 ) {
+            return;
+        }
+
+        $metadata = wp_get_attachment_metadata( $attachment_id );
+
+        if ( ! is_array( $metadata ) || empty( $metadata['file'] ) ) {
+            return;
+        }
+
+        $upload_dir = wp_upload_dir();
+        $base_dir   = untrailingslashit( wp_normalize_path( $upload_dir['basedir'] ) );
+        $main_rel   = ltrim( wp_normalize_path( (string) $metadata['file'] ), '/' );
+        $main_path  = $base_dir . '/' . $main_rel;
+
+        if ( ! is_file( $main_path ) || ! $this->is_inside_upload_dir( $main_path ) ) {
+            return;
+        }
+
+        // 有 original_image 说明当前主文件本身就是缩放产物：从未缩放源文件重新派生，
+        // 阈值调大时才能把主文件相应放大回去。
+        $source_path = $main_path;
+
+        if ( ! empty( $metadata['original_image'] ) ) {
+            $dir_rel   = dirname( $main_rel );
+            $file_rel  = ( '.' === $dir_rel ? '' : $dir_rel . '/' ) . wp_basename( (string) $metadata['original_image'] );
+            $candidate = $base_dir . '/' . ltrim( wp_normalize_path( $file_rel ), '/' );
+
+            if ( is_file( $candidate ) && $this->is_inside_upload_dir( $candidate ) ) {
+                $source_path = $candidate;
+            }
+        }
+
+        if ( ! $this->is_scalable_image( $source_path ) ) {
+            return;
+        }
+
+        $imagesize = wp_getimagesize( $source_path );
+
+        if ( ! is_array( $imagesize ) || empty( $imagesize[0] ) || empty( $imagesize[1] ) ) {
+            return;
+        }
+
+        // 两个方向都没超过阈值就不动：只缩不放
+        if ( (int) $imagesize[0] <= $threshold && (int) $imagesize[1] <= $threshold ) {
+            return;
+        }
+
+        $scaled = $this->generate_scaled_file( $source_path, $threshold );
+
+        if ( null === $scaled ) {
+            return;
+        }
+
+        $new_rel = ltrim( $this->get_relative_upload_path( $scaled['path'] ), '/' );
+
+        if ( ! is_file( $scaled['path'] ) || ! $this->is_inside_upload_dir( $scaled['path'] ) ) {
+            return;
+        }
+
+        // 目标路径与现主文件相同说明覆盖的就是现主文件本身，引用和文章链接都不用动。
+        $path_changed = $this->normalized_path( $new_rel ) !== $this->normalized_path( $main_rel );
+        $old_path     = $main_path;
+
+        $metadata['file']     = $new_rel;
+        $metadata['width']    = isset( $scaled['width'] ) ? (int) $scaled['width'] : (int) ( $metadata['width'] ?? 0 );
+        $metadata['height']   = isset( $scaled['height'] ) ? (int) $scaled['height'] : (int) ( $metadata['height'] ?? 0 );
+        $metadata['filesize'] = isset( $scaled['filesize'] ) ? (int) $scaled['filesize'] : wp_filesize( $scaled['path'] );
+
+        // 未缩放源文件按原名留在磁盘上，让 WordPress 的“原图”入口和插件的备份都能取到它。
+        $metadata['original_image'] = wp_basename( $source_path );
+
+        if ( ! wp_update_attachment_metadata( $attachment_id, $metadata ) ) {
+            // 引用一个都没改，缩放文件下次会被重新生成，不会留下不一致状态。
+            return;
+        }
+
+        if ( $path_changed ) {
+            update_attached_file( $attachment_id, $scaled['path'] );
+
+            // 文章里固化的旧地址要跟着改；旧文件仍然保留，改写失败也不会 404，
+            // 只是正文继续加载旧文件，重试即可。
+            libre_compress()->output_processor->update_content_references(
+                array(
+                    array(
+                        'from' => $old_path,
+                        'to'   => $scaled['path'],
+                    ),
+                )
+            );
+        }
+    }
+
+    /**
+     * 判断文件能否安全缩放
+     *
+     * SVG 没有栅格尺寸；动画 GIF、动画 WebP 与 APNG 用 WP 编辑器缩放只会留下第一帧，
+     * 与压缩、格式转换流程的取舍保持一致——宁可不动，也不能毁文件。
+     *
+     * @param string $file_path 文件绝对路径
+     * @return bool 是否允许缩放
+     */
+    private function is_scalable_image( string $file_path ): bool {
+        $extension = strtolower( pathinfo( $file_path, PATHINFO_EXTENSION ) );
+
+        if ( 'svg' === $extension ) {
+            return false;
+        }
+
+        if ( 'gif' === $extension && Libre_Compress_Compressor::is_animated_gif( $file_path ) ) {
+            return false;
+        }
+
+        if ( 'webp' === $extension && Libre_Compress_Compressor::is_animated_webp( $file_path ) ) {
+            return false;
+        }
+
+        if ( 'png' === $extension && Libre_Compress_Compressor::is_apng( $file_path ) ) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * 用 WordPress 图片编辑器生成 -scaled 缩放文件
+     *
+     * 与核心上传流程一致：resize 到阈值内、按 EXIF 方向旋转、另存为 xxx-scaled 文件。
+     * 目标必须与源文件不同，否则会把未缩放源文件直接覆盖掉。
+     *
+     * @param string $source_path 未缩放的源文件绝对路径
+     * @param int    $threshold   阈值（像素）
+     * @return array|null 图片编辑器保存结果；失败或目标与源相同时返回 null
+     */
+    private function generate_scaled_file( string $source_path, int $threshold ): ?array {
+        $editor = wp_get_image_editor( $source_path );
+
+        if ( is_wp_error( $editor ) ) {
+            return null;
+        }
+
+        $resized = $editor->resize( $threshold, $threshold );
+
+        if ( is_wp_error( $resized ) ) {
+            return null;
+        }
+
+        // 与核心一致：取源图的 EXIF Orientation，避免缩放出来的图方向不对。
+        $rotated = $editor->maybe_exif_rotate();
+
+        if ( is_wp_error( $rotated ) ) {
+            return null;
+        }
+
+        $target = $editor->generate_filename( 'scaled' );
+
+        if ( ! is_string( $target ) || '' === $target ) {
+            return null;
+        }
+
+        if ( $this->normalized_path( $target ) === $this->normalized_path( $source_path ) ) {
+            return null;
+        }
+
+        if ( ! $this->is_inside_upload_dir( $target ) ) {
+            return null;
+        }
+
+        $saved = $editor->save( $target );
+
+        if ( is_wp_error( $saved ) || ! is_array( $saved ) || empty( $saved['path'] ) || ! is_file( $saved['path'] ) ) {
+            return null;
+        }
+
+        return $saved;
     }
 
     /**

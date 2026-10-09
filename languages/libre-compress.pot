@@ -90,7 +90,7 @@ msgstr ""
 msgid "%s 不可用"
 msgstr ""
 
-#: compression\class-tool-base.php:376 includes\class-compressor.php:243 includes\class-converter.php:156
+#: compression\class-tool-base.php:376 includes/class-compressor.php:411 includes/class-converter.php:156
 msgid "文件不存在"
 msgstr ""
 
@@ -98,7 +98,7 @@ msgstr ""
 msgid "不支持的文件格式"
 msgstr ""
 
-#: compression\class-tool-base.php:415 includes\class-compressor.php:439 includes\class-converter.php:368 includes\class-converter.php:408
+#: compression\class-tool-base.php:415 includes/class-compressor.php:607 includes/class-converter.php:368 includes/class-converter.php:408
 msgid "压缩成功"
 msgstr ""
 
@@ -114,119 +114,119 @@ msgstr ""
 msgid "命令为空"
 msgstr ""
 
-#: includes\class-compressor.php:251 includes\class-converter.php:161
+#: includes/class-compressor.php:419 includes/class-converter.php:161
 msgid "文件路径不安全"
 msgstr ""
 
-#: includes\class-compressor.php:262
+#: includes/class-compressor.php:430
 msgid "APNG 动图不压缩"
 msgstr ""
 
-#: includes\class-compressor.php:274 includes\class-converter.php:265
+#: includes/class-compressor.php:442 includes/class-converter.php:265
 msgid "没有可用的压缩工具"
 msgstr ""
 
-#: includes\class-compressor.php:287
+#: includes/class-compressor.php:455
 msgid "文件大小超过限制（最大 %d MB）"
 msgstr ""
 
-#: includes\class-compressor.php:299 includes\class-converter.php:323
+#: includes/class-compressor.php:467 includes/class-converter.php:323
 msgid "无法创建原图备份，已停止压缩"
 msgstr ""
 
-#: includes\class-compressor.php:312
+#: includes/class-compressor.php:480
 msgid "无法创建回滚副本，已跳过压缩"
 msgstr ""
 
-#: includes\class-compressor.php:325
+#: includes/class-compressor.php:493
 msgid "压缩失败且回滚失败，请保留回滚副本并检查磁盘状态"
 msgstr ""
 
-#: includes\class-compressor.php:355
+#: includes/class-compressor.php:523
 msgid "压缩结果无效且回滚失败，请保留回滚副本并检查磁盘状态"
 msgstr ""
 
-#: includes\class-compressor.php:377
+#: includes/class-compressor.php:545
 msgid "压缩后体积没有变小，已保留原图"
 msgstr ""
 
-#: includes\class-compressor.php:390 includes\class-converter.php:303
+#: includes/class-compressor.php:558 includes/class-converter.php:303
 msgid "压缩记录保存失败，请重新压缩"
 msgstr ""
 
-#: includes\class-compressor.php:423
+#: includes/class-compressor.php:591
 msgid "压缩记录保存失败，已恢复原文件"
 msgstr ""
 
-#: includes\class-compressor.php:424
+#: includes/class-compressor.php:592
 msgid "压缩记录保存失败且回滚失败，请保留回滚副本并检查数据库状态"
 msgstr ""
 
-#: includes\class-converter.php:171
+#: includes/class-converter.php:171
 msgid "该格式未配置格式转换"
 msgstr ""
 
-#: includes\class-converter.php:195
+#: includes/class-converter.php:195
 msgid "同名目标文件过多，无法分配新文件名"
 msgstr ""
 
-#: includes\class-converter.php:216
+#: includes/class-converter.php:216
 msgid "动画 GIF 压缩为 WebP 需要 gif2webp 工具（libwebp 套件）"
 msgstr ""
 
-#: includes\class-converter.php:217
+#: includes/class-converter.php:217
 msgid "动画 GIF 压缩为 AVIF 需要 ffmpeg"
 msgstr ""
 
-#: includes\class-converter.php:228
+#: includes/class-converter.php:228
 msgid "静态 GIF 压缩需要 GD 扩展"
 msgstr ""
 
-#: includes\class-converter.php:236
+#: includes/class-converter.php:236
 msgid "GIF 压缩预处理失败"
 msgstr ""
 
-#: includes\class-converter.php:246
+#: includes/class-converter.php:246
 msgid "SVG 压缩需要 resvg 工具"
 msgstr ""
 
-#: includes\class-converter.php:254
+#: includes/class-converter.php:254
 msgid "SVG 压缩预处理失败"
 msgstr ""
 
-#: includes\class-converter.php:272 includes\class-media-library.php:132
+#: includes/class-converter.php:272 includes\class-media-library.php:132
 msgid "压缩失败"
 msgstr ""
 
-#: includes\class-converter.php:310
+#: includes/class-converter.php:310
 msgid "转换结果没有变小，已保留原图"
 msgstr ""
 
-#: includes\class-converter.php:336
+#: includes/class-converter.php:336
 msgid "压缩结果文件写入失败"
 msgstr ""
 
-#: includes\class-converter.php:345 includes\class-converter.php:395
+#: includes/class-converter.php:345 includes/class-converter.php:395
 msgid "压缩记录保存失败，已保留原文件"
 msgstr ""
 
-#: includes\class-converter.php:352 includes\class-converter.php:355
+#: includes/class-converter.php:352 includes/class-converter.php:355
 msgid "恢复映射保存失败，已保留原文件"
 msgstr ""
 
-#: includes\class-converter.php:437
+#: includes/class-converter.php:437
 msgid "附件路径同步失败，已保留原文件"
 msgstr ""
 
-#: includes\class-converter.php:441
+#: includes/class-converter.php:441
 msgid "附件 MIME 类型同步失败，已保留原文件"
 msgstr ""
 
-#: includes\class-converter.php:445
+#: includes/class-converter.php:445
 msgid "文章图片链接替换失败，已保留原文件"
 msgstr ""
 
-#: includes\class-converter.php:449
+#: includes/class-converter.php:449
 msgid "原文件删除失败，已退回原文件引用"
 msgstr ""
 
@@ -378,7 +378,7 @@ msgstr ""
 msgid "权限不足"
 msgstr ""
 
-#: includes\class-media-library.php:272 includes\class-processor.php:238
+#: includes\class-media-library.php:272 includes/class-processor.php:238
 msgid "无效的图片附件"
 msgstr ""
 
@@ -422,47 +422,47 @@ msgstr ""
 msgid "本批恢复完成，成功 %1$d 个，失败 %2$d 个"
 msgstr ""
 
-#: includes\class-processor.php:256
+#: includes/class-processor.php:256
 msgid "未找到可压缩的图片文件"
 msgstr ""
 
-#: includes\class-processor.php:269
+#: includes/class-processor.php:269
 msgid "图片已经压缩"
 msgstr ""
 
-#: includes\class-processor.php:338
+#: includes/class-processor.php:356
 msgid "附件引用更新失败，已退回原文件"
 msgstr ""
 
-#: includes\class-processor.php:346
+#: includes/class-processor.php:364
 msgid "压缩结果已生成，但附件引用或文章链接更新失败，图片仍指向原文件，可重新压缩继续提交"
 msgstr ""
 
-#: includes\class-processor.php:356
+#: includes/class-processor.php:374
 msgid "图片压缩完成"
 msgstr ""
 
-#: includes\class-processor.php:359
+#: includes/class-processor.php:377
 msgid "图片仅部分压缩完成，仍有文件需要重试"
 msgstr ""
 
-#: includes\class-processor.php:362
+#: includes/class-processor.php:380
 msgid "图片压缩失败"
 msgstr ""
 
-#: includes\class-processor.php:365
+#: includes/class-processor.php:383
 msgid "没有可用的压缩结果"
 msgstr ""
 
-#: includes\class-processor.php:1316
+#: includes/class-processor.php:1757
 msgid "插件正在执行维护操作，请稍后重试"
 msgstr ""
 
-#: includes\class-processor.php:1317
+#: includes/class-processor.php:1758
 msgid "该图片正在处理中，请稍后重试"
 msgstr ""
 
-#: includes\class-processor.php:1320
+#: includes/class-processor.php:1761
 msgid "无法创建锁文件，请检查上传目录的写入权限"
 msgstr ""
 
@@ -655,7 +655,7 @@ msgid "像素"
 msgstr ""
 
 #: includes/class-settings.php:412
-msgid "WordPress 上传新图片时，宽或高超过此阈值会重新编码出一张 -scaled 缩放图并接管原文件位置，未缩放的源文件仍留在磁盘上。填 0 表示关闭自动缩放，原图文件直接投入使用。默认 2560，与 WordPress 默认一致，仅影响之后上传的图片。"
+msgid "WordPress 上传新图片时，宽或高超过此阈值会重新编码出一张 -scaled 缩放图并接管原文件位置，未缩放的源文件仍留在磁盘上；填 0 表示关闭自动缩放，原图文件直接投入使用。压缩未压缩的图片时也会按此阈值重新缩放：主文件超出就生成 -scaled 接管主文件，未缩放源文件保留，正文里的旧图片地址一并改写；已压缩的图片不再改动。默认 2560，与 WordPress 默认一致。"
 msgstr ""
 
 #: includes/class-settings.php:416

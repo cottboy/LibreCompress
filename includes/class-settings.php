@@ -409,7 +409,7 @@ class Libre_Compress_Settings {
                     <td>
                         <input type="number" id="libre-compress-image-threshold" name="libre_compress_general[image_size_threshold]" value="<?php echo esc_attr( Libre_Compress_Settings::image_size_threshold() ); ?>" min="0" max="20000" step="1" class="small-text">
                         <?php esc_html_e( '像素', 'libre-compress' ); ?>
-                        <p class="description"><?php esc_html_e( 'WordPress 上传新图片时，宽或高超过此阈值会重新编码出一张 -scaled 缩放图并接管原文件位置，未缩放的源文件仍留在磁盘上。填 0 表示关闭自动缩放，原图文件直接投入使用。默认 2560，与 WordPress 默认一致，仅影响之后上传的图片。', 'libre-compress' ); ?></p>
+                        <p class="description"><?php esc_html_e( 'WordPress 上传新图片时，宽或高超过此阈值会重新编码出一张 -scaled 缩放图并接管原文件位置，未缩放的源文件仍留在磁盘上；填 0 表示关闭自动缩放，原图文件直接投入使用。压缩未压缩的图片时也会按此阈值重新缩放：主文件超出就生成 -scaled 接管主文件，未缩放源文件保留，正文里的旧图片地址一并改写；已压缩的图片不再改动。默认 2560，与 WordPress 默认一致。', 'libre-compress' ); ?></p>
                     </td>
                 </tr>
                 <tr>

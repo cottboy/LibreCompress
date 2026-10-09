@@ -223,6 +223,90 @@ class Libre_Compress_Compressor {
     }
 
     /**
+     * 检测 GIF 是否为动画（解析 GIF 块结构统计图像帧数）
+     *
+     * WordPress 的图片编辑器缩放 GIF 只会留下第一帧，动图被当静态图处理就毁掉了，
+     * 所以压缩、格式转换和缩放流程都先过这一关。
+     *
+     * @param string $file_path 文件绝对路径
+     * @return bool 是否为动画
+     */
+    public static function is_animated_gif( string $file_path ): bool {
+        $size = filesize( $file_path );
+
+        if ( false === $size ) {
+            return false;
+        }
+
+        // 超大 GIF 基本都是动画，跳过解析
+        if ( $size > 30 * 1024 * 1024 ) {
+            return true;
+        }
+
+        // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_get_contents
+        $data = file_get_contents( $file_path );
+
+        if ( false === $data || strlen( $data ) < 14 || 'GIF' !== substr( $data, 0, 3 ) ) {
+            return false;
+        }
+
+        // 跳过文件头（签名 6 字节 + 逻辑屏幕描述符 7 字节）与全局调色板
+        $pos   = 13;
+        $flags = ord( $data[10] );
+
+        if ( $flags & 0x80 ) {
+            $pos += 3 * ( 2 << ( $flags & 0x07 ) );
+        }
+
+        $length = strlen( $data );
+        $frames = 0;
+
+        while ( $pos < $length ) {
+            $block = ord( $data[ $pos ] );
+
+            if ( 0x21 === $block ) {
+                // 扩展块：跳过子块序列（长度前缀，0 结束）
+                $pos += 2;
+                while ( $pos < $length ) {
+                    $chunk = ord( $data[ $pos ] );
+                    $pos++;
+                    if ( 0 === $chunk ) {
+                        break;
+                    }
+                    $pos += $chunk;
+                }
+            } elseif ( 0x2C === $block ) {
+                // 图像描述符：一帧
+                $frames++;
+                if ( $frames > 1 ) {
+                    return true;
+                }
+                $pos += 9;
+                $local_flags = ord( $data[ $pos ] );
+                $pos++;
+                if ( $local_flags & 0x80 ) {
+                    $pos += 3 * ( 2 << ( $local_flags & 0x07 ) );
+                }
+                // LZW 最小码长字节，其后才是数据子块序列
+                $pos++;
+                while ( $pos < $length ) {
+                    $chunk = ord( $data[ $pos ] );
+                    $pos++;
+                    if ( 0 === $chunk ) {
+                        break;
+                    }
+                    $pos += $chunk;
+                }
+            } else {
+                // 块结束符或未知结构，停止解析
+                break;
+            }
+        }
+
+        return $frames > 1;
+    }
+
+    /**
      * 获取附件对应的原图和缩略图文件
      *
      * @param int $attachment_id 附件 ID
