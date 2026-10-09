@@ -228,16 +228,16 @@ class Libre_Compress_Media_Library {
                 <button type="button" class="button button-small libre-compress-btn" data-action="restore" data-attachment-id="<?php echo esc_attr( $attachment_id ); ?>">
                     <?php esc_html_e( '恢复原图', 'libre-compress' ); ?>
                 </button>
-                <?php if ( $has_fallback ) : ?>
-                    <button type="button" class="button button-small libre-compress-btn" data-action="delete-fallback" data-attachment-id="<?php echo esc_attr( $attachment_id ); ?>">
-                        <?php esc_html_e( '删除兼容格式回退', 'libre-compress' ); ?>
-                    </button>
-                <?php endif; ?>
-                <?php if ( $has_backup ) : ?>
-                    <button type="button" class="button button-small libre-compress-btn" data-action="delete-backup" data-attachment-id="<?php echo esc_attr( $attachment_id ); ?>">
-                        <?php esc_html_e( '删除备份', 'libre-compress' ); ?>
-                    </button>
-                <?php endif; ?>
+            <?php endif; ?>
+            <?php if ( $has_fallback ) : ?>
+                <button type="button" class="button button-small libre-compress-btn" data-action="delete-fallback" data-attachment-id="<?php echo esc_attr( $attachment_id ); ?>">
+                    <?php esc_html_e( '删除兼容格式回退', 'libre-compress' ); ?>
+                </button>
+            <?php endif; ?>
+            <?php if ( $has_backup ) : ?>
+                <button type="button" class="button button-small libre-compress-btn" data-action="delete-backup" data-attachment-id="<?php echo esc_attr( $attachment_id ); ?>">
+                    <?php esc_html_e( '删除备份', 'libre-compress' ); ?>
+                </button>
             <?php endif; ?>
         </div>
         <?php

@@ -122,6 +122,10 @@ msgstr ""
 msgid "APNG 动图不压缩"
 msgstr ""
 
+#: includes/class-compressor.php:425
+msgid "动画 WebP 不压缩"
+msgstr ""
+
 #: includes/class-compressor.php:442 includes/class-converter.php:265
 msgid "没有可用的压缩工具"
 msgstr ""
