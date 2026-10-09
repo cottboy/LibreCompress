@@ -87,18 +87,6 @@ class Libre_Compress_Output {
     );
 
     /**
-     * 参与同名判断的全部图片后缀
-     *
-     * 转换前逐个查一遍，确保新生成的"同名换后缀"文件在整份媒体库里都是独一份的：
-     * 目标后缀被占用会直接覆盖别人的图，其他后缀存在则会让前台的旧格式回退
-     * 探到不属于本附件的图片。WordPress 上传时只按完整文件名避让，同名不同后缀
-     * 的文件完全可以共存，所以这一步不能省。
-     *
-     * @var array
-     */
-    private $name_conflict_extensions = array( 'jpg', 'jpeg', 'png', 'gif', 'svg', 'webp', 'avif' );
-
-    /**
      * 获取目标格式输出设置
      *
      * @return array target: webp|avif, formats: 已勾选的源格式列表
@@ -205,7 +193,7 @@ class Libre_Compress_Output {
             $entry = null;
         }
 
-        // 同目录已有任何后缀的同名图片时，先给源文件改一个独一无二的名字。
+        // 同目录已有主名相同的任何文件时，先给源文件改一个独一无二的名字。
         if ( null === $entry && $this->has_name_conflict( $file_path ) ) {
             $renamed = $this->rename_source_for_target( $attachment_id, $file_path );
 
@@ -1188,10 +1176,11 @@ class Libre_Compress_Output {
     }
 
     /**
-     * 同目录是否已有同名不同后缀的图片文件
+     * 同目录是否已有主名相同的文件（不看后缀）
      *
-     * 不看后缀优先级，所有图片后缀逐个查：只要有一个同名文件存在，新生成的
-     * "同名换后缀"文件就不再是独一份，必须先把源文件改成独一无二的名字。
+     * 直接扫目录比主名：不管对方是什么后缀，哪怕是 .sb 这种插件根本不认识的后缀，
+     * 只要主名相同就必须先给源文件改名。按固定后缀列表排查会漏掉意外后缀，
+     * 而 WordPress 上传时只按完整文件名避让，同名不同后缀完全可以共存。
      *
      * @param string $file_path 源文件绝对路径
      * @return bool
@@ -1199,15 +1188,29 @@ class Libre_Compress_Output {
     private function has_name_conflict( string $file_path ): bool {
         $directory = dirname( $file_path );
         $basename  = pathinfo( $file_path, PATHINFO_FILENAME );
-        $extension = strtolower( pathinfo( $file_path, PATHINFO_EXTENSION ) );
+        $source    = $this->normalized_path( $file_path );
 
-        foreach ( $this->name_conflict_extensions as $candidate ) {
-            // 自己的后缀就是文件本身，不算冲突。
-            if ( $candidate === $extension ) {
+        if ( ! is_dir( $directory ) ) {
+            return false;
+        }
+
+        $files = @scandir( $directory );
+
+        if ( ! is_array( $files ) ) {
+            return false;
+        }
+
+        foreach ( $files as $file ) {
+            // 主名不相干的直接跳过：字符串比较远比 stat 便宜，目录里几千个文件也扛得住。
+            if ( ! is_string( $file ) || '.' === $file || '..' === $file
+                || pathinfo( $file, PATHINFO_FILENAME ) !== $basename ) {
                 continue;
             }
 
-            if ( file_exists( $directory . '/' . $basename . '.' . $candidate ) ) {
+            $candidate = $this->normalized_path( $directory . '/' . $file );
+
+            // 源文件自己不算冲突；其余同主名的一律算，含没有后缀的同名文件。
+            if ( $candidate !== $source ) {
                 return true;
             }
         }
@@ -1399,15 +1402,15 @@ class Libre_Compress_Output {
      * 压缩记录表以 (attachment_id, size_type) 唯一：新旧格式文件同属一个尺寸，
      * 回退文件必须落在另一个键下，否则会顶掉新格式文件的记录。
      *
-     * 不再截断：size_type 列宽就是 InnoDB 唯一索引的物理上限（utf8mb4 下
-     * 3072 字节索引减去 8 字节 BIGINT，每字符最多 4 字节），任何真实尺寸名
-     * 都远在这个范围之内，截断只会平白制造撞车。
+     * 截断长度与 size_type 列宽一致，纯粹是写入兜底：列宽之内不可能因超长
+     * 写入失败，而 WordPress 的尺寸名到不了这个量级，正常路径永远不截断，
+     * 也就不会出现两个尺寸名撞到同一个键上。
      *
      * @param string $size_type 尺寸类型
      * @return string
      */
     private function fallback_size_type( string $size_type ): string {
-        return 'fallback_' . $size_type;
+        return substr( 'fallback_' . $size_type, 0, 255 );
     }
 
     /**
