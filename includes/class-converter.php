@@ -163,9 +163,10 @@ class Libre_Compress_Output {
      * @param string $file_path     源文件绝对路径
      * @param string $size_type     尺寸类型
      * @param string $target        本次操作固定的目标格式
+     * @param bool   $force         是否为已有新格式附件强制补生成尺寸
      * @return array 压缩结果
      */
-    public function compress_to_target_format( int $attachment_id, string $file_path, string $size_type = 'full', string $target = '' ): array {
+    public function compress_to_target_format( int $attachment_id, string $file_path, string $size_type = 'full', string $target = '', bool $force = false ): array {
         $result_template = array(
             'file_path'       => $file_path,
             'from'            => $file_path,
@@ -190,7 +191,7 @@ class Libre_Compress_Output {
         $target   = in_array( $target, array( 'webp', 'avif' ), true ) ? $target : $settings['target'];
         $format   = $this->format_of( $file_path );
 
-        if ( ! in_array( $format, $settings['formats'], true ) ) {
+        if ( ! $force && ! in_array( $format, $settings['formats'], true ) ) {
             $result_template['status']  = 'skipped';
             $result_template['message'] = __( '该格式未配置格式转换', 'libre-compress' );
             return $result_template;

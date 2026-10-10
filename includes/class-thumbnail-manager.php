@@ -288,12 +288,30 @@ class Libre_Compress_Thumbnail_Manager {
                 );
             }
 
+            // 兼容格式不写进附件元数据，必须按转换映射找到同尺寸的旧文件。
+            // 这里不看“兼容格式回退”开关：开关关闭后，磁盘上仍可能留有旧文件。
+            $fallback_by_size = array();
+            foreach ( libre_compress()->output_processor->get_fallback_entries( $attachment_id ) as $entry ) {
+                $size_type = isset( $entry['size_type'] ) ? (string) $entry['size_type'] : '';
+
+                if ( '' !== $size_type && isset( $victims[ $size_type ] ) ) {
+                    $fallback_by_size[ $size_type ] = $entry;
+                }
+            }
+
             $replacements = array();
             foreach ( $targets as $size_name => $target_path ) {
                 $replacements[] = array(
                     'from' => $victims[ $size_name ]['file'],
                     'to'   => $target_path,
                 );
+
+                if ( isset( $fallback_by_size[ $size_name ] ) ) {
+                    $replacements[] = array(
+                        'from' => $fallback_by_size[ $size_name ]['from'],
+                        'to'   => $target_path,
+                    );
+                }
             }
 
             $replaced = 0;
@@ -338,6 +356,34 @@ class Libre_Compress_Thumbnail_Manager {
 
                 if ( $record ) {
                     $database->delete_record( $record['id'] );
+                }
+
+                // 新格式删掉后，映射对应的旧格式缩略图也必须一起删掉。
+                if ( isset( $fallback_by_size[ $size_name ] ) ) {
+                    $fallback_path = $fallback_by_size[ $size_name ]['from'];
+
+                    if ( $this->is_safe_upload_path( $fallback_path ) && is_file( $fallback_path ) && ! is_link( $fallback_path ) ) {
+                        // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
+                        unlink( $fallback_path );
+                    }
+
+                    if ( ! file_exists( $fallback_path ) ) {
+                        $deleted++;
+                    }
+                }
+            }
+
+            if ( ! empty( $fallback_by_size ) ) {
+                $deleted_fallback_sizes = array();
+
+                foreach ( $fallback_by_size as $size_name => $entry ) {
+                    if ( ! is_file( $entry['from'] ) && ! is_link( $entry['from'] ) ) {
+                        $deleted_fallback_sizes[] = $size_name;
+                    }
+                }
+
+                if ( ! empty( $deleted_fallback_sizes ) ) {
+                    libre_compress()->output_processor->forget_fallback_records( $attachment_id, $deleted_fallback_sizes );
                 }
             }
 
@@ -483,6 +529,10 @@ class Libre_Compress_Thumbnail_Manager {
                 return 'apng';
             }
 
+            // 转换后的附件主文件是 WebP/AVIF，生成缺失尺寸时要回到 uploads 中
+            // 的未缩放旧格式原图。不能使用备份文件，也不能拿 -scaled 图当原图。
+            $legacy_source = $this->find_legacy_original_source( $attachment_id, wp_get_attachment_metadata( $attachment_id ) );
+
             // 先按当前缩放设置补建/修正 -scaled 缩放图（与缩略图缺失无关）
             $scaled = $this->ensure_scaled( $attachment_id );
 
@@ -510,6 +560,15 @@ class Libre_Compress_Thumbnail_Manager {
             $file_dir = dirname( $metadata['file'] );
             $width    = isset( $metadata['width'] ) ? (int) $metadata['width'] : 0;
             $height   = isset( $metadata['height'] ) ? (int) $metadata['height'] : 0;
+
+            if ( null !== $legacy_source ) {
+                $source_size = wp_getimagesize( $legacy_source['path'] );
+
+                if ( is_array( $source_size ) && ! empty( $source_size[0] ) && ! empty( $source_size[1] ) ) {
+                    $width  = (int) $source_size[0];
+                    $height = (int) $source_size[1];
+                }
+            }
 
             $missing = array();
 
@@ -541,17 +600,25 @@ class Libre_Compress_Thumbnail_Manager {
                 return array_intersect_key( is_array( $sizes ) ? $sizes : array(), array_flip( $missing ) );
             };
 
+            // 旧原图可能超过 WordPress 的大图阈值；这里只生成尺寸，不能顺手生成 -scaled。
+            $disable_scaling = static function () {
+                return 0;
+            };
+
             add_filter( 'intermediate_image_sizes_advanced', $filter, 20 );
+            add_filter( 'big_image_size_threshold', $disable_scaling, 20 );
 
             $processor = libre_compress()->processor;
             $was       = $processor->is_auto_compress_suppressed();
             $processor->set_auto_compress_suppressed( true );
 
             try {
-                $fresh = wp_generate_attachment_metadata( $attachment_id, $file );
+                $generation_source = null !== $legacy_source ? $legacy_source['path'] : $file;
+                $fresh             = wp_generate_attachment_metadata( $attachment_id, $generation_source );
             } finally {
                 $processor->set_auto_compress_suppressed( $was );
                 remove_filter( 'intermediate_image_sizes_advanced', $filter, 20 );
+                remove_filter( 'big_image_size_threshold', $disable_scaling, 20 );
             }
 
             if ( empty( $fresh['sizes'] ) || ! is_array( $fresh['sizes'] ) ) {
@@ -565,6 +632,31 @@ class Libre_Compress_Thumbnail_Manager {
             foreach ( $fresh['sizes'] as $size_name => $size_data ) {
                 if ( ! in_array( $size_name, $missing, true ) ) {
                     continue;
+                }
+
+                // 用旧格式原图生成的文件保留作回退；再把同一尺寸转换成当前目标格式，
+                // 元数据只指向新格式，转换映射负责记住新旧两个文件的对应关系。
+                if ( null !== $legacy_source && ! empty( $size_data['file'] ) ) {
+                    $legacy_path = $base_dir . '/' . $file_dir . '/' . $size_data['file'];
+
+                    if ( is_file( $legacy_path ) ) {
+                        $target = libre_compress()->output_processor->get_output_settings()['target'];
+                        $converted = libre_compress()->output_processor->compress_to_target_format(
+                            $attachment_id,
+                            $legacy_path,
+                            $size_name,
+                            $target,
+                            true
+                        );
+
+                        if ( 'success' !== ( $converted['status'] ?? '' ) || empty( $converted['to'] ) ) {
+                            return null;
+                        }
+
+                        $size_data['file']      = wp_basename( $converted['to'] );
+                        $size_data['mime-type'] = 'avif' === $target ? 'image/avif' : 'image/webp';
+                        $size_data['filesize']  = is_file( $converted['to'] ) ? (int) filesize( $converted['to'] ) : 0;
+                    }
                 }
 
                 $merged['sizes'][ $size_name ] = $size_data;
@@ -587,6 +679,86 @@ class Libre_Compress_Thumbnail_Manager {
             libre_compress()->processor->release_attachment_lock( $global_lock );
             libre_compress()->processor->release_attachment_lock( $lock );
         }
+    }
+
+    /**
+     * 找到 uploads 中未缩放的旧格式原图。
+     *
+     * 优先使用 original_image 映射；没有映射时再从双扩展名的新格式路径推导。
+     * 任何文件名带 -scaled 的候选都不作为生成源。
+     *
+     * @param int        $attachment_id 附件 ID
+     * @param mixed      $metadata       附件元数据
+     * @return array|null path、size_type
+     */
+    private function find_legacy_original_source( int $attachment_id, $metadata ): ?array {
+        $entries = libre_compress()->output_processor->get_output_entries( $attachment_id );
+
+        foreach ( array( 'original_image', 'full' ) as $wanted_type ) {
+            foreach ( $entries as $entry ) {
+                if ( $wanted_type !== (string) ( $entry['size_type'] ?? '' ) ) {
+                    continue;
+                }
+
+                $source = (string) ( $entry['from'] ?? '' );
+                $target = (string) ( $entry['to'] ?? '' );
+
+                if ( ! is_file( $source ) || ! $this->is_safe_upload_path( $source ) || ! $this->is_double_extension_target( $target ) ) {
+                    continue;
+                }
+
+                if ( preg_match( '/-scaled\.[^.]+$/i', wp_basename( $source ) ) ) {
+                    continue;
+                }
+
+                return array( 'path' => $source, 'size_type' => $wanted_type );
+            }
+        }
+
+        if ( is_array( $metadata ) && ! empty( $metadata['file'] ) ) {
+            $directory = dirname( (string) $metadata['file'] );
+            $targets   = array();
+
+            if ( ! empty( $metadata['original_image'] ) ) {
+                $targets[] = (string) $metadata['original_image'];
+            }
+
+            // 没有 original_image 时，未缩放附件本身就是最大尺寸图。
+            $targets[] = wp_basename( (string) $metadata['file'] );
+
+            foreach ( $targets as $target ) {
+                if ( ! $this->is_double_extension_target( $target ) ) {
+                    continue;
+                }
+
+                $extension = pathinfo( $target, PATHINFO_EXTENSION );
+                $relative  = substr( $target, 0, strlen( $target ) - strlen( $extension ) - 1 );
+                $relative  = ( '.' === $directory ? '' : $directory . '/' ) . wp_basename( $relative );
+                $path      = untrailingslashit( wp_normalize_path( wp_upload_dir()['basedir'] ) ) . '/' . ltrim( wp_normalize_path( $relative ), '/' );
+
+                if ( is_file( $path ) && ! preg_match( '/-scaled\.[^.]+$/i', wp_basename( $path ) ) && $this->is_safe_upload_path( $path ) ) {
+                    return array( 'path' => $path, 'size_type' => 'original_image' );
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * 判断目标是否为插件双扩展名新格式文件。
+     *
+     * @param string $path 文件路径
+     * @return bool
+     */
+    private function is_double_extension_target( string $path ): bool {
+        $extension = strtolower( pathinfo( $path, PATHINFO_EXTENSION ) );
+
+        if ( ! in_array( $extension, array( 'webp', 'avif' ), true ) ) {
+            return false;
+        }
+
+        return '' !== pathinfo( substr( $path, 0, strlen( $path ) - strlen( $extension ) - 1 ), PATHINFO_EXTENSION );
     }
 
     /**
