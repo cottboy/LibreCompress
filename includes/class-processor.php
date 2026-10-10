@@ -55,8 +55,8 @@ class Libre_Compress_Processor {
     /**
      * 恢复中间状态标记
      *
-     * 引用与文件已退回原图，但转换结果、备份和记录尚未清理完时写入，
-     * 让中断后的恢复可以从清理阶段继续，而不是重复改动引用。
+     * 原图已写回、其余文件已删除，但缩略图还没重新生成、正文链接还没还原时写入，
+     * 让中断后的恢复可以从收尾阶段继续，而不是重复改动文件与引用。
      */
     const RESTORE_STATE_META_KEY = '_libre_compress_restore_ready';
 
@@ -598,10 +598,12 @@ class Libre_Compress_Processor {
     }
 
     /**
-     * 智能备份恢复：把主图像写回原路径，删掉其余文件，元数据与引用回到原图状态
+     * 智能备份恢复：把主图像写回原路径，删掉其余文件，并记下正文链接的还原目标
      *
      * 只备份了一份主图像，恢复时把它写回，再删除缩放图、缩略图与格式转换结果，
      * 让附件回到“只有原图”的干净状态；缩略图交由 finish 阶段按当前设置重新生成。
+     * 正文链接不在这里改写：链接要指向的文件得等缩略图重新生成后才知道在不在，
+     * 因此只把“每个地址原来叫什么”记进恢复状态，由 finish 阶段解析后统一改写。
      *
      * @param int $attachment_id 附件 ID
      * @return bool
@@ -664,6 +666,9 @@ class Libre_Compress_Processor {
 
         $to_delete = array_values( array_unique( array_filter( $to_delete ) ) );
 
+        // 正文链接的还原目标要在删文件和改元数据之前定下来，此时元数据还是压缩后的样子
+        $links = $this->collect_restore_links( $attachment_id, $metadata, $to_delete );
+
         // 删除除原图外的文件，绝不删到原图头上，也不碰 uploads 外的路径与符号链接
         foreach ( $to_delete as $path ) {
             if ( ! is_file( $path ) || is_link( $path ) ) {
@@ -678,22 +683,6 @@ class Libre_Compress_Processor {
             if ( ! unlink( $path ) && file_exists( $path ) ) {
                 return false;
             }
-        }
-
-        // 正文里固化的旧地址一律改到原图
-        $replacements = array();
-
-        foreach ( $to_delete as $path ) {
-            if ( $this->normalized_path( $path ) !== $original_norm ) {
-                $replacements[] = array(
-                    'from' => $path,
-                    'to'   => $original,
-                );
-            }
-        }
-
-        if ( ! empty( $replacements ) ) {
-            libre_compress()->output_processor->update_content_references( $replacements );
         }
 
         // 元数据回到干净的原图状态
@@ -733,14 +722,141 @@ class Libre_Compress_Processor {
             );
         }
 
-        return $this->write_restore_state( $attachment_id, array() );
+        return $this->write_restore_state( $attachment_id, $links );
+    }
+
+    /**
+     * 收集正文链接的还原目标
+     *
+     * 恢复不是把链接一律改回原图：压缩前链接指向哪个尺寸，恢复后还要指向同一个
+     * 尺寸的名字。转换映射里的 from 就是压缩前的地址；没被转换改过名的文件地址
+     * 本身没变，重新生成后同名文件会回来。目标这次没生成出来的留给 finish 阶段
+     * 就近替换，因此连宽高、是否主图一起记下。
+     *
+     * @param int   $attachment_id 附件 ID
+     * @param array $metadata      恢复前的附件元数据
+     * @param array $paths         本次删除的文件绝对路径
+     * @return array 每项包含 from（链接当前指向的地址）、to（还原目标）、width、height、is_main
+     */
+    private function collect_restore_links( int $attachment_id, array $metadata, array $paths ): array {
+        $links = array();
+        $seen  = array();
+
+        foreach ( libre_compress()->output_processor->get_output_entries( $attachment_id ) as $entry ) {
+            $from = isset( $entry['to'] ) ? wp_normalize_path( (string) $entry['to'] ) : '';
+            $to   = isset( $entry['from'] ) ? wp_normalize_path( (string) $entry['from'] ) : '';
+            $size_type = isset( $entry['size_type'] ) ? (string) $entry['size_type'] : 'full';
+
+            if ( '' === $from || '' === $to || ! $this->is_inside_upload_dir( $from ) ) {
+                continue;
+            }
+
+            list( $width, $height ) = $this->restore_size_dimensions( $metadata, $size_type );
+
+            $key = $this->normalized_path( $from );
+
+            if ( isset( $seen[ $key ] ) ) {
+                continue;
+            }
+
+            $seen[ $key ] = true;
+            $links[]      = array(
+                'from'    => $from,
+                'to'      => $to,
+                'width'   => $width,
+                'height'  => $height,
+                'is_main' => 'full' === $size_type,
+            );
+        }
+
+        // 没有被转换改过名的文件：地址不变，只要重新生成出来链接就仍然有效
+        foreach ( $paths as $path ) {
+            $path = wp_normalize_path( (string) $path );
+
+            if ( '' === $path || ! $this->is_inside_upload_dir( $path ) ) {
+                continue;
+            }
+
+            $key = $this->normalized_path( $path );
+
+            if ( isset( $seen[ $key ] ) ) {
+                continue;
+            }
+
+            $seen[ $key ] = true;
+            list( $width, $height ) = $this->restore_file_dimensions( $metadata, wp_basename( $path ) );
+            $links[]                = array(
+                'from'    => $path,
+                'to'      => $path,
+                'width'   => $width,
+                'height'  => $height,
+                'is_main' => wp_basename( $path ) === ( isset( $metadata['file'] ) ? wp_basename( (string) $metadata['file'] ) : '' ),
+            );
+        }
+
+        return $links;
+    }
+
+    /**
+     * 取恢复前元数据里某个尺寸的宽高
+     *
+     * @param array  $metadata  恢复前的附件元数据
+     * @param string $size_type 尺寸类型，full 表示主图
+     * @return array width、height，取不到时为 0
+     */
+    private function restore_size_dimensions( array $metadata, string $size_type ): array {
+        if ( 'full' === $size_type ) {
+            return array(
+                isset( $metadata['width'] ) ? (int) $metadata['width'] : 0,
+                isset( $metadata['height'] ) ? (int) $metadata['height'] : 0,
+            );
+        }
+
+        $size = isset( $metadata['sizes'][ $size_type ] ) ? $metadata['sizes'][ $size_type ] : null;
+
+        if ( is_array( $size ) ) {
+            return array(
+                isset( $size['width'] ) ? (int) $size['width'] : 0,
+                isset( $size['height'] ) ? (int) $size['height'] : 0,
+            );
+        }
+
+        return array( 0, 0 );
+    }
+
+    /**
+     * 按文件名取恢复前元数据里的宽高
+     *
+     * @param array  $metadata  恢复前的附件元数据
+     * @param string $file_name 文件名
+     * @return array width、height，取不到时为 0
+     */
+    private function restore_file_dimensions( array $metadata, string $file_name ): array {
+        if ( '' !== $file_name && $file_name === ( isset( $metadata['file'] ) ? wp_basename( (string) $metadata['file'] ) : '' ) ) {
+            return $this->restore_size_dimensions( $metadata, 'full' );
+        }
+
+        if ( ! empty( $metadata['sizes'] ) && is_array( $metadata['sizes'] ) ) {
+            foreach ( $metadata['sizes'] as $size_data ) {
+                if ( is_array( $size_data ) && ! empty( $size_data['file'] )
+                    && wp_basename( (string) $size_data['file'] ) === $file_name ) {
+                    return array(
+                        isset( $size_data['width'] ) ? (int) $size_data['width'] : 0,
+                        isset( $size_data['height'] ) ? (int) $size_data['height'] : 0,
+                    );
+                }
+            }
+        }
+
+        return array( 0, 0 );
     }
 
     /**
      * 按当前勾选设置重新生成缩略图
      *
-     * 恢复的语义是回到原图：临时禁用 -scaled 缩放，只按当前勾选的尺寸生成缩略图，
-     * 生成的都是未压缩文件，与“恢复原图”一致，用户可重新压缩。
+     * 恢复的语义是回到压缩前的样子：勾选了自动缩放且原图超过阈值时，-scaled 缩放图
+     * 会重新生成并接管主文件，正文链接也随之指向同一个名字；关闭缩放时主图就是原图
+     * 本身。生成的都是未压缩文件，与“恢复原图”一致，用户可重新压缩。
      *
      * @param int $attachment_id 附件 ID
      * @return bool 是否允许继续清理（原图缺失不阻断）
@@ -752,28 +868,18 @@ class Libre_Compress_Processor {
             return true;
         }
 
-        $no_scale = function ( $threshold ) {
-            return 0;
-        };
-
-        add_filter( 'big_image_size_threshold', $no_scale, 999 );
-
-        try {
-            $fresh = wp_generate_attachment_metadata( $attachment_id, $file );
-        } finally {
-            remove_filter( 'big_image_size_threshold', $no_scale, 999 );
-        }
+        $fresh = wp_generate_attachment_metadata( $attachment_id, $file );
 
         if ( ! is_array( $fresh ) || empty( $fresh['file'] ) ) {
             return true;
         }
 
-        // 保住在恢复主流程里设好的原图主文件信息，只采纳新生成的尺寸
+        // 新元数据缺失的字段（如 SVG 没有尺寸和体积）用恢复主流程里写好的值补齐
         $current = wp_get_attachment_metadata( $attachment_id );
 
         if ( is_array( $current ) ) {
-            foreach ( array( 'file', 'filesize', 'width', 'height', 'mime-type', 'image_meta' ) as $key ) {
-                if ( isset( $current[ $key ] ) ) {
+            foreach ( array( 'filesize', 'width', 'height', 'image_meta' ) as $key ) {
+                if ( ! isset( $fresh[ $key ] ) && isset( $current[ $key ] ) ) {
                     $fresh[ $key ] = $current[ $key ];
                 }
             }
@@ -820,13 +926,18 @@ class Libre_Compress_Processor {
     }
 
     /**
-     * 恢复收尾：按当前设置重新生成缩略图，再清理备份、记录与映射
+     * 恢复收尾：按当前设置重新生成缩略图，还原正文链接，再清理备份、记录与映射
      *
      * @param int $attachment_id 附件 ID
-     * @return bool 是否全部清理成功
+     * @return bool 是否全部完成
      */
     private function finish_restore( int $attachment_id ): bool {
         if ( ! $this->regenerate_thumbnails( $attachment_id ) ) {
+            return false;
+        }
+
+        // 正文链接要在忘记转换映射之前还原，失败时保留恢复状态，下次可重试续跑
+        if ( ! $this->restore_content_links( $attachment_id ) ) {
             return false;
         }
 
@@ -843,6 +954,123 @@ class Libre_Compress_Processor {
         }
 
         return $this->delete_restore_state( $attachment_id );
+    }
+
+    /**
+     * 按恢复状态里记下的目标还原正文链接
+     *
+     * 目标文件已经重新生成好的，地址原样还原；目标这次没生成出来的分两种情况：
+     * 原来指向主图的改成当前主文件（关闭自动缩放后缩放图不再生成，主图就是原图本身），
+     * 原来指向缩略图的按像素面积挑一个最接近的现有尺寸顶上，平手选更大的，面积差太大
+     * 就保持原样。
+     *
+     * @param int $attachment_id 附件 ID
+     * @return bool 是否全部改写成功
+     */
+    private function restore_content_links( int $attachment_id ): bool {
+        $state = $this->get_restore_state( $attachment_id );
+        $links = isset( $state['links'] ) && is_array( $state['links'] ) ? $state['links'] : array();
+
+        if ( empty( $links ) ) {
+            return true;
+        }
+
+        $candidates   = $this->existing_size_candidates( $attachment_id );
+        $replacements = array();
+
+        foreach ( $links as $link ) {
+            $from = isset( $link['from'] ) ? wp_normalize_path( (string) $link['from'] ) : '';
+            $to   = isset( $link['to'] ) ? wp_normalize_path( (string) $link['to'] ) : '';
+
+            if ( '' === $from || '' === $to || ! $this->is_inside_upload_dir( $from ) ) {
+                continue;
+            }
+
+            if ( ! is_file( $to ) ) {
+                // 原来指向主图的链接改到当前主文件：按面积挑会把全文大图降级成小缩略图
+                if ( ! empty( $link['is_main'] ) ) {
+                    $to = get_attached_file( $attachment_id );
+                    $to = $to ? wp_normalize_path( $to ) : '';
+                } else {
+                    $nearest = libre_compress()->thumbnail_manager->nearest_replacement(
+                        array(
+                            'file'   => $to,
+                            'width'  => isset( $link['width'] ) ? (int) $link['width'] : 0,
+                            'height' => isset( $link['height'] ) ? (int) $link['height'] : 0,
+                        ),
+                        $candidates
+                    );
+
+                    $to = null === $nearest ? '' : wp_normalize_path( (string) $nearest['file'] );
+                }
+            }
+
+            if ( '' === $to || ! $this->is_inside_upload_dir( $to )
+                || $this->normalized_path( $from ) === $this->normalized_path( $to ) ) {
+                continue;
+            }
+
+            $replacements[] = array(
+                'from' => $from,
+                'to'   => $to,
+            );
+        }
+
+        if ( empty( $replacements ) ) {
+            return true;
+        }
+
+        $replaced = 0;
+
+        return libre_compress()->output_processor->update_content_references( $replacements, $replaced );
+    }
+
+    /**
+     * 收集当前磁盘上真实存在的尺寸，作为链接还原的候选
+     *
+     * @param int $attachment_id 附件 ID
+     * @return array 每项包含 file、width、height
+     */
+    private function existing_size_candidates( int $attachment_id ): array {
+        $metadata = wp_get_attachment_metadata( $attachment_id );
+
+        if ( ! is_array( $metadata ) || empty( $metadata['file'] ) ) {
+            return array();
+        }
+
+        $base_dir = untrailingslashit( wp_normalize_path( wp_upload_dir()['basedir'] ) );
+        $file_dir = dirname( (string) $metadata['file'] );
+        $found    = array();
+
+        if ( ! empty( $metadata['sizes'] ) && is_array( $metadata['sizes'] ) ) {
+            foreach ( $metadata['sizes'] as $size_data ) {
+                if ( ! is_array( $size_data ) || empty( $size_data['file'] ) ) {
+                    continue;
+                }
+
+                $path = $base_dir . '/' . ltrim( wp_normalize_path( $file_dir . '/' . $size_data['file'] ), '/' );
+
+                if ( is_file( $path ) ) {
+                    $found[] = array(
+                        'file'   => $path,
+                        'width'  => isset( $size_data['width'] ) ? (int) $size_data['width'] : 0,
+                        'height' => isset( $size_data['height'] ) ? (int) $size_data['height'] : 0,
+                    );
+                }
+            }
+        }
+
+        $main = $base_dir . '/' . ltrim( wp_normalize_path( (string) $metadata['file'] ), '/' );
+
+        if ( is_file( $main ) ) {
+            $found[] = array(
+                'file'   => $main,
+                'width'  => isset( $metadata['width'] ) ? (int) $metadata['width'] : 0,
+                'height' => isset( $metadata['height'] ) ? (int) $metadata['height'] : 0,
+            );
+        }
+
+        return $found;
     }
 
     /**
@@ -1135,24 +1363,27 @@ class Libre_Compress_Processor {
     private function has_restore_state( int $attachment_id ): bool {
         $state = $this->get_restore_state( $attachment_id );
 
-        return isset( $state['targets'] ) && is_array( $state['targets'] );
+        return isset( $state['links'] ) && is_array( $state['links'] );
     }
 
     /**
      * 写入恢复中间状态
      *
+     * 记录正文链接的还原目标：缩略图要等 finish 阶段重新生成后才知道文件在不在，
+     * 恢复中断后继续收尾时靠这份记录把正文链接改完，不会漏掉已经固化在文章里的旧地址。
+     *
      * @param int   $attachment_id 附件 ID
-     * @param array $targets       待删除的转换结果相对路径
+     * @param array $links         正文链接还原目标
      * @return bool
      */
-    private function write_restore_state( int $attachment_id, array $targets ): bool {
-        $state = array( 'targets' => array_values( $targets ) );
+    private function write_restore_state( int $attachment_id, array $links ): bool {
+        $state = array( 'links' => $links );
 
         update_post_meta( $attachment_id, self::RESTORE_STATE_META_KEY, wp_slash( $state ) );
 
         $saved = $this->get_restore_state( $attachment_id );
 
-        return isset( $saved['targets'] ) && $saved['targets'] === $state['targets'];
+        return isset( $saved['links'] ) && $saved['links'] === $links;
     }
 
     /**
@@ -1805,12 +2036,6 @@ class Libre_Compress_Processor {
 
     /**
      * 获取上传目录内相对路径
-     *
-     * @param string $path 文件路径
-     * @return string
-     */
-    /**
-     * 获取上传目录内的相对路径
      *
      * 返回值只统一分隔符、不动大小写，避免写入元数据的文件名大小写被改掉。
      *

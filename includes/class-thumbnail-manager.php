@@ -140,10 +140,8 @@ class Libre_Compress_Thumbnail_Manager {
             'has_more'             => false,
         );
 
-        if ( empty( self::disabled_sizes() ) ) {
-            return $result;
-        }
-
+        // 不能因为“没有未勾选的尺寸”就整页跳过：-scaled 缩放图的清理与尺寸勾选无关，
+        // 关闭自动缩放或阈值改小后，即使尺寸全部勾选也要进来把缩放图退回原图。
         $limit       = max( 1, min( 100, $limit ) );
         $attachments = libre_compress()->database->get_image_attachment_ids_after( $after_id, $limit + 1 );
         $has_more    = count( $attachments ) > $limit;
@@ -364,11 +362,13 @@ class Libre_Compress_Thumbnail_Manager {
     /**
      * 为被删尺寸挑一个像素面积最接近的替代尺寸，平手时选更大的
      *
+     * 删除按钮与恢复原图都要把正文链接改到仍然存在的尺寸上，共用同一套挑选规则。
+     *
      * @param array $victim     被删尺寸的文件与宽高
      * @param array $candidates 仍然存在的候选尺寸
      * @return array|null 面积差过大时返回 null
      */
-    private function nearest_replacement( array $victim, array $candidates ) {
+    public function nearest_replacement( array $victim, array $candidates ) {
         $victim_area = max( 1, $victim['width'] * $victim['height'] );
         $best        = null;
         $best_score  = null;
@@ -418,10 +418,8 @@ class Libre_Compress_Thumbnail_Manager {
         $enabled    = self::enabled_sizes();
         $registered = wp_get_registered_image_subsizes();
 
-        if ( empty( $enabled ) ) {
-            return $result;
-        }
-
+        // 与删除按钮同理：没有勾选任何尺寸时也要进来处理 -scaled 缩放图，
+        // 缩放图由独立的勾选框负责，不该被“没有要补的尺寸”挡在门外。
         $limit       = max( 1, min( 100, $limit ) );
         $attachments = libre_compress()->database->get_image_attachment_ids_after( $after_id, $limit + 1 );
         $has_more    = count( $attachments ) > $limit;

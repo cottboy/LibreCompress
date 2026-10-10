@@ -76,8 +76,8 @@ class Libre_Compress_Settings {
      * 归一化大图缩放阈值
      *
      * 对应 WordPress 的 big_image_size_threshold：上传图片的宽或高超过此值时会生成
-     * -scaled 缩放图并接管原文件位置；0 表示关闭自动缩放。非数字按默认值处理，
-     * 负数一律按关闭缩放。
+     * -scaled 缩放图并接管原文件位置。阈值不再承担“关闭”语义，关闭自动缩放由独立的
+     * 勾选框负责，因此非数字或小于 1 的值一律回落到默认阈值。
      *
      * @param mixed $value 待归一化的原始值
      * @return int
@@ -413,32 +413,34 @@ class Libre_Compress_Settings {
                             <?php esc_html_e( '像素', 'libre-compress' ); ?>
                         </label>
                         <p class="description" style="margin-top:0;"><?php esc_html_e( '勾选后，上传或补生成缩略图时，宽或高超过此阈值的主图会另存为 -scaled 缩放图并接管主文件，未缩放的源文件仍留在磁盘上；不勾选则关闭自动缩放，原图直接投入使用。压缩已有图片时不会改动缩放，改动缩放请用下方的“删除未勾选尺寸的缩略图”和“补生成缺失尺寸的缩略图”两个按钮。默认 2560，与 WordPress 默认一致。', 'libre-compress' ); ?></p>
-                        <?php if ( empty( $registered_sizes ) ) : ?>
-                            <p class="description"><?php esc_html_e( '当前没有注册额外的缩略图尺寸。', 'libre-compress' ); ?></p>
-                        <?php else : ?>
-                            <?php foreach ( $registered_sizes as $size_name => $size_config ) : ?>
-                                <?php
-                                $width     = (int) $size_config['width'];
-                                $height    = (int) $size_config['height'];
-                                $dimension = $height > 0 ? $width . '×' . $height : $width . '×' . __( '自动', 'libre-compress' );
-                                $crop      = empty( $size_config['crop'] ) ? __( '等比', 'libre-compress' ) : __( '裁剪', 'libre-compress' );
-                                ?>
-                                <label style="display:block;">
-                                    <input type="hidden" name="libre_compress_general[thumbnail_state][<?php echo esc_attr( $size_name ); ?>]" value="0">
-                                    <input type="checkbox" name="libre_compress_general[thumbnail_state][<?php echo esc_attr( $size_name ); ?>]" value="1" <?php checked( ! in_array( $size_name, $disabled_sizes, true ) ); ?>>
+                        <div style="margin-top:14px;">
+                            <?php if ( empty( $registered_sizes ) ) : ?>
+                                <p class="description"><?php esc_html_e( '当前没有注册额外的缩略图尺寸。', 'libre-compress' ); ?></p>
+                            <?php else : ?>
+                                <?php foreach ( $registered_sizes as $size_name => $size_config ) : ?>
                                     <?php
-                                    printf(
-                                        /* translators: 1: 尺寸名, 2: 目标像素, 3: 裁剪方式 */
-                                        esc_html__( '%1$s（%2$s，%3$s）', 'libre-compress' ),
-                                        esc_html( $size_name ),
-                                        esc_html( $dimension ),
-                                        esc_html( $crop )
-                                    );
+                                    $width     = (int) $size_config['width'];
+                                    $height    = (int) $size_config['height'];
+                                    $dimension = $height > 0 ? $width . '×' . $height : $width . '×' . __( '自动', 'libre-compress' );
+                                    $crop      = empty( $size_config['crop'] ) ? __( '等比', 'libre-compress' ) : __( '裁剪', 'libre-compress' );
                                     ?>
-                                </label>
-                            <?php endforeach; ?>
-                            <p class="description"><?php esc_html_e( '取消勾选的尺寸在上传图片时不再生成；已经存在的文件用下方“删除未勾选尺寸的缩略图”清理。以后新注册的尺寸默认勾选。', 'libre-compress' ); ?></p>
-                        <?php endif; ?>
+                                    <label style="display:block;">
+                                        <input type="hidden" name="libre_compress_general[thumbnail_state][<?php echo esc_attr( $size_name ); ?>]" value="0">
+                                        <input type="checkbox" name="libre_compress_general[thumbnail_state][<?php echo esc_attr( $size_name ); ?>]" value="1" <?php checked( ! in_array( $size_name, $disabled_sizes, true ) ); ?>>
+                                        <?php
+                                        printf(
+                                            /* translators: 1: 尺寸名, 2: 目标像素, 3: 裁剪方式 */
+                                            esc_html__( '%1$s（%2$s，%3$s）', 'libre-compress' ),
+                                            esc_html( $size_name ),
+                                            esc_html( $dimension ),
+                                            esc_html( $crop )
+                                        );
+                                        ?>
+                                    </label>
+                                <?php endforeach; ?>
+                                <p class="description"><?php esc_html_e( '取消勾选的尺寸在上传图片时不再生成；已经存在的文件用下方“删除未勾选尺寸的缩略图”清理。以后新注册的尺寸默认勾选。', 'libre-compress' ); ?></p>
+                            <?php endif; ?>
+                        </div>
                     </td>
                 </tr>
             </table>
