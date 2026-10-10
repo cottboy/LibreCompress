@@ -570,7 +570,7 @@ class Libre_Compress_Thumbnail_Manager {
                 }
             }
 
-            $missing = array();
+            $missing_new = array();
 
             foreach ( $enabled as $size_name ) {
                 if ( ! isset( $registered[ $size_name ] ) ) {
@@ -589,73 +589,138 @@ class Libre_Compress_Thumbnail_Manager {
                     continue;
                 }
 
-                $missing[] = $size_name;
+                $missing_new[] = $size_name;
             }
 
-            if ( empty( $missing ) ) {
+            $legacy_entries = array();
+            if ( null !== $legacy_source ) {
+                foreach ( libre_compress()->output_processor->get_output_entries( $attachment_id ) as $entry ) {
+                    $size_name = isset( $entry['size_type'] ) ? (string) $entry['size_type'] : '';
+
+                    if ( '' !== $size_name && is_file( $entry['from'] ) && $this->is_safe_upload_path( $entry['from'] ) ) {
+                        $legacy_entries[ $size_name ] = $entry;
+                    }
+                }
+            }
+
+            $missing_legacy = array();
+            if ( null !== $legacy_source ) {
+                foreach ( $enabled as $size_name ) {
+                    if ( ! isset( $registered[ $size_name ] ) || isset( $legacy_entries[ $size_name ] ) ) {
+                        continue;
+                    }
+
+                    if ( ! $this->size_applies_to_image( $registered[ $size_name ], $width, $height ) ) {
+                        continue;
+                    }
+
+                    $missing_legacy[] = $size_name;
+                }
+            }
+
+            if ( empty( $missing_new ) && empty( $missing_legacy ) ) {
                 return 0 === $scaled_count ? 'nothing' : $scaled_count;
             }
-
-            $filter = function ( $sizes ) use ( $missing ) {
-                return array_intersect_key( is_array( $sizes ) ? $sizes : array(), array_flip( $missing ) );
-            };
 
             // 旧原图可能超过 WordPress 的大图阈值；这里只生成尺寸，不能顺手生成 -scaled。
             $disable_scaling = static function () {
                 return 0;
             };
 
-            add_filter( 'intermediate_image_sizes_advanced', $filter, 20 );
-            add_filter( 'big_image_size_threshold', $disable_scaling, 20 );
-
             $processor = libre_compress()->processor;
             $was       = $processor->is_auto_compress_suppressed();
             $processor->set_auto_compress_suppressed( true );
 
-            try {
-                $generation_source = null !== $legacy_source ? $legacy_source['path'] : $file;
-                $fresh             = wp_generate_attachment_metadata( $attachment_id, $generation_source );
-            } finally {
-                $processor->set_auto_compress_suppressed( $was );
-                remove_filter( 'intermediate_image_sizes_advanced', $filter, 20 );
-                remove_filter( 'big_image_size_threshold', $disable_scaling, 20 );
+            $generate_sizes = function ( string $source, array $wanted ) use ( $attachment_id, $disable_scaling ) {
+                if ( empty( $wanted ) ) {
+                    return array();
+                }
+
+                $filter = function ( $sizes ) use ( $wanted ) {
+                    return array_intersect_key( is_array( $sizes ) ? $sizes : array(), array_flip( $wanted ) );
+                };
+
+                add_filter( 'intermediate_image_sizes_advanced', $filter, 20 );
+                add_filter( 'big_image_size_threshold', $disable_scaling, 20 );
+
+                $fresh = array();
+
+                try {
+                    $fresh = wp_generate_attachment_metadata( $attachment_id, $source );
+                } finally {
+                    remove_filter( 'intermediate_image_sizes_advanced', $filter, 20 );
+                    remove_filter( 'big_image_size_threshold', $disable_scaling, 20 );
+                }
+
+                return is_array( $fresh ) && ! empty( $fresh['sizes'] ) && is_array( $fresh['sizes'] ) ? $fresh['sizes'] : array();
+            };
+
+            $new_source = $file;
+            if ( ! empty( $metadata['original_image'] ) ) {
+                $original_rel  = ( '.' === $file_dir ? '' : $file_dir . '/' ) . wp_basename( (string) $metadata['original_image'] );
+                $original_path = $base_dir . '/' . $original_rel;
+
+                if ( is_file( $original_path ) && $this->is_safe_upload_path( $original_path ) ) {
+                    $new_source = $original_path;
+                }
             }
 
-            if ( empty( $fresh['sizes'] ) || ! is_array( $fresh['sizes'] ) ) {
-                return 0 === $scaled_count ? 'nothing' : $scaled_count;
+            try {
+                $new_sizes    = $generate_sizes( $new_source, $missing_new );
+                $legacy_sizes = null !== $legacy_source ? $generate_sizes( $legacy_source['path'], $missing_legacy ) : array();
+            } finally {
+                $processor->set_auto_compress_suppressed( $was );
             }
 
             $merged          = $metadata;
             $merged['sizes'] = isset( $metadata['sizes'] ) && is_array( $metadata['sizes'] ) ? $metadata['sizes'] : array();
-            $generated       = 0;
+            $generated       = count( $legacy_sizes );
 
-            foreach ( $fresh['sizes'] as $size_name => $size_data ) {
-                if ( ! in_array( $size_name, $missing, true ) ) {
+            // 两套缩略图都由 WordPress 独立生成，但新文件名要沿用旧文件的主体，
+            // 这样前台按“双扩展名”规则才能找到对应的旧格式文件。
+            $legacy_names = array();
+            foreach ( $legacy_entries as $size_name => $entry ) {
+                $legacy_names[ $size_name ] = wp_basename( $entry['from'] );
+            }
+            foreach ( $legacy_sizes as $size_name => $size_data ) {
+                if ( ! empty( $size_data['file'] ) ) {
+                    $legacy_names[ $size_name ] = (string) $size_data['file'];
+                }
+            }
+
+            foreach ( $new_sizes as $size_name => $size_data ) {
+                if ( ! in_array( $size_name, $missing_new, true ) ) {
                     continue;
                 }
 
-                // 用旧格式原图生成的文件保留作回退；再把同一尺寸转换成当前目标格式，
-                // 元数据只指向新格式，转换映射负责记住新旧两个文件的对应关系。
-                if ( null !== $legacy_source && ! empty( $size_data['file'] ) ) {
-                    $legacy_path = $base_dir . '/' . $file_dir . '/' . $size_data['file'];
+                if ( ! empty( $size_data['file'] ) && isset( $legacy_names[ $size_name ] ) ) {
+                    $new_path     = $base_dir . '/' . $file_dir . '/' . $size_data['file'];
+                    $new_extension = pathinfo( $size_data['file'], PATHINFO_EXTENSION );
+                    $desired_name = $legacy_names[ $size_name ] . '.' . $new_extension;
+                    $desired_path = $base_dir . '/' . $file_dir . '/' . $desired_name;
 
-                    if ( is_file( $legacy_path ) ) {
-                        $target = libre_compress()->output_processor->get_output_settings()['target'];
-                        $converted = libre_compress()->output_processor->compress_to_target_format(
-                            $attachment_id,
-                            $legacy_path,
-                            $size_name,
-                            $target,
-                            true
-                        );
+                    if ( $new_path !== $desired_path && is_file( $new_path ) ) {
+                        if ( is_file( $desired_path ) ) {
+                            if ( is_link( $desired_path ) ) {
+                                return null;
+                            }
 
-                        if ( 'success' !== ( $converted['status'] ?? '' ) || empty( $converted['to'] ) ) {
-                            return null;
+                            if ( $this->is_safe_upload_path( $new_path ) && ! is_link( $new_path ) ) {
+                                // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
+                                unlink( $new_path );
+                            }
+
+                            if ( is_file( $desired_path ) ) {
+                                $size_data['file'] = $desired_name;
+                            }
+                        } else {
+                            if ( ! $this->is_safe_upload_path( $desired_path )
+                                || ! rename( $new_path, $desired_path ) ) {
+                                return null;
+                            }
+
+                            $size_data['file'] = $desired_name;
                         }
-
-                        $size_data['file']      = wp_basename( $converted['to'] );
-                        $size_data['mime-type'] = 'avif' === $target ? 'image/avif' : 'image/webp';
-                        $size_data['filesize']  = is_file( $converted['to'] ) ? (int) filesize( $converted['to'] ) : 0;
                     }
                 }
 
@@ -663,7 +728,11 @@ class Libre_Compress_Thumbnail_Manager {
                 $generated++;
             }
 
-            if ( 0 === $generated ) {
+            if ( empty( $new_sizes ) && ! empty( $missing_new ) ) {
+                return null;
+            }
+
+            if ( 0 === $generated && empty( $new_sizes ) ) {
                 return 0 === $scaled_count ? 'nothing' : $scaled_count;
             }
 
@@ -672,6 +741,19 @@ class Libre_Compress_Thumbnail_Manager {
                 $this->write_metadata( $attachment_id, $metadata );
 
                 return null;
+            }
+
+            foreach ( $legacy_names as $size_name => $legacy_name ) {
+                if ( empty( $merged['sizes'][ $size_name ]['file'] ) ) {
+                    continue;
+                }
+
+                $legacy_path = $base_dir . '/' . $file_dir . '/' . $legacy_name;
+                $new_path    = $base_dir . '/' . $file_dir . '/' . $merged['sizes'][ $size_name ]['file'];
+
+                if ( is_file( $legacy_path ) && is_file( $new_path ) ) {
+                    libre_compress()->output_processor->save_output_mapping( $attachment_id, $size_name, $legacy_path, $new_path );
+                }
             }
 
             return $generated + $scaled_count;

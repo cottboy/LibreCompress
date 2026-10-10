@@ -163,10 +163,9 @@ class Libre_Compress_Output {
      * @param string $file_path     源文件绝对路径
      * @param string $size_type     尺寸类型
      * @param string $target        本次操作固定的目标格式
-     * @param bool   $force         是否为已有新格式附件强制补生成尺寸
      * @return array 压缩结果
      */
-    public function compress_to_target_format( int $attachment_id, string $file_path, string $size_type = 'full', string $target = '', bool $force = false ): array {
+    public function compress_to_target_format( int $attachment_id, string $file_path, string $size_type = 'full', string $target = '' ): array {
         $result_template = array(
             'file_path'       => $file_path,
             'from'            => $file_path,
@@ -191,7 +190,7 @@ class Libre_Compress_Output {
         $target   = in_array( $target, array( 'webp', 'avif' ), true ) ? $target : $settings['target'];
         $format   = $this->format_of( $file_path );
 
-        if ( ! $force && ! in_array( $format, $settings['formats'], true ) ) {
+        if ( ! in_array( $format, $settings['formats'], true ) ) {
             $result_template['status']  = 'skipped';
             $result_template['message'] = __( '该格式未配置格式转换', 'libre-compress' );
             return $result_template;
@@ -967,6 +966,26 @@ class Libre_Compress_Output {
         }
 
         return null;
+    }
+
+    /**
+     * 保存同尺寸的新旧文件对应关系。
+     *
+     * 缩略图可以由 WordPress 分别生成，不经过格式转换；保存映射后，删除和前台回退
+     * 仍能知道两个独立生成的文件属于同一个尺寸。
+     *
+     * @param int    $attachment_id 附件 ID
+     * @param string $size_type     尺寸类型
+     * @param string $from_path     旧格式文件绝对路径
+     * @param string $to_path       新格式文件绝对路径
+     * @return bool
+     */
+    public function save_output_mapping( int $attachment_id, string $size_type, string $from_path, string $to_path ): bool {
+        if ( ! is_file( $from_path ) || ! is_file( $to_path ) || ! $this->is_safe_path( $from_path ) || ! $this->is_safe_path( $to_path ) ) {
+            return false;
+        }
+
+        return $this->add_output_entry( $attachment_id, $size_type, $from_path, $to_path );
     }
 
     /**
