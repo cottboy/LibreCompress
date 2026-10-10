@@ -105,14 +105,17 @@ class Libre_Compress_Thumbnail_Manager {
     /**
      * 按设置覆盖 WordPress 的大图缩放阈值
      *
-     * 接的是 WordPress 生成 -scaled 缩放图时用的那个阈值，官方默认 2560；
-     * 0 与 false 一样会被核心当作“不缩放”处理。
+     * 接的是 WordPress 生成 -scaled 缩放图时用的那个阈值，官方默认 2560。
+     * 勾选自动缩放时返回设定阈值，未勾选时返回 0——0 与 false 一样会被核心
+     * 当作“不缩放”处理，上传的大图直接作为主文件投入使用。
      *
      * @param int|false $threshold WordPress 当前阈值
-     * @return int 设置中的阈值，0 表示关闭自动缩放
+     * @return int 开启自动缩放时为设定阈值，关闭时为 0
      */
     public function filter_big_image_size_threshold( $threshold ) {
-        return Libre_Compress_Settings::image_size_threshold();
+        return Libre_Compress_Settings::image_scale_enabled()
+            ? Libre_Compress_Settings::image_size_threshold()
+            : 0;
     }
 
     /**
@@ -200,12 +203,22 @@ class Libre_Compress_Thumbnail_Manager {
         }
 
         try {
+            // 先按当前缩放设置清理 -scaled 缩放图（与尺寸勾选无关）
+            $scaled = $this->cleanup_scaled( $attachment_id );
+
+            if ( null === $scaled ) {
+                return null;
+            }
+
+            $deleted_base  = (int) $scaled['deleted'];
+            $replaced_base = (int) $scaled['replaced'];
+
             $metadata = wp_get_attachment_metadata( $attachment_id );
 
             if ( empty( $metadata ) || empty( $metadata['file'] ) || empty( $metadata['sizes'] ) ) {
                 return array(
-                    'deleted' => 0,
-                    'replaced' => 0,
+                    'deleted'  => $deleted_base,
+                    'replaced' => $replaced_base,
                 );
             }
 
@@ -242,8 +255,8 @@ class Libre_Compress_Thumbnail_Manager {
 
             if ( empty( $victims ) ) {
                 return array(
-                    'deleted' => 0,
-                    'replaced' => 0,
+                    'deleted'  => $deleted_base,
+                    'replaced' => $replaced_base,
                 );
             }
 
@@ -272,8 +285,8 @@ class Libre_Compress_Thumbnail_Manager {
 
             if ( empty( $targets ) ) {
                 return array(
-                    'deleted' => 0,
-                    'replaced' => 0,
+                    'deleted'  => $deleted_base,
+                    'replaced' => $replaced_base,
                 );
             }
 
@@ -289,8 +302,8 @@ class Libre_Compress_Thumbnail_Manager {
 
             if ( ! libre_compress()->output_processor->update_content_references( $replacements, $replaced ) ) {
                 return array(
-                    'deleted'        => 0,
-                    'replaced'       => $replaced,
+                    'deleted'        => $deleted_base,
+                    'replaced'       => $replaced_base + $replaced,
                     'content_failed' => true,
                 );
             }
@@ -331,8 +344,8 @@ class Libre_Compress_Thumbnail_Manager {
             }
 
             return array(
-                'deleted'  => $deleted,
-                'replaced' => $replaced,
+                'deleted'  => $deleted_base + $deleted,
+                'replaced' => $replaced_base + $replaced,
             );
         } finally {
             libre_compress()->processor->release_attachment_lock( $global_lock );
@@ -472,6 +485,22 @@ class Libre_Compress_Thumbnail_Manager {
                 return 'apng';
             }
 
+            // 先按当前缩放设置补建/修正 -scaled 缩放图（与缩略图缺失无关）
+            $scaled = $this->ensure_scaled( $attachment_id );
+
+            if ( null === $scaled ) {
+                return null;
+            }
+
+            $scaled_count = isset( $scaled['generated'] ) ? (int) $scaled['generated'] : 0;
+
+            // ensure_scaled 可能改写了主文件，重新取当前主文件用于后续生成
+            $file = get_attached_file( $attachment_id );
+
+            if ( ! $file || ! file_exists( $file ) ) {
+                return null;
+            }
+
             $metadata = wp_get_attachment_metadata( $attachment_id );
 
             if ( empty( $metadata ) || empty( $metadata['file'] ) ) {
@@ -507,7 +536,7 @@ class Libre_Compress_Thumbnail_Manager {
             }
 
             if ( empty( $missing ) ) {
-                return 'nothing';
+                return 0 === $scaled_count ? 'nothing' : $scaled_count;
             }
 
             $filter = function ( $sizes ) use ( $missing ) {
@@ -528,7 +557,7 @@ class Libre_Compress_Thumbnail_Manager {
             }
 
             if ( empty( $fresh['sizes'] ) || ! is_array( $fresh['sizes'] ) ) {
-                return 'nothing';
+                return 0 === $scaled_count ? 'nothing' : $scaled_count;
             }
 
             $merged          = $metadata;
@@ -545,7 +574,7 @@ class Libre_Compress_Thumbnail_Manager {
             }
 
             if ( 0 === $generated ) {
-                return 'nothing';
+                return 0 === $scaled_count ? 'nothing' : $scaled_count;
             }
 
             if ( ! $this->write_metadata( $attachment_id, $merged ) ) {
@@ -555,7 +584,7 @@ class Libre_Compress_Thumbnail_Manager {
                 return null;
             }
 
-            return $generated;
+            return $generated + $scaled_count;
         } finally {
             libre_compress()->processor->release_attachment_lock( $global_lock );
             libre_compress()->processor->release_attachment_lock( $lock );
@@ -591,6 +620,279 @@ class Libre_Compress_Thumbnail_Manager {
         }
 
         return ( $target_width > 0 && $width > $target_width ) || ( $target_height > 0 && $height > $target_height );
+    }
+
+    /**
+     * 规范化路径用于大小写不敏感的比较
+     *
+     * Windows 文件系统不区分大小写，比较缩放图与原图是否为同一文件时必须忽略大小写。
+     *
+     * @param string $path 路径
+     * @return string
+     */
+    private function normalized_path( string $path ): string {
+        $normalized = wp_normalize_path( $path );
+
+        return 'WIN' === strtoupper( substr( PHP_OS, 0, 3 ) ) ? strtolower( $normalized ) : $normalized;
+    }
+
+    /**
+     * 计算附件的 -scaled 缩放图上下文
+     *
+     * @param array $metadata 附件元数据
+     * @return array threshold、enabled、main_rel、orig_rel、source_rel、is_scaled
+     */
+    private function scaled_context( array $metadata ): array {
+        $threshold = Libre_Compress_Settings::image_size_threshold();
+        $enabled   = Libre_Compress_Settings::image_scale_enabled();
+
+        $main_rel  = isset( $metadata['file'] ) ? ltrim( wp_normalize_path( (string) $metadata['file'] ), '/' ) : '';
+        $orig_name = isset( $metadata['original_image'] ) ? (string) $metadata['original_image'] : '';
+        $is_scaled = '' !== $orig_name && '' !== $main_rel;
+
+        // original_image 存的是文件名，与主文件同目录，拼成完整相对路径
+        $file_dir   = dirname( $main_rel );
+        $orig_rel   = $is_scaled ? ( ( '.' === $file_dir ? '' : $file_dir . '/' ) . $orig_name ) : '';
+        $source_rel = $is_scaled ? $orig_rel : $main_rel;
+
+        return array(
+            'threshold'  => $threshold,
+            'enabled'    => $enabled,
+            'main_rel'   => $main_rel,
+            'orig_rel'   => $orig_rel,
+            'source_rel' => $source_rel,
+            'is_scaled'  => $is_scaled,
+        );
+    }
+
+    /**
+     * 删除主文件相关的压缩记录
+     *
+     * 缩放图的生成与去缩放都改变了主文件结构，full 与 original_image 两条记录
+     * 描述的是旧文件，删除后让主文件回到待压缩状态，用户可重新压缩。
+     *
+     * @param int $attachment_id 附件 ID
+     */
+    private function forget_main_records( int $attachment_id ): void {
+        $database = libre_compress()->database;
+
+        foreach ( array( 'full', 'original_image' ) as $size_type ) {
+            $record = $database->get_record( $attachment_id, $size_type );
+
+            if ( $record ) {
+                $database->delete_record( (int) $record['id'] );
+            }
+        }
+    }
+
+    /**
+     * 删除按钮：按当前缩放设置清理 -scaled 缩放图
+     *
+     * 关闭了自动缩放，或现有缩放图长边超过阈值（阈值被调小）时，删掉缩放图、
+     * 让主文件退回未缩放的原图，并同步元数据、正文链接和压缩记录。
+     * 缩放图长边不超阈值（符合当前设置）时不动。调用前须已持有附件锁。
+     *
+     * @param int $attachment_id 附件 ID
+     * @return array|null deleted、replaced；处理失败返回 null
+     */
+    private function cleanup_scaled( int $attachment_id ): ?array {
+        $metadata = wp_get_attachment_metadata( $attachment_id );
+
+        if ( ! is_array( $metadata ) || empty( $metadata['file'] ) ) {
+            return array( 'deleted' => 0, 'replaced' => 0 );
+        }
+
+        $context = $this->scaled_context( $metadata );
+
+        if ( ! $context['is_scaled'] ) {
+            return array( 'deleted' => 0, 'replaced' => 0 );
+        }
+
+        $upload   = wp_upload_dir();
+        $base_dir = untrailingslashit( wp_normalize_path( $upload['basedir'] ) );
+        $main_abs = $base_dir . '/' . ltrim( wp_normalize_path( $context['main_rel'] ), '/' );
+        $orig_abs = $base_dir . '/' . ltrim( wp_normalize_path( $context['orig_rel'] ), '/' );
+
+        // 原图必须还在，否则无法退回
+        if ( ! is_file( $orig_abs ) ) {
+            return array( 'deleted' => 0, 'replaced' => 0 );
+        }
+
+        // 关闭缩放，或缩放图长边超过阈值，才需要清理
+        $need_cleanup = ! $context['enabled'];
+
+        if ( ! $need_cleanup ) {
+            if ( ! is_file( $main_abs ) ) {
+                // 缩放图文件已不在，元数据还挂着 original_image，属悬空条目，清理元数据即可
+                $need_cleanup = true;
+            } else {
+                $main_size = wp_getimagesize( $main_abs );
+
+                if ( is_array( $main_size ) && ! empty( $main_size[0] ) && ! empty( $main_size[1] )
+                    && max( (int) $main_size[0], (int) $main_size[1] ) > $context['threshold'] ) {
+                    $need_cleanup = true;
+                }
+            }
+        }
+
+        if ( ! $need_cleanup ) {
+            return array( 'deleted' => 0, 'replaced' => 0 );
+        }
+
+        $deleted  = 0;
+        $replaced = 0;
+
+        if ( is_file( $main_abs ) ) {
+            // 绝不删到原图头上，也不删 uploads 外的路径
+            if ( ! $this->is_safe_upload_path( $main_abs )
+                || $this->normalized_path( $main_abs ) === $this->normalized_path( $orig_abs ) ) {
+                return null;
+            }
+
+            // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
+            if ( ! unlink( $main_abs ) || file_exists( $main_abs ) ) {
+                return null;
+            }
+
+            $deleted = 1;
+
+            // 正文里固化的缩放图地址改回原图
+            libre_compress()->output_processor->update_content_references(
+                array(
+                    array(
+                        'from' => $main_abs,
+                        'to'   => $orig_abs,
+                    ),
+                ),
+                $replaced
+            );
+        }
+
+        $metadata['file'] = $context['orig_rel'];
+        unset( $metadata['original_image'] );
+
+        $orig_size = wp_getimagesize( $orig_abs );
+
+        if ( is_array( $orig_size ) && ! empty( $orig_size[0] ) && ! empty( $orig_size[1] ) ) {
+            $metadata['width']  = (int) $orig_size[0];
+            $metadata['height'] = (int) $orig_size[1];
+        }
+
+        clearstatcache( true, $orig_abs );
+        $metadata['filesize'] = (int) filesize( $orig_abs );
+
+        if ( ! $this->write_metadata( $attachment_id, $metadata ) ) {
+            return null;
+        }
+
+        update_attached_file( $attachment_id, $context['orig_rel'] );
+
+        $this->forget_main_records( $attachment_id );
+
+        return array( 'deleted' => $deleted, 'replaced' => $replaced );
+    }
+
+    /**
+     * 补生成按钮：按当前缩放设置补建或修正 -scaled 缩放图
+     *
+     * 开启自动缩放且未缩放原图长边超过阈值时，若无缩放图或缩放图长边超过阈值，
+     * 就从原图重新生成 -scaled 缩放图并接管主文件，同步元数据、正文链接和压缩记录。
+     * 调用前须已持有附件锁。
+     *
+     * @param int $attachment_id 附件 ID
+     * @return array|null generated、replaced；处理失败返回 null
+     */
+    private function ensure_scaled( int $attachment_id ): ?array {
+        if ( ! Libre_Compress_Settings::image_scale_enabled() ) {
+            return array( 'generated' => 0, 'replaced' => 0 );
+        }
+
+        $metadata = wp_get_attachment_metadata( $attachment_id );
+
+        if ( ! is_array( $metadata ) || empty( $metadata['file'] ) ) {
+            return array( 'generated' => 0, 'replaced' => 0 );
+        }
+
+        $context    = $this->scaled_context( $metadata );
+        $upload     = wp_upload_dir();
+        $base_dir   = untrailingslashit( wp_normalize_path( $upload['basedir'] ) );
+        $source_abs = $base_dir . '/' . ltrim( wp_normalize_path( $context['source_rel'] ), '/' );
+        $main_abs   = $base_dir . '/' . ltrim( wp_normalize_path( $context['main_rel'] ), '/' );
+
+        if ( ! is_file( $source_abs ) || ! libre_compress()->processor->is_scalable_image( $source_abs ) ) {
+            return array( 'generated' => 0, 'replaced' => 0 );
+        }
+
+        $source_size = wp_getimagesize( $source_abs );
+
+        if ( ! is_array( $source_size ) || empty( $source_size[0] ) || empty( $source_size[1] ) ) {
+            return array( 'generated' => 0, 'replaced' => 0 );
+        }
+
+        // 原图没超阈值，不需要缩放图
+        if ( max( (int) $source_size[0], (int) $source_size[1] ) <= $context['threshold'] ) {
+            return array( 'generated' => 0, 'replaced' => 0 );
+        }
+
+        // 已有缩放图且长边不超阈值（符合当前设置），不用重建；超过则先删掉旧的
+        if ( $context['is_scaled'] && is_file( $main_abs ) ) {
+            $main_size = wp_getimagesize( $main_abs );
+
+            if ( is_array( $main_size ) && ! empty( $main_size[0] ) && ! empty( $main_size[1] )
+                && max( (int) $main_size[0], (int) $main_size[1] ) <= $context['threshold'] ) {
+                return array( 'generated' => 0, 'replaced' => 0 );
+            }
+
+            if ( $this->is_safe_upload_path( $main_abs )
+                && $this->normalized_path( $main_abs ) !== $this->normalized_path( $source_abs ) ) {
+                // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
+                if ( ! unlink( $main_abs ) || file_exists( $main_abs ) ) {
+                    return null;
+                }
+            }
+        }
+
+        $scaled = libre_compress()->processor->generate_scaled_file( $source_abs, $context['threshold'] );
+
+        if ( ! is_array( $scaled ) || empty( $scaled['path'] ) || ! is_file( $scaled['path'] ) ) {
+            return null;
+        }
+
+        $scaled_abs = wp_normalize_path( (string) $scaled['path'] );
+        $scaled_rel = ltrim( substr( $scaled_abs, strlen( $base_dir ) ), '/' );
+
+        $replaced = 0;
+
+        // 主文件名变化时，正文里固化的旧地址改到新缩放图
+        if ( $this->normalized_path( $scaled_rel ) !== $this->normalized_path( $context['main_rel'] ) ) {
+            libre_compress()->output_processor->update_content_references(
+                array(
+                    array(
+                        'from' => $main_abs,
+                        'to'   => $scaled_abs,
+                    ),
+                ),
+                $replaced
+            );
+        }
+
+        $metadata['file']           = $scaled_rel;
+        $metadata['original_image'] = wp_basename( $source_abs );
+        $metadata['width']          = isset( $scaled['width'] ) ? (int) $scaled['width'] : (int) $source_size[0];
+        $metadata['height']         = isset( $scaled['height'] ) ? (int) $scaled['height'] : (int) $source_size[1];
+
+        clearstatcache( true, $scaled_abs );
+        $metadata['filesize'] = isset( $scaled['filesize'] ) ? (int) $scaled['filesize'] : (int) filesize( $scaled_abs );
+
+        if ( ! $this->write_metadata( $attachment_id, $metadata ) ) {
+            return null;
+        }
+
+        update_attached_file( $attachment_id, $scaled_rel );
+
+        $this->forget_main_records( $attachment_id );
+
+        return array( 'generated' => 1, 'replaced' => $replaced );
     }
 
     /**

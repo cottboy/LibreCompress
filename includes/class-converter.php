@@ -233,16 +233,6 @@ class Libre_Compress_Output {
             $result_template['from']     = $file_path;
         }
 
-        // 备份先于任何改动：备份的必须是还没被压缩和转换动过的原图。
-        $settings_general = get_option( 'libre_compress_general', array() );
-        $backup_enabled   = isset( $settings_general['backup_enabled'] ) ? (bool) $settings_general['backup_enabled'] : true;
-
-        if ( $backup_enabled && ! libre_compress()->backup->create_backup( $attachment_id, $file_path ) ) {
-            $result_template['message']       = __( '无法创建原图备份，已停止压缩', 'libre-compress' );
-            $result_template['original_size'] = $original_size;
-            return $result_template;
-        }
-
         if ( null !== $entry && $this->is_safe_path( $entry['to'] ) && (int) filesize( $entry['to'] ) < $original_size ) {
             // 上次已生成的转换结果仍然有效，直接接管，不重复编码。
             $adopted = $this->prepare_existing_output( $attachment_id, $file_path, $entry['to'], $size_type, $original_size, $tool_name );

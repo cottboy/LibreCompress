@@ -83,17 +83,33 @@ class Libre_Compress_Settings {
      * @return int
      */
     public static function normalize_image_size_threshold( $value ): int {
-        if ( ! is_numeric( $value ) ) {
+        // 阈值不再用 0 表示关闭：关闭自动缩放由独立的勾选框负责，
+        // 因此非数字或小于 1 的值一律回落到默认阈值。
+        if ( ! is_numeric( $value ) || (int) $value < 1 ) {
             return self::IMAGE_SIZE_THRESHOLD_DEFAULT;
         }
 
-        return (int) max( 0, min( self::IMAGE_SIZE_THRESHOLD_MAX, (int) $value ) );
+        return (int) max( 1, min( self::IMAGE_SIZE_THRESHOLD_MAX, (int) $value ) );
+    }
+
+    /**
+     * 是否开启自动缩放主图
+     *
+     * 对应缩略图尺寸区域里带勾选框的缩放小项：勾选才按阈值生成 -scaled 缩放图，
+     * 不勾选就是关闭自动缩放。选项缺失时按开启处理，与 WordPress 默认缩放一致。
+     *
+     * @return bool
+     */
+    public static function image_scale_enabled(): bool {
+        $general = get_option( 'libre_compress_general', array() );
+
+        return ! isset( $general['image_scale_enabled'] ) || ! empty( $general['image_scale_enabled'] );
     }
 
     /**
      * 大图缩放阈值
      *
-     * @return int 像素值，0 表示关闭自动缩放
+     * @return int 像素值，仅在开启自动缩放时生效
      */
     public static function image_size_threshold(): int {
         $general = get_option( 'libre_compress_general', array() );
@@ -156,6 +172,7 @@ class Libre_Compress_Settings {
         $sanitized['auto_compress']      = ! empty( $input['auto_compress'] );
         $sanitized['backup_enabled']     = ! empty( $input['backup_enabled'] );
         $sanitized['backup_retention_days'] = self::normalize_retention_days( isset( $input['backup_retention_days'] ) ? $input['backup_retention_days'] : null );
+        $sanitized['image_scale_enabled']      = ! empty( $input['image_scale_enabled'] );
         $sanitized['image_size_threshold']   = self::normalize_image_size_threshold( isset( $input['image_size_threshold'] ) ? $input['image_size_threshold'] : null );
         $sanitized['strip_metadata']        = ! empty( $input['strip_metadata'] );
         $sanitized['tool_concurrency']   = isset( $input['tool_concurrency'] ) ? absint( $input['tool_concurrency'] ) : 5;
@@ -387,16 +404,15 @@ class Libre_Compress_Settings {
                     </td>
                 </tr>
                 <tr>
-                    <th scope="row"><label for="libre-compress-image-threshold"><?php esc_html_e( '大图缩放阈值', 'libre-compress' ); ?></label></th>
-                    <td>
-                        <input type="number" id="libre-compress-image-threshold" name="libre_compress_general[image_size_threshold]" value="<?php echo esc_attr( Libre_Compress_Settings::image_size_threshold() ); ?>" min="0" max="20000" step="1" class="small-text">
-                        <?php esc_html_e( '像素', 'libre-compress' ); ?>
-                        <p class="description"><?php esc_html_e( 'WordPress 上传新图片时，宽或高超过此阈值会重新编码出一张 -scaled 缩放图并接管原文件位置，未缩放的源文件仍留在磁盘上；填 0 表示关闭自动缩放，原图文件直接投入使用。压缩未压缩的图片时也会按此阈值重新缩放：主文件超出就生成 -scaled 接管主文件，未缩放源文件保留，正文里的旧图片地址一并改写；已压缩的图片不再改动。默认 2560，与 WordPress 默认一致。', 'libre-compress' ); ?></p>
-                    </td>
-                </tr>
-                <tr>
                     <th scope="row"><?php esc_html_e( '缩略图尺寸', 'libre-compress' ); ?></th>
                     <td>
+                        <label style="display:block; margin-bottom:10px;">
+                            <input type="checkbox" name="libre_compress_general[image_scale_enabled]" value="1" <?php checked( Libre_Compress_Settings::image_scale_enabled() ); ?>>
+                            <?php esc_html_e( '自动缩放超尺寸的主图，阈值', 'libre-compress' ); ?>
+                            <input type="number" name="libre_compress_general[image_size_threshold]" value="<?php echo esc_attr( Libre_Compress_Settings::image_size_threshold() ); ?>" min="1" max="20000" step="1" class="small-text">
+                            <?php esc_html_e( '像素', 'libre-compress' ); ?>
+                        </label>
+                        <p class="description" style="margin-top:0;"><?php esc_html_e( '勾选后，上传或补生成缩略图时，宽或高超过此阈值的主图会另存为 -scaled 缩放图并接管主文件，未缩放的源文件仍留在磁盘上；不勾选则关闭自动缩放，原图直接投入使用。压缩已有图片时不会改动缩放，改动缩放请用下方的“删除未勾选尺寸的缩略图”和“补生成缺失尺寸的缩略图”两个按钮。默认 2560，与 WordPress 默认一致。', 'libre-compress' ); ?></p>
                         <?php if ( empty( $registered_sizes ) ) : ?>
                             <p class="description"><?php esc_html_e( '当前没有注册额外的缩略图尺寸。', 'libre-compress' ); ?></p>
                         <?php else : ?>
@@ -490,7 +506,7 @@ class Libre_Compress_Settings {
                     </button>
                 </td>
                 <td style="padding: 10px 0;">
-                    <span class="description"><?php esc_html_e( '删除上方未勾选尺寸已存在的缩略图文件，并把文章里指向它们的图片链接改到最相邻的尺寸', 'libre-compress' ); ?></span>
+                    <span class="description"><?php esc_html_e( '删除未勾选尺寸已存在的缩略图，文章里指向它们的图片链接会改到最相邻的尺寸；若关闭了自动缩放，或现有 -scaled 缩放图与阈值不符，也会删除缩放图让主图退回原图', 'libre-compress' ); ?></span>
                 </td>
             </tr>
             <tr>
@@ -500,7 +516,7 @@ class Libre_Compress_Settings {
                     </button>
                 </td>
                 <td style="padding: 10px 0;">
-                    <span class="description"><?php esc_html_e( '只为上方已勾选但文件缺失的尺寸生成缩略图，不会重建已存在的文件，也不改动任何文章链接', 'libre-compress' ); ?></span>
+                    <span class="description"><?php esc_html_e( '为已勾选但缺失的尺寸补生成缩略图；若开启了自动缩放且主图超过阈值，还会生成或修正 -scaled 缩放图。不会重建已存在的缩略图，纯缩略图缺失也不改动文章链接', 'libre-compress' ); ?></span>
                 </td>
             </tr>
         </table>

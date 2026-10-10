@@ -432,9 +432,7 @@ class Libre_Compress_Compressor {
             );
         }
 
-        $settings       = get_option( 'libre_compress_general', array() );
-        $backup_enabled = isset( $settings['backup_enabled'] ) ? (bool) $settings['backup_enabled'] : true;
-        $tool           = $this->get_tool_for_format( $extension );
+        $tool = $this->get_tool_for_format( $extension );
 
         if ( ! $tool ) {
             $message = __( '没有可用的压缩工具', 'libre-compress' );
@@ -463,20 +461,6 @@ class Libre_Compress_Compressor {
                 'message' => $message,
                 'status'  => 'skipped',
             );
-        }
-
-        if ( $backup_enabled ) {
-            $backup = libre_compress()->backup;
-            if ( ! $backup->create_backup( $attachment_id, $file_path ) ) {
-                $message = __( '无法创建原图备份，已停止压缩', 'libre-compress' );
-                $this->record_skipped_file( $attachment_id, $file_path, $size_type, $message );
-
-                return array(
-                    'success' => false,
-                    'message' => $message,
-                    'status'  => 'failed',
-                );
-            }
         }
 
         // 使用唯一回滚副本，避免异常中断或并发遗留文件互相覆盖。
