@@ -63,26 +63,23 @@ class Libre_Compress_Media_Library {
     public function output_media_library_styles() {
         ?>
         <style>
-            /* 媒体库表格改成按内容分配宽度，压缩列只占自己需要的宽度，省下来的宽度让给左边的文件列 */
-            .wp-list-table.fixed {
-                table-layout: auto;
-            }
-
+            /* 压缩列的宽度、列内两栏的宽度都由脚本按当前语言下的实际文字量算出来（见 admin.js），
+               这里的数值只是脚本没跑起来时的兜底 */
             .wp-list-table .column-libre_compress {
-                width: 1%;
+                width: 320px;
             }
 
-            /* 左侧文字、右侧按钮两栏：按钮栏固定成两个按钮的宽度，多了自动折到第二行；
-               整块内容贴着单元格右边，文字紧跟在按钮左边，按钮在各行之间就自然对齐了 */
+            /* 左侧文字栏、右侧按钮栏：两栏宽度由脚本取"各行里最宽的那个"，
+               所以每行的文字左边缘、按钮左边缘都对齐，两栏之间只留 8px，整块内容贴着单元格右边 */
             .wp-list-table .column-libre_compress .libre-compress-status {
                 display: grid;
-                grid-template-columns: max-content 176px;
+                grid-template-columns: var(--lc-info-width, 1fr) var(--lc-actions-width, 176px);
                 justify-content: end;
                 align-items: center;
                 gap: 6px 8px;
             }
 
-            /* 按钮最多排两行，排不下就往下折 */
+            /* 按钮栏宽度由脚本按"最多两行"算好，排不下就往下折 */
             .libre-compress-actions {
                 display: flex;
                 flex-wrap: wrap;
