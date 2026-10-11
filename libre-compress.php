@@ -3,7 +3,7 @@
  * Plugin Name: LibreCompress
  * Plugin URI: https://github.com/cottboy/libre-compress
  * Description: 免费的 WordPress 图片压缩插件。
- * Version: 1.3.2
+ * Version: 1.3.3
  * Author: cottboy
  * Author URI: https://github.com/cottboy
  * License: GPL v2 or later
@@ -24,7 +24,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 /**
  * 插件版本号
  */
-define( 'LIBRE_COMPRESS_VERSION', '1.3.2' );
+define( 'LIBRE_COMPRESS_VERSION', '1.3.3' );
 
 /**
  * 插件文件路径

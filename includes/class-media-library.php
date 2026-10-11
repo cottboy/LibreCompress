@@ -70,11 +70,10 @@ class Libre_Compress_Media_Library {
             }
 
             /* 左侧文字栏、右侧按钮栏：两栏宽度由脚本取"各行里最宽的那个"，
-               所以每行的文字左边缘、按钮左边缘都对齐，两栏之间只留 8px，整块内容贴着单元格右边 */
+               所以每行的文字左边缘、按钮左边缘都对齐，表头也和内容对得上，两栏之间只留 8px */
             .wp-list-table .column-libre_compress .libre-compress-status {
                 display: grid;
                 grid-template-columns: var(--lc-info-width, 1fr) var(--lc-actions-width, 176px);
-                justify-content: end;
                 align-items: center;
                 gap: 6px 8px;
             }

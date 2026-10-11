@@ -22,7 +22,6 @@
          */
         init: function() {
             this.bindEvents();
-            this.fitMediaColumn();
         },
 
         /**
@@ -1095,6 +1094,10 @@
         },
 
     };
+
+    // 脚本在页面末尾执行，此时表格已经在页面上：先同步量一次列宽，
+    // 让首屏画出来就是最终宽度，刷新时不会看到列宽先错后跳
+    LC.fitMediaColumn();
 
     // DOM 加载完成后初始化
     $(document).ready(function() {
