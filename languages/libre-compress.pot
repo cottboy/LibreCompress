@@ -1024,14 +1024,6 @@ msgid "关闭"
 msgstr ""
 
 #: includes/class-libre-compress.php
-msgid "图片原始大小"
-msgstr ""
-
-#: includes/class-libre-compress.php
-msgid "当前总占用"
-msgstr ""
-
-#: includes/class-libre-compress.php
 msgid "类别"
 msgstr ""
 

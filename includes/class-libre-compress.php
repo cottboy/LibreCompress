@@ -220,8 +220,6 @@ class Libre_Compress {
                     'error'                   => __( '操作失败', 'libre-compress' ),
                     'detailsTitle'            => __( '图片详情', 'libre-compress' ),
                     'detailsClose'            => __( '关闭', 'libre-compress' ),
-                    'detailsOriginalSize'     => __( '图片原始大小', 'libre-compress' ),
-                    'detailsTotalSize'        => __( '当前总占用', 'libre-compress' ),
                     'detailsGroup'            => __( '类别', 'libre-compress' ),
                     'detailsItem'             => __( '文件项目', 'libre-compress' ),
                     'detailsFormat'           => __( '格式', 'libre-compress' ),

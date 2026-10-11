@@ -188,10 +188,6 @@
             html += '<h2>' + this.escapeHtml(i18n.detailsTitle) + '</h2>';
             html += '<button type="button" class="button-link libre-compress-details-close">' + this.escapeHtml(i18n.detailsClose) + '</button>';
             html += '</div>';
-            html += '<p class="libre-compress-details-summary">';
-            html += this.escapeHtml(i18n.detailsOriginalSize) + '：' + this.escapeHtml(this.formatBytes(details.original_size));
-            html += '　' + this.escapeHtml(i18n.detailsTotalSize) + '：' + this.escapeHtml(this.formatBytes(details.total_size));
-            html += '</p>';
             html += '<table class="libre-compress-details-table"><thead><tr>';
             html += '<th>' + this.escapeHtml(i18n.detailsGroup) + '</th>';
             html += '<th>' + this.escapeHtml(i18n.detailsItem) + '</th>';

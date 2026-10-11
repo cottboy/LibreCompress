@@ -287,7 +287,6 @@ class Libre_Compress_Processor {
         $items          = array();
         $total_size     = 0;
         $seen_paths     = array();
-        $original_size  = 0;
 
         foreach ( $files as $file ) {
             $path              = isset( $file['file_path'] ) ? (string) $file['file_path'] : '';
@@ -311,12 +310,6 @@ class Libre_Compress_Processor {
                     $seen_paths[ $normalized_path ] = true;
                     $total_size += $current_size;
                 }
-            }
-
-            if ( ! $is_fallback && 'original_image' === $size_type ) {
-                $original_size = $item_original;
-            } elseif ( ! $is_fallback && 'full' === $size_type && 0 === $original_size ) {
-                $original_size = $item_original;
             }
 
             $items[] = array(
@@ -346,10 +339,6 @@ class Libre_Compress_Processor {
                 }
             }
 
-            if ( $backup_size > 0 ) {
-                $original_size = $backup_size;
-            }
-
             $items[] = array(
                 'group'         => __( '原图备份', 'libre-compress' ),
                 'name'          => __( '备份文件', 'libre-compress' ),
@@ -364,18 +353,8 @@ class Libre_Compress_Processor {
             );
         }
 
-        if ( 0 === $original_size ) {
-            foreach ( $items as $item ) {
-                if ( isset( $item['size_type'] ) && 'full' === $item['size_type'] && $item['original_size'] > 0 ) {
-                    $original_size = (int) $item['original_size'];
-                    break;
-                }
-            }
-        }
-
         return array(
             'attachment_id' => $attachment_id,
-            'original_size' => $original_size,
             'total_size'    => $total_size,
             'items'         => $items,
         );
