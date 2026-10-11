@@ -64,21 +64,22 @@ class Libre_Compress_Media_Library {
         ?>
         <style>
             .wp-list-table .column-libre_compress {
-                width: 380px;
+                width: 400px;
             }
 
-            /* 状态文字在左，操作按钮紧接在它右边；按钮放不下时整体换到下一行 */
+            /* 左侧文字一列、右侧按钮一列：两列的起点每行都固定，按钮才能上下对齐 */
             .wp-list-table .column-libre_compress .libre-compress-status {
-                display: flex;
-                flex-wrap: wrap;
-                align-items: flex-start;
-                gap: 4px 8px;
+                display: grid;
+                grid-template-columns: minmax(0, 1fr) 190px;
+                align-items: center;
+                gap: 6px 12px;
             }
 
             .libre-compress-info {
-                flex: 0 0 auto;
+                min-width: 0;
             }
 
+            /* 按钮最多排两行，排不下就往下折 */
             .libre-compress-actions {
                 display: flex;
                 flex-wrap: wrap;
