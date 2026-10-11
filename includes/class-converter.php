@@ -1517,6 +1517,16 @@ class Libre_Compress_Output {
     }
 
     /**
+     * 获取兼容格式回退文件对应的压缩记录名称。
+     *
+     * @param string $size_type 尺寸类型
+     * @return string
+     */
+    public function get_fallback_record_size_type( string $size_type ): string {
+        return $this->fallback_size_type( $size_type );
+    }
+
+    /**
      * 压缩记录是否与当前文件完全匹配
      *
      * @param array|null $record    压缩记录

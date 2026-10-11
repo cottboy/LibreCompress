@@ -36,6 +36,7 @@ class Libre_Compress_Media_Library {
         // 注册 AJAX 接口
         add_action( 'wp_ajax_libre_compress_get_uncompressed', array( $this, 'ajax_get_uncompressed' ) );
         add_action( 'wp_ajax_libre_compress_compress_single', array( $this, 'ajax_compress_single' ) );
+        add_action( 'wp_ajax_libre_compress_get_details', array( $this, 'ajax_get_details' ) );
         add_action( 'wp_ajax_libre_compress_restore', array( $this, 'ajax_restore' ) );
         add_action( 'wp_ajax_libre_compress_restore_all', array( $this, 'ajax_restore_all' ) );
         add_action( 'wp_ajax_libre_compress_clear_records', array( $this, 'ajax_clear_records' ) );
@@ -70,6 +71,91 @@ class Libre_Compress_Media_Library {
             .wp-list-table .column-libre_compress .libre-compress-status .libre-compress-btn {
                 margin-top: 2px;
                 margin-bottom: 2px;
+            }
+
+            .libre-compress-storage {
+                color: #666;
+                margin-top: 3px;
+            }
+
+            .libre-compress-storage .libre-compress-detail-btn {
+                margin-left: 4px;
+                padding: 0;
+                vertical-align: baseline;
+            }
+
+            .libre-compress-details-modal {
+                position: fixed;
+                z-index: 100000;
+                inset: 0;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                padding: 24px;
+                background: rgba(0, 0, 0, 0.55);
+            }
+
+            .libre-compress-details-dialog {
+                width: min(900px, 100%);
+                max-height: min(720px, 90vh);
+                overflow: auto;
+                background: #fff;
+                padding: 20px;
+                box-shadow: 0 8px 30px rgba(0, 0, 0, 0.28);
+            }
+
+            .libre-compress-details-head {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 16px;
+                margin-bottom: 14px;
+            }
+
+            .libre-compress-details-head h2 {
+                margin: 0;
+            }
+
+            .libre-compress-details-summary {
+                margin: 0 0 14px;
+                color: #50575e;
+            }
+
+            .libre-compress-details-table {
+                width: 100%;
+                border-collapse: collapse;
+            }
+
+            .libre-compress-details-table th,
+            .libre-compress-details-table td {
+                padding: 8px;
+                border-bottom: 1px solid #dcdcde;
+                text-align: left;
+                vertical-align: top;
+            }
+
+            .libre-compress-details-table th {
+                background: #f6f7f7;
+                white-space: nowrap;
+            }
+
+            @media screen and (max-width: 782px) {
+                .libre-compress-details-modal {
+                    padding: 10px;
+                }
+
+                .libre-compress-details-dialog {
+                    padding: 14px;
+                }
+
+                .libre-compress-details-table {
+                    font-size: 12px;
+                }
+
+                .libre-compress-details-table th,
+                .libre-compress-details-table td {
+                    padding: 6px 4px;
+                }
             }
         </style>
         <?php
@@ -125,6 +211,7 @@ class Libre_Compress_Media_Library {
         ?>
         <div class="libre-compress-status" data-attachment-id="<?php echo esc_attr( $attachment_id ); ?>">
             <span class="status-text"><?php esc_html_e( '未压缩', 'libre-compress' ); ?></span>
+            <?php $this->render_storage_summary( $attachment_id ); ?>
             <button type="button" class="button button-small libre-compress-btn" data-action="compress" data-attachment-id="<?php echo esc_attr( $attachment_id ); ?>">
                 <?php esc_html_e( '压缩', 'libre-compress' ); ?>
             </button>
@@ -141,6 +228,7 @@ class Libre_Compress_Media_Library {
         ?>
         <div class="libre-compress-status" data-attachment-id="<?php echo esc_attr( $attachment_id ); ?>">
             <span class="status-text" style="color: #d63638;"><?php esc_html_e( '压缩失败', 'libre-compress' ); ?></span>
+            <?php $this->render_storage_summary( $attachment_id ); ?>
             <button type="button" class="button button-small libre-compress-btn" data-action="compress" data-attachment-id="<?php echo esc_attr( $attachment_id ); ?>">
                 <?php esc_html_e( '重试', 'libre-compress' ); ?>
             </button>
@@ -170,6 +258,7 @@ class Libre_Compress_Media_Library {
                 );
                 ?>
             </span>
+            <?php $this->render_storage_summary( $attachment_id ); ?>
             <br>
             <button type="button" class="button button-small libre-compress-btn" data-action="compress" data-attachment-id="<?php echo esc_attr( $attachment_id ); ?>">
                 <?php esc_html_e( '继续压缩', 'libre-compress' ); ?>
@@ -203,9 +292,6 @@ class Libre_Compress_Media_Library {
      * @param bool  $has_fallback  是否有兼容格式回退
      */
     private function render_compressed_status( int $attachment_id, array $stats, bool $has_backup, bool $can_restore, bool $has_fallback ) {
-        $original_size   = isset( $stats['total_original_size'] ) ? max( 0, absint( $stats['total_original_size'] ) ) : 0;
-        $compressed_size = isset( $stats['total_compressed_size'] ) ? max( 0, absint( $stats['total_compressed_size'] ) ) : 0;
-        $saved_bytes     = max( 0, $original_size - $compressed_size );
         ?>
         <div class="libre-compress-status" data-attachment-id="<?php echo esc_attr( $attachment_id ); ?>">
             <span class="status-text" style="color: #00a32a;">
@@ -218,17 +304,7 @@ class Libre_Compress_Media_Library {
                 ?>
             </span>
             <br>
-            <small style="color: #666;">
-                <?php
-                printf(
-                    /* translators: 1: 原始大小，2: 节省大小，3: 当前大小 */
-                    esc_html__( '%1$s-%2$s=%3$s', 'libre-compress' ),
-                    esc_html( $this->format_file_size( $original_size ) ),
-                    esc_html( $this->format_file_size( $saved_bytes ) ),
-                    esc_html( $this->format_file_size( $compressed_size ) )
-                );
-                ?>
-            </small>
+            <?php $this->render_storage_summary( $attachment_id ); ?>
             <?php if ( $can_restore ) : ?>
                 <br>
                 <button type="button" class="button button-small libre-compress-btn" data-action="restore" data-attachment-id="<?php echo esc_attr( $attachment_id ); ?>">
@@ -245,6 +321,30 @@ class Libre_Compress_Media_Library {
                     <?php esc_html_e( '删除兼容格式回退', 'libre-compress' ); ?>
                 </button>
             <?php endif; ?>
+        </div>
+        <?php
+    }
+
+    /**
+     * 输出附件当前所有相关文件的占用空间和详情按钮。
+     *
+     * @param int $attachment_id 附件 ID
+     */
+    private function render_storage_summary( int $attachment_id ) {
+        $details = libre_compress()->processor->get_attachment_details( $attachment_id );
+        $bytes   = isset( $details['total_size'] ) ? max( 0, (int) $details['total_size'] ) : 0;
+        ?>
+        <div class="libre-compress-storage">
+            <?php
+            printf(
+                /* translators: %s: 当前所有相关文件的总占用空间 */
+                esc_html__( '占用 %s', 'libre-compress' ),
+                esc_html( $this->format_file_size( $bytes ) )
+            );
+            ?>
+            <button type="button" class="button-link libre-compress-btn libre-compress-detail-btn" data-action="details" data-attachment-id="<?php echo esc_attr( $attachment_id ); ?>">
+                <?php esc_html_e( '详情', 'libre-compress' ); ?>
+            </button>
         </div>
         <?php
     }
@@ -301,6 +401,29 @@ class Libre_Compress_Media_Library {
         }
 
         wp_send_json_success( libre_compress()->processor->compress_attachment( $attachment_id ) );
+    }
+
+    /**
+     * AJAX：获取媒体库详情。
+     */
+    public function ajax_get_details() {
+        check_ajax_referer( 'libre_compress_nonce', 'nonce' );
+
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( array( 'message' => __( '权限不足', 'libre-compress' ) ) );
+        }
+
+        $attachment_id = isset( $_POST['attachment_id'] ) ? absint( $_POST['attachment_id'] ) : 0;
+        if ( ! libre_compress()->processor->is_valid_attachment( $attachment_id ) ) {
+            wp_send_json_error( array( 'message' => __( '无效的图片附件', 'libre-compress' ) ) );
+        }
+
+        $details = libre_compress()->processor->get_attachment_details( $attachment_id );
+        if ( empty( $details ) ) {
+            wp_send_json_error( array( 'message' => __( '无法读取图片详情', 'libre-compress' ) ) );
+        }
+
+        wp_send_json_success( $details );
     }
 
     /**
@@ -565,12 +688,19 @@ class Libre_Compress_Media_Library {
      * @return string 格式化后的大小
      */
     private function format_file_size( int $bytes ): string {
-        if ( $bytes < 1024 ) {
-            return $bytes . 'B';
-        } elseif ( $bytes < 1024 * 1024 ) {
-            return round( $bytes / 1024, 2 ) . 'KB';
-        } else {
-            return round( $bytes / ( 1024 * 1024 ), 2 ) . 'MB';
+        $units = array( 'B', 'KB', 'MB', 'GB', 'TB' );
+        $value = max( 0, (float) $bytes );
+        $index = 0;
+
+        while ( $value >= 1024 && $index < count( $units ) - 1 ) {
+            $value /= 1024;
+            $index++;
         }
+
+        if ( 0 === $index ) {
+            return (string) (int) $value . $units[ $index ];
+        }
+
+        return rtrim( rtrim( number_format( $value, 2, '.', '' ), '0' ), '.' ) . $units[ $index ];
     }
 }

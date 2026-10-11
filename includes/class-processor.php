@@ -170,7 +170,7 @@ class Libre_Compress_Processor {
      * @return array
      */
     public function get_attachment_state( int $attachment_id ): array {
-        $files = libre_compress()->compressor->get_attachment_files( $attachment_id );
+        $files = $this->get_processing_files( $attachment_id );
         $state = array(
             'status'               => 'empty',
             'total_files'          => 0,
@@ -194,13 +194,18 @@ class Libre_Compress_Processor {
 
             $state['total_files']++;
 
-            $record   = libre_compress()->database->get_record( $attachment_id, $file['size_type'] );
+            $record_size_type = isset( $file['record_size_type'] ) ? $file['record_size_type'] : $file['size_type'];
+            $record            = libre_compress()->database->get_record( $attachment_id, $record_size_type );
             $complete = $this->is_complete_record( $file['file_path'], $record );
 
             if ( $complete ) {
                 $state['success_count']++;
-                $state['total_original_size'] += max( 0, (int) $record['original_size'] );
-                $state['total_compressed_size'] += max( 0, (int) $record['compressed_size'] );
+                // 绿色压缩比例保持原来的口径，只统计附件元数据里的文件，
+                // 兼容格式只参与完成状态，不改变这项比例的计算方式。
+                if ( empty( $file['is_fallback'] ) ) {
+                    $state['total_original_size'] += max( 0, (int) $record['original_size'] );
+                    $state['total_compressed_size'] += max( 0, (int) $record['compressed_size'] );
+                }
             } elseif ( $record && 'failed' === $record['status'] ) {
                 $state['failed_count']++;
             } elseif ( $record && 'skipped' === $record['status'] ) {
@@ -230,6 +235,229 @@ class Libre_Compress_Processor {
         }
 
         return $state;
+    }
+
+    /**
+     * 获取附件本次压缩需要关注的所有文件。
+     *
+     * 兼容格式不写进 WordPress 附件元数据，因此单独从转换映射补进来。
+     * 记录名称加 fallback_ 前缀，避免覆盖新格式同尺寸的压缩记录。
+     *
+     * @param int        $attachment_id 附件 ID
+     * @param array|null $metadata       附件元数据
+     * @return array
+     */
+    private function get_processing_files( int $attachment_id, ?array $metadata = null ): array {
+        $files = libre_compress()->compressor->get_attachment_files( $attachment_id, $metadata );
+
+        foreach ( $files as $index => $file ) {
+            $files[ $index ]['is_fallback']      = false;
+            $files[ $index ]['record_size_type'] = $file['size_type'];
+        }
+
+        foreach ( libre_compress()->output_processor->get_fallback_entries( $attachment_id ) as $entry ) {
+            $size_type = isset( $entry['size_type'] ) ? (string) $entry['size_type'] : 'full';
+
+            $files[] = array(
+                'size_type'        => $size_type,
+                'record_size_type' => libre_compress()->output_processor->get_fallback_record_size_type( $size_type ),
+                'file_path'        => $entry['from'],
+                'is_fallback'      => true,
+                'fallback_to'      => $entry['to'],
+            );
+        }
+
+        return $files;
+    }
+
+    /**
+     * 获取媒体库详情所需的文件明细和总占用空间。
+     *
+     * @param int $attachment_id 附件 ID
+     * @return array
+     */
+    public function get_attachment_details( int $attachment_id ): array {
+        if ( ! $this->is_valid_attachment( $attachment_id ) ) {
+            return array();
+        }
+
+        $metadata       = wp_get_attachment_metadata( $attachment_id );
+        $metadata       = is_array( $metadata ) ? $metadata : array();
+        $files          = $this->get_processing_files( $attachment_id, $metadata );
+        $items          = array();
+        $total_size     = 0;
+        $seen_paths     = array();
+        $original_size  = 0;
+
+        foreach ( $files as $file ) {
+            $path              = isset( $file['file_path'] ) ? (string) $file['file_path'] : '';
+            $exists            = '' !== $path && is_file( $path );
+            $current_size      = $exists ? (int) filesize( $path ) : 0;
+            $record_size_type  = isset( $file['record_size_type'] ) ? (string) $file['record_size_type'] : (string) $file['size_type'];
+            $record            = libre_compress()->database->get_record( $attachment_id, $record_size_type );
+            $complete          = $exists && $this->is_complete_record( $path, $record );
+            $status            = $this->detail_file_status( $exists, $record, $complete );
+            $record_original   = is_array( $record ) ? max( 0, (int) $record['original_size'] ) : 0;
+            $record_compressed = is_array( $record ) ? max( 0, (int) $record['compressed_size'] ) : 0;
+            $item_original     = $record_original > 0 ? $record_original : $current_size;
+            $item_current      = $current_size;
+            $item_saved        = $complete ? max( 0, $item_original - $record_compressed ) : 0;
+            $size_type         = isset( $file['size_type'] ) ? (string) $file['size_type'] : 'full';
+            $is_fallback       = ! empty( $file['is_fallback'] );
+
+            if ( $exists ) {
+                $normalized_path = wp_normalize_path( $path );
+                if ( ! isset( $seen_paths[ $normalized_path ] ) ) {
+                    $seen_paths[ $normalized_path ] = true;
+                    $total_size += $current_size;
+                }
+            }
+
+            if ( ! $is_fallback && 'original_image' === $size_type ) {
+                $original_size = $item_original;
+            } elseif ( ! $is_fallback && 'full' === $size_type && 0 === $original_size ) {
+                $original_size = $item_original;
+            }
+
+            $items[] = array(
+                'group'         => $is_fallback ? __( '旧兼容格式', 'libre-compress' ) : __( '当前文件', 'libre-compress' ),
+                'name'          => $this->detail_size_label( $size_type, $metadata ),
+                'size_type'     => $size_type,
+                'format'        => $this->detail_file_format( $path ),
+                'status'        => $status,
+                'original_size' => $item_original,
+                'current_size'  => $item_current,
+                'saved_size'    => $item_saved,
+                'file_name'     => '' !== $path ? wp_basename( $path ) : '',
+                'is_fallback'   => $is_fallback,
+            );
+        }
+
+        foreach ( libre_compress()->backup->get_backup_info( $attachment_id ) as $backup ) {
+            $backup_path  = isset( $backup['backup_path'] ) ? (string) $backup['backup_path'] : '';
+            $backup_size  = isset( $backup['backup_size'] ) ? max( 0, (int) $backup['backup_size'] ) : 0;
+            $backup_exists = $backup_size > 0 && is_file( $backup_path );
+
+            if ( $backup_exists ) {
+                $normalized_path = wp_normalize_path( $backup_path );
+                if ( ! isset( $seen_paths[ $normalized_path ] ) ) {
+                    $seen_paths[ $normalized_path ] = true;
+                    $total_size += $backup_size;
+                }
+            }
+
+            if ( $backup_size > 0 ) {
+                $original_size = $backup_size;
+            }
+
+            $items[] = array(
+                'group'         => __( '原图备份', 'libre-compress' ),
+                'name'          => __( '备份文件', 'libre-compress' ),
+                'size_type'     => 'backup',
+                'format'        => $this->detail_file_format( $backup_path ),
+                'status'        => $backup_exists ? __( '备份中', 'libre-compress' ) : __( '文件不存在', 'libre-compress' ),
+                'original_size' => $backup_size,
+                'current_size'  => $backup_size,
+                'saved_size'    => 0,
+                'file_name'     => '' !== $backup_path ? wp_basename( $backup_path ) : '',
+                'is_fallback'   => false,
+            );
+        }
+
+        if ( 0 === $original_size ) {
+            foreach ( $items as $item ) {
+                if ( isset( $item['size_type'] ) && 'full' === $item['size_type'] && $item['original_size'] > 0 ) {
+                    $original_size = (int) $item['original_size'];
+                    break;
+                }
+            }
+        }
+
+        return array(
+            'attachment_id' => $attachment_id,
+            'original_size' => $original_size,
+            'total_size'    => $total_size,
+            'items'         => $items,
+        );
+    }
+
+    /**
+     * 详情里的文件状态。
+     *
+     * @param bool       $exists   文件是否存在
+     * @param array|null $record   压缩记录
+     * @param bool       $complete 记录是否匹配当前文件
+     * @return string
+     */
+    private function detail_file_status( bool $exists, $record, bool $complete ): string {
+        if ( ! $exists ) {
+            return __( '文件不存在', 'libre-compress' );
+        }
+
+        if ( $complete ) {
+            return __( '已压缩', 'libre-compress' );
+        }
+
+        if ( is_array( $record ) && 'failed' === (string) $record['status'] ) {
+            return __( '压缩失败', 'libre-compress' );
+        }
+
+        if ( is_array( $record ) && 'skipped' === (string) $record['status'] ) {
+            return __( '已跳过', 'libre-compress' );
+        }
+
+        return __( '未压缩', 'libre-compress' );
+    }
+
+    /**
+     * 详情里的尺寸名称，缩略图逐尺寸显示宽高。
+     *
+     * @param string $size_type 尺寸类型
+     * @param array  $metadata  附件元数据
+     * @return string
+     */
+    private function detail_size_label( string $size_type, array $metadata ): string {
+        if ( 'full' === $size_type ) {
+            return __( '主图', 'libre-compress' );
+        }
+
+        if ( 'original_image' === $size_type ) {
+            return __( '未缩放原图', 'libre-compress' );
+        }
+
+        $size = isset( $metadata['sizes'][ $size_type ] ) && is_array( $metadata['sizes'][ $size_type ] )
+            ? $metadata['sizes'][ $size_type ]
+            : array();
+        $width  = isset( $size['width'] ) ? absint( $size['width'] ) : 0;
+        $height = isset( $size['height'] ) ? absint( $size['height'] ) : 0;
+
+        if ( $width > 0 && $height > 0 ) {
+            return sprintf(
+                /* translators: 1: 缩略图尺寸名, 2: 宽度, 3: 高度 */
+                __( '缩略图 %1$s（%2$d × %3$d）', 'libre-compress' ),
+                $size_type,
+                $width,
+                $height
+            );
+        }
+
+        return sprintf(
+            /* translators: %s: 缩略图尺寸名 */
+            __( '缩略图 %s', 'libre-compress' ),
+            $size_type
+        );
+    }
+
+    /**
+     * 详情里的文件格式。
+     *
+     * @param string $path 文件路径
+     * @return string
+     */
+    private function detail_file_format( string $path ): string {
+        $extension = strtolower( (string) pathinfo( $path, PATHINFO_EXTENSION ) );
+
+        return '' === $extension ? __( '未知', 'libre-compress' ) : strtoupper( $extension );
     }
 
     /**
@@ -271,7 +499,7 @@ class Libre_Compress_Processor {
 
         try {
             $metadata = wp_get_attachment_metadata( $attachment_id );
-            $files    = libre_compress()->compressor->get_attachment_files( $attachment_id, is_array( $metadata ) ? $metadata : null );
+            $files    = $this->get_processing_files( $attachment_id, is_array( $metadata ) ? $metadata : null );
             if ( empty( $files ) ) {
                 return $this->empty_result( __( '未找到可压缩的图片文件', 'libre-compress' ), 'failed' );
             }
@@ -282,6 +510,19 @@ class Libre_Compress_Processor {
             // 不会对同一张图反复处理，也不会动已压缩文件的大小。
             if ( empty( $pending ) ) {
                 return $this->empty_result( __( '图片已经压缩', 'libre-compress' ), 'skipped' );
+            }
+
+            // 只要附件已有一个成功记录，后续补压缩就只能保持当前格式，
+            // 避免重新生成缩略图时把旧格式再次转换成目标格式。
+            $allow_target_conversion = true;
+            foreach ( $files as $candidate ) {
+                $candidate_record_type = isset( $candidate['record_size_type'] ) ? $candidate['record_size_type'] : $candidate['size_type'];
+                $candidate_record      = libre_compress()->database->get_record( $attachment_id, $candidate_record_type );
+
+                if ( is_file( $candidate['file_path'] ) && $this->is_complete_record( $candidate['file_path'], $candidate_record ) ) {
+                    $allow_target_conversion = false;
+                    break;
+                }
             }
 
             // 智能备份：压缩前只备份一份主图像（未缩放原图优先），恢复时据此重建缩略图。
@@ -307,7 +548,9 @@ class Libre_Compress_Processor {
             foreach ( $pending as $file ) {
                 do_action( 'libre_compress_before_compress', $attachment_id, $file['file_path'], $file['size_type'] );
 
-                if ( libre_compress()->output_processor->should_output_target( $file['file_path'] ) ) {
+                if ( empty( $file['is_fallback'] )
+                    && $allow_target_conversion
+                    && libre_compress()->output_processor->should_output_target( $file['file_path'] ) ) {
                     $file_result = libre_compress()->output_processor->compress_to_target_format(
                         $attachment_id,
                         $file['file_path'],
@@ -404,7 +647,8 @@ class Libre_Compress_Processor {
         $pending = array();
 
         foreach ( $files as $file ) {
-            $record = libre_compress()->database->get_record( $attachment_id, $file['size_type'] );
+            $record_size_type = isset( $file['record_size_type'] ) ? $file['record_size_type'] : $file['size_type'];
+            $record            = libre_compress()->database->get_record( $attachment_id, $record_size_type );
 
             if ( ! $this->is_complete_record( $file['file_path'], $record ) ) {
                 $pending[] = $file;

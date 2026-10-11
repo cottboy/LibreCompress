@@ -80,6 +80,11 @@
                 return;
             }
 
+            if (action === 'details') {
+                this.showDetails(attachmentId);
+                return;
+            }
+
             $btn.data('original-label', $btn.text());
             $btn.prop('disabled', true).text(this.i18n.processing);
 
@@ -131,6 +136,134 @@
                     $btn.prop('disabled', false).text($btn.data('original-label'));
                 }
             });
+        },
+
+        /**
+         * 显示单张图片的空间详情。
+         */
+        showDetails: function(attachmentId) {
+            var self = this;
+
+            $.ajax({
+                url: this.ajaxUrl,
+                type: 'POST',
+                data: {
+                    action: 'libre_compress_get_details',
+                    nonce: this.nonce,
+                    attachment_id: attachmentId
+                },
+                success: function(response) {
+                    if (!response.success || !response.data) {
+                        alert((response.data && response.data.message) || self.i18n.error);
+                        return;
+                    }
+
+                    self.renderDetailsModal(response.data);
+                },
+                error: function() {
+                    alert(self.i18n.error);
+                }
+            });
+        },
+
+        /**
+         * 安全转义详情弹窗里的文本。
+         */
+        escapeHtml: function(value) {
+            return $('<div>').text(value == null ? '' : String(value)).html();
+        },
+
+        /**
+         * 渲染详情弹窗。
+         */
+        renderDetailsModal: function(details) {
+            var self = this;
+            var i18n = this.i18n;
+            var rows = details.items || [];
+            var html = '';
+
+            html += '<div class="libre-compress-details-modal" role="dialog" aria-modal="true">';
+            html += '<div class="libre-compress-details-dialog">';
+            html += '<div class="libre-compress-details-head">';
+            html += '<h2>' + this.escapeHtml(i18n.detailsTitle) + '</h2>';
+            html += '<button type="button" class="button-link libre-compress-details-close">' + this.escapeHtml(i18n.detailsClose) + '</button>';
+            html += '</div>';
+            html += '<p class="libre-compress-details-summary">';
+            html += this.escapeHtml(i18n.detailsOriginalSize) + '：' + this.escapeHtml(this.formatBytes(details.original_size));
+            html += '　' + this.escapeHtml(i18n.detailsTotalSize) + '：' + this.escapeHtml(this.formatBytes(details.total_size));
+            html += '</p>';
+            html += '<table class="libre-compress-details-table"><thead><tr>';
+            html += '<th>' + this.escapeHtml(i18n.detailsGroup) + '</th>';
+            html += '<th>' + this.escapeHtml(i18n.detailsItem) + '</th>';
+            html += '<th>' + this.escapeHtml(i18n.detailsFormat) + '</th>';
+            html += '<th>' + this.escapeHtml(i18n.detailsStatus) + '</th>';
+            html += '<th>' + this.escapeHtml(i18n.detailsOriginalFileSize) + '</th>';
+            html += '<th>' + this.escapeHtml(i18n.detailsCurrentSize) + '</th>';
+            html += '<th>' + this.escapeHtml(i18n.detailsSavedSize) + '</th>';
+            html += '</tr></thead><tbody>';
+
+            if (!rows.length) {
+                html += '<tr><td colspan="7">' + this.escapeHtml(i18n.detailsEmpty) + '</td></tr>';
+            } else {
+                $.each(rows, function(index, row) {
+                    html += '<tr>';
+                    html += '<td>' + self.escapeHtml(row.group) + '</td>';
+                    html += '<td>' + self.escapeHtml(row.name);
+                    if (row.file_name) {
+                        html += '<br><small>' + self.escapeHtml(row.file_name) + '</small>';
+                    }
+                    html += '</td>';
+                    html += '<td>' + self.escapeHtml(row.format) + '</td>';
+                    html += '<td>' + self.escapeHtml(row.status) + '</td>';
+                    html += '<td>' + self.escapeHtml(self.formatBytes(row.original_size)) + '</td>';
+                    html += '<td>' + self.escapeHtml(self.formatBytes(row.current_size)) + '</td>';
+                    html += '<td>' + self.escapeHtml(self.formatBytes(row.saved_size)) + '</td>';
+                    html += '</tr>';
+                });
+            }
+
+            html += '</tbody></table></div></div>';
+
+            $('.libre-compress-details-modal').remove();
+            $('body').append(html);
+
+            var $modal = $('.libre-compress-details-modal').last();
+
+            function closeModal() {
+                $modal.remove();
+                $(document).off('keydown.libreCompressDetails');
+            }
+
+            $modal.on('click', function(e) {
+                if (e.target === this || $(e.target).hasClass('libre-compress-details-close')) {
+                    closeModal();
+                }
+            });
+            $(document).off('keydown.libreCompressDetails').on('keydown.libreCompressDetails', function(e) {
+                if (e.key === 'Escape') {
+                    closeModal();
+                }
+            });
+        },
+
+        /**
+         * 格式化详情中的文件大小。
+         */
+        formatBytes: function(bytes) {
+            var value = Math.max(0, parseInt(bytes, 10) || 0);
+            var units = ['B', 'KB', 'MB', 'GB', 'TB'];
+            var index = 0;
+
+            while (value >= 1024 && index < units.length - 1) {
+                value = value / 1024;
+                index++;
+            }
+
+            if (index === 0) {
+                return value + units[index];
+            }
+
+            return parseFloat(value.toFixed(2)) + units[index];
         },
 
         /**

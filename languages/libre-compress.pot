@@ -1006,3 +1006,101 @@ msgstr ""
 #: libre-compress.php:252
 msgid "无法安全写入清理后的 SVG 文件"
 msgstr ""
+
+#: includes/class-media-library.php
+msgid "占用 %s"
+msgstr ""
+
+#: includes/class-media-library.php
+msgid "详情"
+msgstr ""
+
+#: includes/class-media-library.php includes/class-libre-compress.php
+msgid "图片详情"
+msgstr ""
+
+#: includes/class-libre-compress.php
+msgid "关闭"
+msgstr ""
+
+#: includes/class-libre-compress.php
+msgid "图片原始大小"
+msgstr ""
+
+#: includes/class-libre-compress.php
+msgid "当前总占用"
+msgstr ""
+
+#: includes/class-libre-compress.php
+msgid "类别"
+msgstr ""
+
+#: includes/class-libre-compress.php
+msgid "文件项目"
+msgstr ""
+
+#: includes/class-libre-compress.php
+msgid "格式"
+msgstr ""
+
+#: includes/class-libre-compress.php
+msgid "压缩前大小"
+msgstr ""
+
+#: includes/class-libre-compress.php
+msgid "当前大小"
+msgstr ""
+
+#: includes/class-libre-compress.php
+msgid "节省大小"
+msgstr ""
+
+#: includes/class-libre-compress.php
+msgid "没有可显示的文件"
+msgstr ""
+
+#: includes/class-processor.php
+msgid "旧兼容格式"
+msgstr ""
+
+#: includes/class-processor.php
+msgid "当前文件"
+msgstr ""
+
+#: includes/class-processor.php
+msgid "原图备份"
+msgstr ""
+
+#: includes/class-processor.php
+msgid "备份文件"
+msgstr ""
+
+#: includes/class-processor.php
+msgid "备份中"
+msgstr ""
+
+#: includes/class-processor.php
+msgid "已跳过"
+msgstr ""
+
+#: includes/class-processor.php
+msgid "未缩放原图"
+msgstr ""
+
+#: includes/class-processor.php
+#, php-format
+msgid "缩略图 %1$s（%2$d × %3$d）"
+msgstr ""
+
+#: includes/class-processor.php
+#, php-format
+msgid "缩略图 %s"
+msgstr ""
+
+#: includes/class-processor.php
+msgid "未知"
+msgstr ""
+
+#: includes/class-media-library.php
+msgid "无法读取图片详情"
+msgstr ""
