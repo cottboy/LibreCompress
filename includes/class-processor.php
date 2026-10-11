@@ -1683,8 +1683,8 @@ class Libre_Compress_Processor {
         }
 
         try {
+            $entries = array();
             $pairs   = array();
-            $deleted = array();
 
             foreach ( libre_compress()->output_processor->get_fallback_entries( $attachment_id ) as $entry ) {
                 // 回退文件必须位于 uploads 内且不是符号链接，否则一律不动。
@@ -1693,6 +1693,29 @@ class Libre_Compress_Processor {
                     continue;
                 }
 
+                $entries[] = $entry;
+                $pairs[]   = array(
+                    'from' => $entry['from'],
+                    'to'   => $entry['to'],
+                );
+            }
+
+            if ( empty( $pairs ) ) {
+                return $result;
+            }
+
+            // 先把正文里固化的旧格式地址改到仍存在的新格式，成功后才删除旧文件。
+            $replaced              = 0;
+            $updated               = libre_compress()->output_processor->update_content_references( $pairs, $replaced );
+            $result['replaced']    = $replaced;
+            if ( ! $updated ) {
+                $result['failed'] = true;
+                return $result;
+            }
+
+            $deleted = array();
+
+            foreach ( $entries as $entry ) {
                 // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
                 if ( ! unlink( $entry['from'] ) || file_exists( $entry['from'] ) ) {
                     $result['failed'] = true;
@@ -1700,26 +1723,13 @@ class Libre_Compress_Processor {
                 }
 
                 $deleted[] = $entry['size_type'];
-                $pairs[]   = array(
-                    'from' => $entry['from'],
-                    'to'   => $entry['to'],
-                );
-
                 $result['deleted_files']++;
             }
 
-            if ( empty( $pairs ) ) {
-                return $result;
-            }
-
-            // 删除后正文里固化的旧格式地址会 404，必须改到新格式。
-            $replaced              = 0;
-            $updated               = libre_compress()->output_processor->update_content_references( $pairs, $replaced );
-            $result['replaced']    = $replaced;
-            $result['failed']      = $result['failed'] || ! $updated;
-
             // 回退文件已删除，指向它的压缩记录不再描述任何真实文件。
-            libre_compress()->output_processor->forget_fallback_records( $attachment_id, $deleted );
+            if ( ! empty( $deleted ) ) {
+                libre_compress()->output_processor->forget_fallback_records( $attachment_id, $deleted );
+            }
 
             return $result;
         } finally {
