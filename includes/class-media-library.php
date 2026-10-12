@@ -64,18 +64,19 @@ class Libre_Compress_Media_Library {
         ?>
         <style>
             /* WordPress 后台表格是固定列宽模式，列宽只能写具体数值，写"按内容伸缩"浏览器直接忽略。
-               360px = 左栏 130 + 间距 8 + 右栏 200 + 单元格左右内边距 20 */
+               354px = 左栏 130 + 间距 8 + 右栏 196 + 单元格左右内边距 20。
+               右栏 196 是四个按钮分两行时较宽那一行的宽度（删除备份 + 删除兼容格式回退），
+               所以最挤的情况下按钮也刚好顶到右边缘，不留空白 */
             .wp-list-table .column-libre_compress {
-                width: 360px;
+                width: 354px;
             }
 
             /* 左右两栏宽度写死，每行的文字左边缘、按钮左边缘才对齐在一条竖线上，
                表头"压缩"两个字也和内容对得上，两栏之间只留 8px。
-               文字长过 130px 会自动换行、按钮多过 200px 会自动往下折，
-               都只会多占一行，不会撑破表格，所以换语言也不会散架 */
+               文字长过 130px 会自动换行，都只会多占一行，不会撑破表格，所以换语言也不会散架 */
             .wp-list-table .column-libre_compress .libre-compress-status {
                 display: grid;
-                grid-template-columns: 130px 200px;
+                grid-template-columns: 130px 196px;
                 align-items: center;
                 gap: 0 8px;
             }
@@ -84,12 +85,18 @@ class Libre_Compress_Media_Library {
                 min-width: 0;
             }
 
-            /* 按钮从栏内左边开始排，排不下就往下折 */
+            /* 按钮每行几个由 PHP 直接分好（render_action_buttons 里按两个一组切），
+               这里只负责把行竖着排、行内按钮按文字大小排，绝不去拉伸按钮 */
             .libre-compress-actions {
                 display: flex;
-                flex-wrap: wrap;
+                flex-direction: column;
                 gap: 4px;
-                justify-content: flex-start;
+                align-items: flex-start;
+            }
+
+            .libre-compress-actions-row {
+                display: flex;
+                gap: 4px;
             }
 
             .libre-compress-storage {
@@ -320,28 +327,48 @@ class Libre_Compress_Media_Library {
      * @param bool   $has_fallback   是否有兼容格式回退
      */
     private function render_action_buttons( int $attachment_id, string $primary_action, string $primary_label, bool $can_restore, bool $has_backup, bool $has_fallback ) {
+        // 先把按钮都收集起来，再按两个一组分行，行数就不受按钮文字宽窄影响
+        $buttons = array();
+
+        if ( '' !== $primary_action ) {
+            $buttons[] = array(
+                'label'  => $primary_label,
+                'action' => $primary_action,
+            );
+        }
+        if ( $can_restore ) {
+            $buttons[] = array(
+                'label'  => __( '恢复原图', 'libre-compress' ),
+                'action' => 'restore',
+            );
+        }
+        if ( $has_backup ) {
+            $buttons[] = array(
+                'label'  => __( '删除备份', 'libre-compress' ),
+                'action' => 'delete-backup',
+            );
+        }
+        if ( $has_fallback ) {
+            $buttons[] = array(
+                'label'  => __( '删除兼容格式回退', 'libre-compress' ),
+                'action' => 'delete-fallback',
+            );
+        }
+
+        if ( empty( $buttons ) ) {
+            return;
+        }
         ?>
         <div class="libre-compress-actions">
-            <?php if ( '' !== $primary_action ) : ?>
-                <button type="button" class="button button-small libre-compress-btn" data-action="<?php echo esc_attr( $primary_action ); ?>" data-attachment-id="<?php echo esc_attr( $attachment_id ); ?>">
-                    <?php echo esc_html( $primary_label ); ?>
-                </button>
-            <?php endif; ?>
-            <?php if ( $can_restore ) : ?>
-                <button type="button" class="button button-small libre-compress-btn" data-action="restore" data-attachment-id="<?php echo esc_attr( $attachment_id ); ?>">
-                    <?php esc_html_e( '恢复原图', 'libre-compress' ); ?>
-                </button>
-            <?php endif; ?>
-            <?php if ( $has_backup ) : ?>
-                <button type="button" class="button button-small libre-compress-btn" data-action="delete-backup" data-attachment-id="<?php echo esc_attr( $attachment_id ); ?>">
-                    <?php esc_html_e( '删除备份', 'libre-compress' ); ?>
-                </button>
-            <?php endif; ?>
-            <?php if ( $has_fallback ) : ?>
-                <button type="button" class="button button-small libre-compress-btn" data-action="delete-fallback" data-attachment-id="<?php echo esc_attr( $attachment_id ); ?>">
-                    <?php esc_html_e( '删除兼容格式回退', 'libre-compress' ); ?>
-                </button>
-            <?php endif; ?>
+            <?php foreach ( array_chunk( $buttons, 2 ) as $row_buttons ) : ?>
+                <div class="libre-compress-actions-row">
+                    <?php foreach ( $row_buttons as $button ) : ?>
+                        <button type="button" class="button button-small libre-compress-btn" data-action="<?php echo esc_attr( $button['action'] ); ?>" data-attachment-id="<?php echo esc_attr( $attachment_id ); ?>">
+                            <?php echo esc_html( $button['label'] ); ?>
+                        </button>
+                    <?php endforeach; ?>
+                </div>
+            <?php endforeach; ?>
         </div>
         <?php
     }
