@@ -421,7 +421,12 @@ class Libre_Compress_Settings {
                                     <?php
                                     $width     = (int) $size_config['width'];
                                     $height    = (int) $size_config['height'];
-                                    $dimension = $height > 0 ? $width . '×' . $height : $width . '×' . __( '自动', 'libre-compress' );
+                                    // 宽或高为 0 表示该方向不限，由 WordPress 按原图比例自动推算。
+                                    $dimension = sprintf(
+                                        '%1$s×%2$s',
+                                        $width > 0 ? $width : __( '自动', 'libre-compress' ),
+                                        $height > 0 ? $height : __( '自动', 'libre-compress' )
+                                    );
                                     $crop      = empty( $size_config['crop'] ) ? __( '等比', 'libre-compress' ) : __( '裁剪', 'libre-compress' );
                                     ?>
                                     <label style="display:block;">
