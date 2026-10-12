@@ -557,7 +557,7 @@ class Libre_Compress_Settings {
                 <button type="button" class="button" id="libre-compress-task-stop"><?php esc_html_e( '停止任务', 'libre-compress' ); ?></button>
                 <button type="button" class="button" id="libre-compress-task-resume"><?php esc_html_e( '继续执行', 'libre-compress' ); ?></button>
                 <button type="button" class="button" id="libre-compress-task-retry"><?php esc_html_e( '重试失败的项目', 'libre-compress' ); ?></button>
-                <button type="button" class="button" id="libre-compress-task-refresh"><?php esc_html_e( '刷新页面', 'libre-compress' ); ?></button>
+                <button type="button" class="button" id="libre-compress-task-dismiss"><?php esc_html_e( '完成', 'libre-compress' ); ?></button>
             </p>
         </div>
         <?php

@@ -129,6 +129,7 @@ class Libre_Compress_Task {
         add_action( 'wp_ajax_libre_compress_task_status', array( $this, 'ajax_status' ) );
         add_action( 'wp_ajax_libre_compress_task_stop', array( $this, 'ajax_stop' ) );
         add_action( 'wp_ajax_libre_compress_task_retry', array( $this, 'ajax_retry' ) );
+        add_action( 'wp_ajax_libre_compress_task_dismiss', array( $this, 'ajax_dismiss' ) );
 
         // 接力棒掉了时的定时兜底
         add_action( self::WATCHDOG_HOOK, array( $this, 'run_watchdog' ), 10, 2 );
@@ -157,7 +158,7 @@ class Libre_Compress_Task {
     public function get_state(): array {
         $task = $this->get_task();
 
-        if ( ! $task || ! isset( $this->types[ $task['type'] ] ) ) {
+        if ( ! $task || ! isset( $this->types[ $task['type'] ] ) || ! empty( $task['dismissed'] ) ) {
             return array( 'has_task' => false );
         }
 
@@ -285,6 +286,39 @@ class Libre_Compress_Task {
     }
 
     /**
+     * 后台页面：关掉结果面板
+     */
+    public function ajax_dismiss() {
+        check_ajax_referer( 'libre_compress_nonce', 'nonce' );
+
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( array( 'message' => __( '权限不足', 'libre-compress' ) ) );
+        }
+
+        $task = $this->get_task();
+
+        // 正在执行的任务不给关：关掉就看不到进度，也找不到停止按钮了
+        if ( $task && self::STATUS_RUNNING === $task['status'] ) {
+            wp_send_json_error( array( 'message' => __( '任务还在执行，请先停止再关闭面板', 'libre-compress' ) ) );
+        }
+
+        $this->dismiss();
+
+        wp_send_json_success( array( 'has_task' => false ) );
+    }
+
+    /**
+     * 关掉结果面板：只标记不再显示，任务数据保留
+     */
+    public function dismiss(): void {
+        $this->mutate(
+            function ( array &$task ) {
+                $task['dismissed'] = 1;
+            }
+        );
+    }
+
+    /**
      * 登记并启动一个批量任务
      *
      * @param string $type  任务类型
@@ -332,6 +366,7 @@ class Libre_Compress_Task {
             'runner'       => '',
             'runner_until' => 0.0,
             'watchdog'     => 0,
+            'dismissed'    => 0,
             'started_at'   => time(),
             'updated_at'   => time(),
             'finished_at'  => 0,

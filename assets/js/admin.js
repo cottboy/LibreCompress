@@ -65,10 +65,7 @@
             $(document).on('click', '#libre-compress-task-stop', this.stopTask.bind(this));
             $(document).on('click', '#libre-compress-task-resume', this.resumeTask.bind(this));
             $(document).on('click', '#libre-compress-task-retry', this.retryTask.bind(this));
-            $(document).on('click', '#libre-compress-task-refresh', function(e) {
-                e.preventDefault();
-                location.reload();
-            });
+            $(document).on('click', '#libre-compress-task-dismiss', this.dismissTask.bind(this));
 
             // 原图备份保留时长不接受 0，步进跨过 0 时按方向落到 1 或 -1
             $(document).on('input change', '#libre-compress-retention-days', this.skipRetentionZero.bind(this));
@@ -492,6 +489,46 @@
         },
 
         /**
+         * 关掉结果面板（服务端会记住，刷新页面也不会再冒出来）
+         */
+        dismissTask: function(e) {
+            if (e) {
+                e.preventDefault();
+            }
+
+            var self = this;
+
+            this.stopPolling();
+
+            $.ajax({
+                url: this.ajaxUrl,
+                type: 'POST',
+                timeout: 30000,
+                data: {
+                    action: 'libre_compress_task_dismiss',
+                    nonce: this.nonce
+                },
+                success: function(response) {
+                    if (!response.success) {
+                        alert((response.data && response.data.message) || self.i18n.error);
+                        return;
+                    }
+
+                    self.taskState = { has_task: false };
+
+                    if (self.$panel) {
+                        self.$panel.hide();
+                    }
+
+                    self.lockBatchButtons(false);
+                },
+                error: function() {
+                    alert(self.i18n.error);
+                }
+            });
+        },
+
+        /**
          * 发送一个任务操作请求
          */
         taskAction: function(action) {
@@ -649,7 +686,7 @@
 
             this.$panel.find('#libre-compress-task-stop').toggle(running);
             this.$panel.find('#libre-compress-task-resume').toggle(running && !!state.stalled);
-            this.$panel.find('#libre-compress-task-refresh').toggle(!running);
+            this.$panel.find('#libre-compress-task-dismiss').toggle(!running);
 
             var retryCount = parseInt(state.retry_count, 10) || 0;
             var $retry = this.$panel.find('#libre-compress-task-retry');

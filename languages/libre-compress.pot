@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: LibreCompress 1.3.4\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-12 23:54+0800\n"
+"POT-Creation-Date: 2026-10-13 00:07+0800\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -392,10 +392,11 @@ msgstr ""
 #: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-media-library.php:447
 #: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-media-library.php:483
 #: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-media-library.php:519
-#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-task.php:207
-#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-task.php:230
-#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-task.php:249
-#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-task.php:263
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-task.php:208
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-task.php:231
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-task.php:250
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-task.php:264
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-task.php:295
 msgid "权限不足"
 msgstr ""
 
@@ -785,7 +786,7 @@ msgid "重试失败的项目"
 msgstr ""
 
 #: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:560
-msgid "刷新页面"
+msgid "完成"
 msgstr ""
 
 #: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:605
@@ -1046,78 +1047,82 @@ msgstr ""
 msgid "或"
 msgstr ""
 
-#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-task.php:269
-#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-task.php:275
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-task.php:270
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-task.php:276
 msgid "没有可重试的失败记录"
 msgstr ""
 
-#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-task.php:296
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-task.php:302
+msgid "任务还在执行，请先停止再关闭面板"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-task.php:330
 msgid "无效的操作类型"
 msgstr ""
 
-#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-task.php:302
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-task.php:336
 msgid "已有批量任务正在执行，请等它跑完，或先点“停止任务”"
 msgstr ""
 
-#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-task.php:1002
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-task.php:1043
 msgid "没有需要处理的项目"
 msgstr ""
 
 #. translators: %1$s: 任务名称, %2$d: 成功数, %3$d: 跳过数, %4$d: 失败数
-#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-task.php:1013
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-task.php:1054
 #, php-format
 msgid "%1$s - 成功: %2$d, 跳过: %3$d, 失败: %4$d"
 msgstr ""
 
 #. translators: %1$s: 任务名称, %2$d: 成功数, %3$d: 失败数
-#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-task.php:1025
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-task.php:1066
 #, php-format
 msgid "%1$s - 成功: %2$d, 失败: %3$d"
 msgstr ""
 
 #. translators: 1: 涉及的附件数, 2: 删除的备份文件数, 3: 失败的附件数
-#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-task.php:1035
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-task.php:1076
 #, php-format
 msgid "已删除 %1$d 个附件上的 %2$d 个备份文件，失败 %3$d 个"
 msgstr ""
 
 #. translators: 1: 涉及的附件数, 2: 删除的回退文件数, 3: 替换的链接数
-#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-task.php:1045
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-task.php:1086
 #, php-format
 msgid "已删除 %1$d 个附件上的 %2$d 个兼容格式回退文件，替换了 %3$d 个图片链接"
 msgstr ""
 
-#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-task.php:1052
-#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-task.php:1066
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-task.php:1093
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-task.php:1107
 msgid "部分正文链接未更新成功，可再次执行本操作继续处理。"
 msgstr ""
 
 #. translators: 1: 删除的文件数, 2: 影响的附件数, 3: 替换的链接数
-#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-task.php:1059
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-task.php:1100
 #, php-format
 msgid "已删除 %1$d 个未勾选尺寸的缩略图（涉及 %2$d 个附件），替换了 %3$d 个图片链接"
 msgstr ""
 
 #. translators: 1: 补生成的附件数, 2: 新增文件数, 3: 跳过的附件数, 4: 失败的附件数
-#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-task.php:1073
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-task.php:1114
 #, php-format
 msgid "已为 %1$d 个附件补生成 %2$d 个缩略图（%3$d 个无需处理或已跳过，%4$d 个失败）"
 msgstr ""
 
 #. translators: %s: 附件 ID 列表
-#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-task.php:1091
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-task.php:1132
 #, php-format
 msgid "失败附件 ID：%s"
 msgstr ""
 
 #. translators: %d: 失败附件总数
-#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-task.php:1098
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-task.php:1139
 #, php-format
 msgid "（共 %d 个，仅显示前 10 个）"
 msgstr ""
 
 #. translators: %d: 已处理的附件数
-#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-task.php:1107
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-task.php:1148
 #, php-format
 msgid "任务已停止：本次共处理 %d 个附件，可以随时再执行一次继续处理剩余部分。"
 msgstr ""
