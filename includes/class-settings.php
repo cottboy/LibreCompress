@@ -513,7 +513,7 @@ class Libre_Compress_Settings {
                     </button>
                 </td>
                 <td style="padding: 10px 0;">
-                    <span class="description"><?php esc_html_e( '删除未勾选尺寸已存在的缩略图，文章里指向它们的图片链接会改到面积最相近的尺寸，找不到相近的尺寸时改到原图；若关闭了自动缩放，或现有 -scaled 缩放图与阈值不符，也会删除缩放图让主图退回原图', 'libre-compress' ); ?></span>
+                    <span class="description"><?php esc_html_e( '删除未勾选尺寸已存在的缩略图，文章里指向它们的图片链接会改到面积最接近的现有尺寸；若关闭了自动缩放，或现有 -scaled 缩放图与阈值不符，也会删除缩放图让主图退回原图', 'libre-compress' ); ?></span>
                 </td>
             </tr>
             <tr>

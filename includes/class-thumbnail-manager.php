@@ -258,7 +258,7 @@ class Libre_Compress_Thumbnail_Manager {
                 );
             }
 
-            // 原图永远在，作为最后兜底的替代尺寸
+            // 原图参与比面积：它差得最远，只有真的最接近时才会被选中，不会被优先采用
             $full_path = $base_dir . '/' . $metadata['file'];
 
             if ( file_exists( $full_path ) ) {
@@ -272,6 +272,7 @@ class Libre_Compress_Thumbnail_Manager {
             // 要删的尺寸一律删到底，替代尺寸只决定文章链接改到哪里。
             // 两者捆在一个判断里会让“一个尺寸都没勾选”时没有任何相近尺寸可选，
             // 结果一个文件都删不掉。
+            // $kept 里带着原图，所以挑不到替代只可能是连原图都不在，此时链接不动、文件照删。
             $deletions = array();
             $targets   = array();
 
@@ -279,11 +280,6 @@ class Libre_Compress_Thumbnail_Manager {
                 $deletions[ $size_name ] = $size_data['file'];
 
                 $replacement = $this->nearest_replacement( $size_data, $kept );
-
-                // 没有面积相近的尺寸就拿原图顶上：页面重一点，也好过文章里的图打不开
-                if ( null === $replacement && isset( $kept['full'] ) ) {
-                    $replacement = $kept['full'];
-                }
 
                 if ( null !== $replacement ) {
                     $targets[ $size_name ] = $replacement['file'];
@@ -398,22 +394,15 @@ class Libre_Compress_Thumbnail_Manager {
     }
 
     /**
-     * 替代尺寸允许的最大像素面积倍数
-     *
-     * 面积差得太远就不算“相近”：删缩略图是为了省空间，把正文链接改写成大得多的图
-     * 会让页面体积明显变重，所以超过这个倍数的候选不采用。
-     * 删除按钮挑不到相近尺寸时改用原图兜底，不在本类里再拦一道。
-     */
-    const REPLACEMENT_AREA_RATIO = 4;
-
-    /**
      * 为被删尺寸挑一个像素面积最接近的替代尺寸，平手时选更大的
      *
      * 删除按钮与恢复原图都要把正文链接改到仍然存在的尺寸上，共用同一套挑选规则。
+     * 原图也在这套候选里：它的面积通常差得最远，自然排在最后，只有真的最接近时才轮到它。
+     * 不设“差太多就放弃”的门槛——放弃一支尺寸就会让正文里的图打不开。
      *
      * @param array $victim     被删尺寸的文件与宽高
      * @param array $candidates 仍然存在的候选尺寸
-     * @return array|null 面积差过大时返回 null
+     * @return array|null 一个候选都没有时返回 null
      */
     public function nearest_replacement( array $victim, array $candidates ) {
         $victim_area = max( 1, $victim['width'] * $victim['height'] );
@@ -431,11 +420,6 @@ class Libre_Compress_Thumbnail_Manager {
                 );
                 $best_score = $score;
             }
-        }
-
-        // 最接近的替代尺寸仍然大出太多倍，说明没有真正合适的替代：宁可留空也不换成原图。
-        if ( null !== $best && $best['area'] > $victim_area * self::REPLACEMENT_AREA_RATIO ) {
-            return null;
         }
 
         return $best;
