@@ -25,117 +25,6 @@
         },
 
         /**
-         * 媒体库压缩列：按当前语言下的实际文字量算出这一列要多宽
-         *
-         * 媒体库表格是固定列宽模式，只有把宽度写在列上才管得住；表里其它列仍旧用 WordPress 自己的设置。
-         * 每次打开页面都重新量一遍，所以换语言后文字和按钮长短变了也能跟上。
-         */
-        fitMediaColumn: function() {
-            var $cells = $('.column-libre_compress .libre-compress-status');
-
-            if ( ! $cells.length ) {
-                return;
-            }
-
-            var self = this;
-            var $firstCell = $cells.first();
-            var $sampleBox = $firstCell.closest('td, th');
-            var $sampleActions = $firstCell.find('.libre-compress-actions');
-            var cellPadding = 0;
-            var columnGap = 8;
-            var buttonGap = 4;
-
-            // 间距和内边距都从页面上现读，改了样式这里不用跟着改
-            if ( $sampleBox.length ) {
-                var boxStyle = window.getComputedStyle($sampleBox.get(0));
-                cellPadding = ( parseFloat(boxStyle.paddingLeft) || 0 ) + ( parseFloat(boxStyle.paddingRight) || 0 );
-            }
-
-            if ( $sampleActions.length ) {
-                var cellGap = parseFloat(window.getComputedStyle($firstCell.get(0)).columnGap);
-                var actionsGap = parseFloat(window.getComputedStyle($sampleActions.get(0)).columnGap);
-                columnGap = isNaN(cellGap) ? columnGap : cellGap;
-                buttonGap = isNaN(actionsGap) ? buttonGap : actionsGap;
-            }
-
-            // 在屏幕外量：复制一份内容量完就删，免得量的时候把页面撑变形
-            var $probe = $('<div>').css({
-                position: 'absolute',
-                left: '-9999px',
-                top: '0',
-                visibility: 'hidden',
-                whiteSpace: 'nowrap'
-            }).appendTo('body');
-
-            function measure($element) {
-                $probe.empty().append($element.clone());
-                return $probe.outerWidth() || 0;
-            }
-
-            var infoWidth = 0;
-            var actionsWidth = 0;
-
-            $cells.each(function() {
-                var $cell = $(this);
-
-                infoWidth = Math.max(infoWidth, measure($cell.find('.libre-compress-info')));
-
-                var buttonWidths = [];
-                $cell.find('.libre-compress-actions').children().each(function() {
-                    buttonWidths.push(measure($(this)));
-                });
-
-                actionsWidth = Math.max(actionsWidth, self.twoRowButtonWidth(buttonWidths, buttonGap));
-            });
-
-            $probe.remove();
-
-            infoWidth = Math.ceil(infoWidth);
-            actionsWidth = Math.ceil(actionsWidth);
-
-            // 只改压缩这一列：左栏按最宽的一行文字、右栏按最宽的两行按钮，合起来正好是这一列需要的宽度
-            var $table = $cells.first().closest('.wp-list-table');
-
-            $('.wp-list-table .column-libre_compress').css('width', ( infoWidth + columnGap + actionsWidth + cellPadding ) + 'px');
-
-            // 两栏宽度记在表格上往下继承，某一行被后台刷新重建后也照样有
-            if ( $table.length ) {
-                $table.get(0).style.setProperty('--lc-info-width', infoWidth + 'px');
-                $table.get(0).style.setProperty('--lc-actions-width', actionsWidth + 'px');
-            }
-        },
-
-        /**
-         * 按钮最多排两行时最少要多宽：枚举第一行放几个按钮，取两行里较宽那行最窄的方案
-         */
-        twoRowButtonWidth: function(buttonWidths, gap) {
-            var count = buttonWidths.length;
-
-            if ( ! count ) {
-                return 0;
-            }
-
-            var best = Infinity;
-
-            for (var split = 1; split <= count; split++) {
-                var firstRow = 0;
-                var secondRow = 0;
-
-                for (var i = 0; i < count; i++) {
-                    if (i < split) {
-                        firstRow += buttonWidths[i] + (i > 0 ? gap : 0);
-                    } else {
-                        secondRow += buttonWidths[i] + (i > split ? gap : 0);
-                    }
-                }
-
-                best = Math.min(best, Math.max(firstRow, secondRow));
-            }
-
-            return best;
-        },
-
-        /**
          * 绑定事件
          */
         bindEvents: function() {
@@ -1094,10 +983,6 @@
         },
 
     };
-
-    // 脚本在页面末尾执行，此时表格已经在页面上：先同步量一次列宽，
-    // 让首屏画出来就是最终宽度，刷新时不会看到列宽先错后跳
-    LC.fitMediaColumn();
 
     // DOM 加载完成后初始化
     $(document).ready(function() {
