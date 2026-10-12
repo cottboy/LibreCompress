@@ -36,7 +36,7 @@ $wpdb->query( "DELETE FROM {$wpdb->postmeta} WHERE meta_key IN ('_libre_compress
 // 停用定时任务并清理限流 transient（钩子名需与 Libre_Compress_Processor、Libre_Compress_Task 常量保持一致）
 wp_clear_scheduled_hook( 'libre_compress_pending_sweep_event' );
 wp_clear_scheduled_hook( 'libre_compress_backup_prune_event' );
-wp_clear_scheduled_hook( 'libre_compress_task_watchdog_event' );
+wp_unschedule_hook( 'libre_compress_task_watchdog_event' );
 delete_transient( 'libre_compress_pending_sweep' );
 
 // 删除备份文件目录和附件锁目录（目录名需与 Libre_Compress_Processor 常量保持一致）

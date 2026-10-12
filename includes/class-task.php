@@ -373,6 +373,9 @@ class Libre_Compress_Task {
             'message'      => '',
         );
 
+        // 上一个任务留下的兜底定时事件一并撤掉，免得越攒越多
+        wp_unschedule_hook( self::WATCHDOG_HOOK );
+
         $this->save( $task );
         $this->schedule_watchdog( $task );
 
@@ -389,17 +392,24 @@ class Libre_Compress_Task {
      * 停止当前任务
      */
     public function stop(): void {
-        $this->mutate(
+        $stopped = $this->mutate(
             function ( array &$task ) {
                 if ( self::STATUS_RUNNING !== $task['status'] ) {
-                    return;
+                    return false;
                 }
 
                 $task['status']      = self::STATUS_STOPPED;
                 $task['finished_at'] = time();
                 $task['updated_at']  = time();
+
+                return true;
             }
         );
+
+        if ( $stopped ) {
+            // 任务都停了，兜底事件没必要再留着
+            wp_unschedule_hook( self::WATCHDOG_HOOK );
+        }
     }
 
     /**
@@ -897,10 +907,10 @@ class Libre_Compress_Task {
      * @param string $runner 执行者令牌
      */
     private function finish( string $runner ): void {
-        $this->mutate(
+        $finished = $this->mutate(
             function ( array &$task ) use ( $runner ) {
                 if ( ! $this->runner_owns( $task, $runner ) ) {
-                    return;
+                    return false;
                 }
 
                 $task['status']      = self::STATUS_DONE;
@@ -909,8 +919,15 @@ class Libre_Compress_Task {
                 $task['current']     = '';
                 $task['finished_at'] = time();
                 $task['updated_at']  = time();
+
+                return true;
             }
         );
+
+        if ( $finished ) {
+            // 任务都干完了，兜底事件没必要再留着；万一是别人刚开的新任务，这里不会动它
+            wp_unschedule_hook( self::WATCHDOG_HOOK );
+        }
     }
 
     /**

@@ -372,7 +372,7 @@ function libre_compress_deactivate() {
 
     wp_clear_scheduled_hook( Libre_Compress_Processor::PENDING_SWEEP_HOOK );
     wp_clear_scheduled_hook( Libre_Compress_Processor::BACKUP_PRUNE_HOOK );
-    wp_clear_scheduled_hook( Libre_Compress_Task::WATCHDOG_HOOK );
+    wp_unschedule_hook( Libre_Compress_Task::WATCHDOG_HOOK );
 
     // 刷新重写规则
     flush_rewrite_rules();
