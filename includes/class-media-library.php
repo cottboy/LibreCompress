@@ -70,7 +70,7 @@ class Libre_Compress_Media_Library {
                内边距和 1px 边框，共 106），按钮刚好顶到右边缘，剩下的只有 WP 自己那 10px 格子内边距。
                多出来的宽度会留给左边的文件名栏，所以右边缘不会再留白 */
             .wp-list-table .column-libre_compress {
-                width: 306px;
+                width: 315px;
             }
 
             /* 左右两栏宽度写死，每行的文字左边缘、按钮左边缘才对齐在一条竖线上，
