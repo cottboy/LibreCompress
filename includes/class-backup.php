@@ -481,42 +481,6 @@ class Libre_Compress_Backup {
     }
 
     /**
-     * 删除所有备份
-     *
-     * 删除失败或索引异常时保留记录，避免丢失对残留文件的追踪。
-     *
-     * @return int 删除的备份数量
-     */
-    public function delete_all_backups(): int {
-        $database = libre_compress()->database;
-        $backups  = $database->get_all_backups();
-        $count    = 0;
-
-        foreach ( $backups as $backup ) {
-            // get_all_backups() 返回的是库里的原始相对路径，这里才需要还原成绝对路径。
-            $backup_path = $this->to_absolute_path( isset( $backup['backup_path'] ) ? (string) $backup['backup_path'] : '' );
-
-            if ( '' === $backup_path || ! $this->is_backup_file_path( $backup_path ) ) {
-                // 路径损坏或指向备份目录之外：文件一律不动，但索引要清掉，
-                // 否则"删除所有备份"之后还会留下一批永远定位不到文件的索引。
-                $database->delete_backup( $backup['id'] );
-                continue;
-            }
-
-            if ( file_exists( $backup_path ) && ! unlink( $backup_path ) ) {
-                continue;
-            }
-
-            if ( $database->delete_backup( $backup['id'] ) ) {
-                $count++;
-            }
-        }
-
-
-        return $count;
-    }
-
-    /**
      * 验证路径是否为本插件备份目录内的备份文件
      *
      * @param string $file_path 备份文件路径

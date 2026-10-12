@@ -18,14 +18,6 @@ if ( ! defined( 'ABSPATH' ) ) {
 class Libre_Compress_Thumbnail_Manager {
 
     /**
-     * AJAX 分页单页处理的附件数量
-     *
-     * 一次请求只处理一页，避免大媒体库下单次 PHP 请求超时；
-     * 前端按 next_after 游标循环，直到 has_more 为 false。
-     */
-    const PAGE_SIZE = 20;
-
-    /**
      * 构造函数
      */
     public function __construct() {
@@ -41,9 +33,6 @@ class Libre_Compress_Thumbnail_Manager {
 
         // 按设置调整大图缩放阈值
         add_filter( 'big_image_size_threshold', array( $this, 'filter_big_image_size_threshold' ) );
-
-        // 注册 AJAX 接口
-        add_action( 'wp_ajax_libre_compress_thumbnail_action', array( $this, 'ajax_thumbnail_action' ) );
     }
 
     /**
@@ -119,68 +108,6 @@ class Libre_Compress_Thumbnail_Manager {
     }
 
     /**
-     * 按附件 ID 游标删除一页未勾选尺寸的缩略图
-     *
-     * 前端按 next_after 游标循环调用，每请求只处理一页，
-     * 避免大媒体库下单次 PHP 请求超时。
-     *
-     * @param int $after_id 上一批最后处理的附件 ID
-     * @param int $limit    本页数量
-     * @return array deleted_files、affected_attachments、replaced_links、failed_ids、content_failed、processed、next_after、has_more
-     */
-    public function delete_disabled_page( int $after_id = 0, int $limit = 20 ): array {
-        $result = array(
-            'deleted_files'        => 0,
-            'affected_attachments' => 0,
-            'replaced_links'       => 0,
-            'failed_ids'           => array(),
-            'content_failed'       => false,
-            'processed'            => 0,
-            'next_after'           => $after_id,
-            'has_more'             => false,
-        );
-
-        // 不能因为“没有未勾选的尺寸”就整页跳过：-scaled 缩放图的清理与尺寸勾选无关，
-        // 关闭自动缩放或阈值改小后，即使尺寸全部勾选也要进来把缩放图退回原图。
-        $limit       = max( 1, min( 100, $limit ) );
-        $attachments = libre_compress()->database->get_image_attachment_ids_after( $after_id, $limit + 1 );
-        $has_more    = count( $attachments ) > $limit;
-
-        if ( $has_more ) {
-            array_pop( $attachments );
-        }
-
-        foreach ( $attachments as $attachment_id ) {
-            $outcome = $this->delete_disabled_for_attachment( (int) $attachment_id );
-
-            if ( null === $outcome ) {
-                $result['failed_ids'][] = (int) $attachment_id;
-                continue;
-            }
-
-            if ( ! empty( $outcome['content_failed'] ) ) {
-                $result['failed_ids'][]   = (int) $attachment_id;
-                $result['content_failed'] = true;
-                $result['replaced_links'] += (int) $outcome['replaced'];
-                continue;
-            }
-
-            $result['deleted_files']  += $outcome['deleted'];
-            $result['replaced_links'] += $outcome['replaced'];
-
-            if ( $outcome['deleted'] > 0 ) {
-                $result['affected_attachments']++;
-            }
-        }
-
-        $result['processed']  = count( $attachments );
-        $result['next_after'] = empty( $attachments ) ? $after_id : (int) max( array_map( 'absint', $attachments ) );
-        $result['has_more']   = $has_more;
-
-        return $result;
-    }
-
-    /**
      * 删除单个附件中未勾选尺寸的缩略图
      *
      * 先更新正文链接，成功后再改元数据和删文件；正文更新失败时不做任何清理。
@@ -188,7 +115,7 @@ class Libre_Compress_Thumbnail_Manager {
      * @param int $attachment_id 附件 ID
      * @return array|null 计划结果；锁被占用或元数据写入失败时返回 null
      */
-    private function delete_disabled_for_attachment( int $attachment_id ): ?array {
+    public function delete_disabled_for_attachment( int $attachment_id ): ?array {
         $lock = libre_compress()->processor->acquire_attachment_lock( $attachment_id );
         if ( false === $lock ) {
             return null;
@@ -426,57 +353,17 @@ class Libre_Compress_Thumbnail_Manager {
     }
 
     /**
-     * 按附件 ID 游标为一页附件补齐缺失尺寸
+     * 给单个附件补齐缺失尺寸
      *
-     * 前端按 next_after 游标循环调用，每请求只处理一页，
-     * 避免大媒体库下单次 PHP 请求超时。
-     *
-     * @param int $after_id 上一批最后处理的附件 ID
-     * @param int $limit    本页数量
-     * @return array generated_attachments、generated_files、skipped_attachments、failed_ids、processed、next_after、has_more
+     * @param int $attachment_id 附件 ID
+     * @return int|string|null 新增文件数；无需处理时返回原因字符串；失败返回 null
      */
-    public function generate_missing_page( int $after_id = 0, int $limit = 20 ): array {
-        $result = array(
-            'generated_attachments' => 0,
-            'generated_files'       => 0,
-            'skipped_attachments'   => 0,
-            'failed_ids'            => array(),
-            'processed'             => 0,
-            'next_after'            => $after_id,
-            'has_more'              => false,
+    public function generate_missing_thumbnails( int $attachment_id ) {
+        return $this->generate_missing_for_attachment(
+            $attachment_id,
+            self::enabled_sizes(),
+            wp_get_registered_image_subsizes()
         );
-
-        $enabled    = self::enabled_sizes();
-        $registered = wp_get_registered_image_subsizes();
-
-        // 与删除按钮同理：没有勾选任何尺寸时也要进来处理 -scaled 缩放图，
-        // 缩放图由独立的勾选框负责，不该被“没有要补的尺寸”挡在门外。
-        $limit       = max( 1, min( 100, $limit ) );
-        $attachments = libre_compress()->database->get_image_attachment_ids_after( $after_id, $limit + 1 );
-        $has_more    = count( $attachments ) > $limit;
-
-        if ( $has_more ) {
-            array_pop( $attachments );
-        }
-
-        foreach ( $attachments as $attachment_id ) {
-            $outcome = $this->generate_missing_for_attachment( (int) $attachment_id, $enabled, $registered );
-
-            if ( null === $outcome ) {
-                $result['failed_ids'][] = (int) $attachment_id;
-            } elseif ( is_int( $outcome ) ) {
-                $result['generated_attachments']++;
-                $result['generated_files'] += $outcome;
-            } else {
-                $result['skipped_attachments']++;
-            }
-        }
-
-        $result['processed']  = count( $attachments );
-        $result['next_after'] = empty( $attachments ) ? $after_id : (int) max( array_map( 'absint', $attachments ) );
-        $result['has_more']   = $has_more;
-
-        return $result;
     }
 
     /**
@@ -1190,60 +1077,5 @@ class Libre_Compress_Thumbnail_Manager {
         $candidate = untrailingslashit( wp_normalize_path( $candidate ) );
 
         return 0 === strpos( $candidate, $base_dir . '/' );
-    }
-
-    /**
-     * AJAX: 缩略图管理操作
-     */
-    public function ajax_thumbnail_action() {
-        // 验证 nonce
-        check_ajax_referer( 'libre_compress_nonce', 'nonce' );
-
-        // 验证权限
-        if ( ! current_user_can( 'manage_options' ) ) {
-            wp_send_json_error( array( 'message' => __( '权限不足', 'libre-compress' ) ) );
-        }
-
-        // 获取操作类型
-        $action_type = isset( $_POST['action_type'] ) ? sanitize_text_field( wp_unslash( $_POST['action_type'] ) ) : '';
-        $after_id    = isset( $_POST['after'] ) ? absint( $_POST['after'] ) : 0;
-
-        switch ( $action_type ) {
-            case 'delete':
-                $page = $this->delete_disabled_page( $after_id, self::PAGE_SIZE );
-
-                wp_send_json_success(
-                    array(
-                        'deleted_files'  => $page['deleted_files'],
-                        'affected_count' => $page['affected_attachments'],
-                        'replaced_links' => $page['replaced_links'],
-                        'failed_ids'     => $page['failed_ids'],
-                        'content_failed' => $page['content_failed'],
-                        'processed'      => $page['processed'],
-                        'next_after'     => $page['next_after'],
-                        'has_more'       => $page['has_more'],
-                    )
-                );
-                break;
-
-            case 'generate':
-                $page = $this->generate_missing_page( $after_id, self::PAGE_SIZE );
-
-                wp_send_json_success(
-                    array(
-                        'generated_attachments' => $page['generated_attachments'],
-                        'generated_files'       => $page['generated_files'],
-                        'skipped_attachments'   => $page['skipped_attachments'],
-                        'failed_ids'            => $page['failed_ids'],
-                        'processed'             => $page['processed'],
-                        'next_after'            => $page['next_after'],
-                        'has_more'              => $page['has_more'],
-                    )
-                );
-                break;
-
-            default:
-                wp_send_json_error( array( 'message' => __( '无效的操作类型', 'libre-compress' ) ) );
-        }
     }
 }

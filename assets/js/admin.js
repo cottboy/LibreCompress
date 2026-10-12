@@ -16,29 +16,59 @@
         ajaxUrl: libreCompressData.ajaxUrl,
         nonce: libreCompressData.nonce,
         i18n: libreCompressData.i18n,
+        taskState: libreCompressData.taskState || { has_task: false },
+
+        // 批量任务：面板、轮询定时器、连续取不到状态的次数
+        $panel: null,
+        taskTimer: null,
+        taskErrors: 0,
+
+        /**
+         * 批量按钮与后台任务类型的对应关系
+         */
+        batchButtons: {
+            '#libre-compress-bulk-compress': { type: 'compress' },
+            '#libre-compress-clear-records': { type: 'clear', confirm: 'confirmClear' },
+            '#libre-compress-restore-all': { type: 'restore', confirm: 'confirmRestoreAll' },
+            '#libre-compress-delete-all-backups': { type: 'delete_backups', confirm: 'confirmDeleteAllBackups' },
+            '#libre-compress-delete-all-fallbacks': { type: 'delete_fallbacks', confirm: 'confirmDeleteAllFallbacks' },
+            '#libre-compress-delete-thumbnails': { type: 'delete_thumbnails', confirm: 'confirmDeleteThumbnails' },
+            '#libre-compress-generate-thumbnails': { type: 'generate_thumbnails', confirm: 'confirmGenerateThumbnails' }
+        },
 
         /**
          * 初始化
          */
         init: function() {
             this.bindEvents();
+            this.initTaskPanel();
         },
 
         /**
          * 绑定事件
          */
         bindEvents: function() {
+            var self = this;
+
             // 媒体库压缩/恢复按钮
             $(document).on('click', '.libre-compress-btn', this.handleMediaLibraryAction.bind(this));
 
-            // 设置页面按钮
-            $('#libre-compress-clear-records').on('click', this.handleClearRecords.bind(this));
-            $('#libre-compress-restore-all').on('click', this.handleRestoreAll.bind(this));
-            $('#libre-compress-delete-thumbnails').on('click', this.handleDeleteThumbnails.bind(this));
-            $('#libre-compress-generate-thumbnails').on('click', this.handleGenerateMissingThumbnails.bind(this));
-            $('#libre-compress-bulk-compress').on('click', this.handleBulkCompress.bind(this));
-            $('#libre-compress-delete-all-backups').on('click', this.handleDeleteAllBackups.bind(this));
-            $('#libre-compress-delete-all-fallbacks').on('click', this.handleDeleteAllFallbacks.bind(this));
+            // 批量按钮：只是把任务交给服务器，之后由面板显示进度
+            $.each(this.batchButtons, function(selector, config) {
+                $(document).on('click', selector, function(e) {
+                    e.preventDefault();
+                    self.startTask(config.type, config.confirm ? self.i18n[config.confirm] : '');
+                });
+            });
+
+            // 任务面板上的按钮
+            $(document).on('click', '#libre-compress-task-stop', this.stopTask.bind(this));
+            $(document).on('click', '#libre-compress-task-resume', this.resumeTask.bind(this));
+            $(document).on('click', '#libre-compress-task-retry', this.retryTask.bind(this));
+            $(document).on('click', '#libre-compress-task-refresh', function(e) {
+                e.preventDefault();
+                location.reload();
+            });
 
             // 原图备份保留时长不接受 0，步进跨过 0 时按方向落到 1 或 -1
             $(document).on('input change', '#libre-compress-retention-days', this.skipRetentionZero.bind(this));
@@ -359,629 +389,330 @@
             });
         },
 
+        // ===== 批量任务 =====
+        // 真正干活的是服务器（见 includes/class-task.php），页面只负责把进度画出来。
+        // 所以关掉浏览器任务照样继续，重新打开这个页面还能接着看进度。
+
         /**
-         * 汇总失败附件 ID
+         * 页面载入时按服务端给的状态恢复面板
          */
-        formatFailedIds: function(failedIds) {
-            if (!failedIds.length) {
-                return '';
+        initTaskPanel: function() {
+            this.$panel = $('#libre-compress-task');
+
+            if (!this.$panel.length) {
+                this.$panel = null;
+                return;
             }
 
-            var text = this.i18n.failedIds.replace('%s', failedIds.slice(0, 10).join(', '));
+            if (this.taskState && this.taskState.has_task) {
+                this.renderTask(this.taskState);
 
-            if (failedIds.length > 10) {
-                text += this.i18n.failedMore.replace('%d', failedIds.length);
+                if (this.taskState.status === 'running') {
+                    this.startPolling();
+                }
+            } else {
+                this.$panel.hide();
             }
-
-            return '\n' + text;
         },
 
         /**
-         * 分页清除压缩记录与原图备份
+         * 开始一个批量任务
          */
-        handleClearRecords: function(e) {
-            e.preventDefault();
-
-            if (!confirm(this.i18n.confirmClear)) {
+        startTask: function(type, confirmText) {
+            if (confirmText && !confirm(confirmText)) {
                 return;
             }
 
             var self = this;
-            var $btn = $(e.currentTarget);
-            var after = 0;
-            var cleared = 0;
-            var failed = 0;
-            var failedIds = [];
-            var pageErrors = 0;
 
-            $btn.prop('disabled', true).text(this.i18n.processing);
-
-            function finish(interrupted) {
-                var summary = self.i18n.operationSummary
-                    .replace('%1$s', self.i18n.clearFinished)
-                    .replace('%2$d', cleared)
-                    .replace('%3$d', failed);
-
-                summary += self.formatFailedIds(failedIds);
-
-                if (interrupted) {
-                    summary += '\n' + self.i18n.clearInterrupted.replace('%d', cleared + failed);
-                }
-
-                alert(summary);
-                $btn.prop('disabled', false);
-                location.reload();
-            }
-
-            function loadPage() {
-                $.ajax({
-                    url: self.ajaxUrl,
-                    type: 'POST',
-                    data: {
-                        action: 'libre_compress_clear_records',
-                        nonce: self.nonce,
-                        after: after
-                    },
-                    success: function(response) {
-                        pageErrors = 0;
-
-                        if (!response.success) {
-                            finish(true);
-                            return;
-                        }
-
-                        cleared += parseInt(response.data.cleared_count, 10) || 0;
-                        failed += parseInt(response.data.failed_count, 10) || 0;
-                        failedIds = failedIds.concat(response.data.failed_ids || []);
-                        $btn.text(self.i18n.clearProgress.replace('%d', cleared + failed));
-
-                        if (response.data.has_more && parseInt(response.data.next_after, 10) > after) {
-                            after = parseInt(response.data.next_after, 10);
-                            loadPage();
-                        } else {
-                            finish(false);
-                        }
-                    },
-                    error: function() {
-                        pageErrors++;
-
-                        if (pageErrors <= 3) {
-                            loadPage();
-                            return;
-                        }
-
-                        finish(true);
-                    }
-                });
-            }
-
-            loadPage();
-        },
-
-        /**
-         * 按游标分页恢复所有原图备份
-         */
-        handleRestoreAll: function(e) {
-            e.preventDefault();
-
-            if (!confirm(this.i18n.confirmRestoreAll)) {
-                return;
-            }
-
-            var self = this;
-            var $btn = $(e.currentTarget);
-            var after = 0;
-            var success = 0;
-            var failed = 0;
-            var failedIds = [];
-            var pageErrors = 0;
-
-            $btn.prop('disabled', true).text(this.i18n.processing);
-
-            function finish(interrupted) {
-                var summary = self.i18n.operationSummary
-                    .replace('%1$s', self.i18n.restoreFinished)
-                    .replace('%2$d', success)
-                    .replace('%3$d', failed);
-
-                summary += self.formatFailedIds(failedIds);
-
-                if (interrupted) {
-                    summary += '\n' + self.i18n.restoreInterrupted.replace('%d', success + failed);
-                }
-
-                alert(summary);
-                $btn.prop('disabled', false);
-                location.reload();
-            }
-
-            function loadPage() {
-                $.ajax({
-                    url: self.ajaxUrl,
-                    type: 'POST',
-                    data: {
-                        action: 'libre_compress_restore_all',
-                        nonce: self.nonce,
-                        after: after
-                    },
-                    success: function(response) {
-                        pageErrors = 0;
-
-                        if (!response.success) {
-                            finish(true);
-                            return;
-                        }
-
-                        success += parseInt(response.data.success_count, 10) || 0;
-                        failed += parseInt(response.data.failed_count, 10) || 0;
-                        failedIds = failedIds.concat(response.data.failed_ids || []);
-                        $btn.text(self.i18n.restoreProgress.replace('%d', success + failed));
-
-                        if (response.data.has_more && parseInt(response.data.next_after, 10) > after) {
-                            after = parseInt(response.data.next_after, 10);
-                            loadPage();
-                        } else {
-                            finish(false);
-                        }
-                    },
-                    error: function() {
-                        pageErrors++;
-
-                        if (pageErrors <= 3) {
-                            loadPage();
-                            return;
-                        }
-
-                        finish(true);
-                    }
-                });
-            }
-
-            loadPage();
-        },
-
-        /**
-         * 删除未勾选尺寸的缩略图
-         */
-        handleDeleteThumbnails: function(e) {
-            e.preventDefault();
-
-            if (!confirm(this.i18n.confirmDeleteThumbnails)) {
-                return;
-            }
-
-            this.runThumbnailAction(e, 'delete');
-        },
-
-        /**
-         * 补生成缺失尺寸的缩略图
-         */
-        handleGenerateMissingThumbnails: function(e) {
-            e.preventDefault();
-
-            if (!confirm(this.i18n.confirmGenerateThumbnails)) {
-                return;
-            }
-
-            this.runThumbnailAction(e, 'generate');
-        },
-
-        /**
-         * 发送缩略图管理请求（按附件游标分页，避免大媒体库单次请求超时）
-         */
-        runThumbnailAction: function(e, actionType) {
-            var self = this;
-            var $btn = $(e.currentTarget);
-
-            $btn.prop('disabled', true).text(this.i18n.processing);
-
-            var after = 0;
-            var done = 0;
-            var pageErrors = 0;
-            var acc = {
-                deleted: 0, affected: 0, replaced: 0,
-                generated: 0, generatedFiles: 0, skipped: 0,
-                failed: 0, failedIds: [], contentFailed: false
-            };
-
-            function finish(interrupted) {
-                var summary;
-
-                if (actionType === 'delete') {
-                    summary = self.i18n.thumbnailDeleteSummary
-                        .replace('%1$d', acc.deleted)
-                        .replace('%2$d', acc.affected)
-                        .replace('%3$d', acc.replaced);
-
-                    if (acc.contentFailed) {
-                        summary += ' ' + self.i18n.thumbnailContentFailed;
-                    }
-                } else {
-                    summary = self.i18n.thumbnailGenerateSummary
-                        .replace('%1$d', acc.generated)
-                        .replace('%2$d', acc.generatedFiles)
-                        .replace('%3$d', acc.skipped)
-                        .replace('%4$d', acc.failed);
-                }
-
-                summary += self.formatFailedIds(acc.failedIds);
-
-                if (interrupted) {
-                    summary += '\n' + self.i18n.thumbnailInterrupted;
-                }
-
-                alert(summary);
-                $btn.prop('disabled', false);
-                location.reload();
-            }
-
-            function loadPage() {
-                $.ajax({
-                    url: self.ajaxUrl,
-                    type: 'POST',
-                    data: {
-                        action: 'libre_compress_thumbnail_action',
-                        action_type: actionType,
-                        nonce: self.nonce,
-                        after: after
-                    },
-                    success: function(response) {
-                        pageErrors = 0;
-
-                        if (!response.success) {
-                            finish(true);
-                            return;
-                        }
-
-                        var d = response.data || {};
-                        done += parseInt(d.processed, 10) || 0;
-
-                        if (actionType === 'delete') {
-                            acc.deleted += parseInt(d.deleted_files, 10) || 0;
-                            acc.affected += parseInt(d.affected_count, 10) || 0;
-                            acc.replaced += parseInt(d.replaced_links, 10) || 0;
-
-                            if (d.content_failed) {
-                                acc.contentFailed = true;
-                            }
-                        } else {
-                            acc.generated += parseInt(d.generated_attachments, 10) || 0;
-                            acc.generatedFiles += parseInt(d.generated_files, 10) || 0;
-                            acc.skipped += parseInt(d.skipped_attachments, 10) || 0;
-                        }
-
-                        acc.failed += (d.failed_ids || []).length;
-                        acc.failedIds = acc.failedIds.concat(d.failed_ids || []);
-                        $btn.text(self.i18n.thumbnailProgress.replace('%d', done));
-
-                        if (d.has_more && parseInt(d.next_after, 10) > after) {
-                            after = parseInt(d.next_after, 10);
-                            loadPage();
-                        } else {
-                            finish(false);
-                        }
-                    },
-                    error: function() {
-                        pageErrors++;
-
-                        if (pageErrors <= 3) {
-                            loadPage();
-                            return;
-                        }
-
-                        finish(true);
-                    }
-                });
-            }
-
-            loadPage();
-        },
-
-        /**
-         * 按附件游标分页批量压缩
-         */
-        handleBulkCompress: function(e) {
-            e.preventDefault();
-
-            var self = this;
-            var $btn = $(e.currentTarget);
-            var $progress = $('#libre-compress-bulk-progress');
-            var $progressFill = $progress.find('.progress-fill');
-            var $progressText = $progress.find('.progress-text');
-            var after = 0;
-            var completed = 0;
-            var success = 0;
-            var failed = 0;
-            var skipped = 0;
-            var hadError = false;
-            var pageErrors = 0;
-            var concurrency = parseInt(libreCompressData.concurrency, 10) || 5;
-
-            $btn.prop('disabled', true);
-            $progress.show();
-            $progressFill.css('width', '0%');
-            $progressText.text(this.i18n.processing);
-
-            function updateProgress() {
-                $progressText.text(self.i18n.batchProgress.replace('%d', completed));
-            }
-
-            function finish() {
-                var summary;
-
-                if (completed === 0 && hadError) {
-                    summary = self.i18n.error;
-                } else if (completed === 0) {
-                    summary = self.i18n.noCompressItems;
-                } else {
-                    summary = self.i18n.batchSummary
-                        .replace('%1$s', completed)
-                        .replace('%2$d', success)
-                        .replace('%3$d', skipped)
-                        .replace('%4$d', failed);
-                }
-
-                $progressFill.css('width', '100%');
-                $progressText.text(summary);
-                $btn.prop('disabled', false);
-
-                // 压缩结果只体现在页面统计和媒体库列上，不刷新就看不到本次成果
-                alert(summary);
-                location.reload();
-            }
-
-            function countResult(data) {
-                if (data && data.status === 'success') {
-                    success++;
-                } else if (data && (data.status === 'failed' || data.status === 'partial')) {
-                    failed++;
-                } else {
-                    skipped++;
-                }
-            }
-
-            function processPage(items, nextAfter, hasMore) {
-                var queue = items.slice();
-                var running = 0;
-
-                function processNext() {
-                    while (running < concurrency && queue.length > 0) {
-                        var item = queue.shift();
-                        running++;
-
-                        $.ajax({
-                            url: self.ajaxUrl,
-                            type: 'POST',
-                            data: {
-                                action: 'libre_compress_compress_single',
-                                nonce: self.nonce,
-                                attachment_id: item.attachment_id
-                            },
-                            success: function(response) {
-                                if (response.success) {
-                                    countResult(response.data);
-                                } else {
-                                    failed++;
-                                }
-                            },
-                            error: function() {
-                                failed++;
-                            },
-                            complete: function() {
-                                running--;
-                                completed++;
-                                updateProgress();
-
-                                if (queue.length > 0) {
-                                    processNext();
-                                } else if (running === 0) {
-                                    if (hasMore && nextAfter > after) {
-                                        after = nextAfter;
-                                        loadPage();
-                                    } else {
-                                        finish();
-                                    }
-                                }
-                            }
-                        });
-                    }
-
-                    if (items.length === 0) {
-                        if (hasMore && nextAfter > after) {
-                            after = nextAfter;
-                            loadPage();
-                        } else {
-                            finish();
-                        }
-                    }
-                }
-
-                processNext();
-            }
-
-            function loadPage() {
-                $.ajax({
-                    url: self.ajaxUrl,
-                    type: 'POST',
-                    data: {
-                        action: 'libre_compress_get_uncompressed',
-                        nonce: self.nonce,
-                        after: after
-                    },
-                    success: function(response) {
-                        pageErrors = 0;
-
-                        if (!response.success) {
-                            hadError = true;
-                            failed++;
-                            finish();
-                            return;
-                        }
-
-                        processPage(
-                            response.data.items || [],
-                            parseInt(response.data.next_after, 10) || after,
-                            !!response.data.has_more
-                        );
-                    },
-                    error: function() {
-                        pageErrors++;
-
-                        // 取页失败最多重试 3 次，仍失败才按中断结算，避免一次网络抖动丢下整个批量
-                        if (pageErrors <= 3) {
-                            loadPage();
-                            return;
-                        }
-
-                        alert(self.i18n.error);
-                        hadError = true;
-                        failed++;
-                        finish();
-                    }
-                });
-            }
-
-            loadPage();
-        },
-
-        /**
-         * 删除所有原图备份
-         */
-        handleDeleteAllBackups: function(e) {
-            e.preventDefault();
-
-            if (!confirm(this.i18n.confirmDeleteAllBackups)) {
-                return;
-            }
-
-            var self = this;
-            var $btn = $(e.currentTarget);
-
-            $btn.prop('disabled', true).text(this.i18n.processing);
+            this.lockBatchButtons(true);
 
             $.ajax({
                 url: this.ajaxUrl,
                 type: 'POST',
+                timeout: 60000,
                 data: {
-                    action: 'libre_compress_delete_all_backups',
-                    nonce: this.nonce
+                    action: 'libre_compress_task_start',
+                    nonce: this.nonce,
+                    type: type
                 },
                 success: function(response) {
-                    if (response.success) {
-                        alert(response.data.message);
-                        location.reload();
-                    } else {
-                        alert(response.data.message || self.i18n.error);
+                    self.lockBatchButtons(false);
+
+                    if (!response.success) {
+                        alert((response.data && response.data.message) || self.i18n.error);
+                        return;
                     }
-                    $btn.prop('disabled', false);
+
+                    self.renderTask(response.data);
+                    self.startPolling();
                 },
                 error: function() {
+                    self.lockBatchButtons(false);
                     alert(self.i18n.error);
-                    $btn.prop('disabled', false);
                 }
             });
         },
 
         /**
-         * 删除所有兼容格式回退（按附件游标分页，避免大媒体库单次请求超时）
+         * 停止任务
          */
-        handleDeleteAllFallbacks: function(e) {
-            e.preventDefault();
+        stopTask: function(e) {
+            if (e) {
+                e.preventDefault();
+            }
 
-            if (!confirm(this.i18n.confirmDeleteAllFallbacks)) {
+            if (!confirm(this.i18n.taskStopConfirm)) {
                 return;
             }
 
-            var self = this;
-            var $btn = $(e.currentTarget);
-
-            $btn.prop('disabled', true).text(this.i18n.processing);
-
-            var after = 0;
-            var done = 0;
-            var pageErrors = 0;
-            var acc = {
-                processed: 0, deleted: 0, replaced: 0,
-                failed: 0, failedIds: [], contentFailed: false
-            };
-
-            function finish(interrupted) {
-                var summary = self.i18n.fallbackSummary
-                    .replace('%1$d', acc.processed)
-                    .replace('%2$d', acc.deleted)
-                    .replace('%3$d', acc.replaced);
-
-                if (acc.contentFailed) {
-                    summary += ' ' + self.i18n.fallbackContentFailed;
-                }
-
-                summary += self.formatFailedIds(acc.failedIds);
-
-                if (interrupted) {
-                    summary += '\n' + self.i18n.fallbackInterrupted.replace('%d', done);
-                } else {
-                    summary += '\n' + self.i18n.fallbackFinished;
-                }
-
-                alert(summary);
-                $btn.prop('disabled', false);
-                location.reload();
-            }
-
-            function loadPage() {
-                $.ajax({
-                    url: self.ajaxUrl,
-                    type: 'POST',
-                    data: {
-                        action: 'libre_compress_delete_all_fallbacks',
-                        nonce: self.nonce,
-                        after: after
-                    },
-                    success: function(response) {
-                        pageErrors = 0;
-
-                        if (!response.success) {
-                            finish(true);
-                            return;
-                        }
-
-                        var d = response.data || {};
-                        done += parseInt(d.processed, 10) || 0;
-                        acc.processed += parseInt(d.processed, 10) || 0;
-                        acc.deleted += parseInt(d.deleted_files, 10) || 0;
-                        acc.replaced += parseInt(d.replaced, 10) || 0;
-
-                        if (parseInt(d.failed_count, 10) > 0) {
-                            acc.contentFailed = true;
-                        }
-
-                        acc.failed += (d.failed_ids || []).length;
-                        acc.failedIds = acc.failedIds.concat(d.failed_ids || []);
-                        $btn.text(self.i18n.fallbackProgress.replace('%d', done));
-
-                        if (d.has_more && parseInt(d.next_after, 10) > after) {
-                            after = parseInt(d.next_after, 10);
-                            loadPage();
-                        } else {
-                            finish(false);
-                        }
-                    },
-                    error: function() {
-                        pageErrors++;
-
-                        if (pageErrors <= 3) {
-                            loadPage();
-                            return;
-                        }
-
-                        finish(true);
-                    }
-                });
-            }
-
-            loadPage();
+            this.taskAction('libre_compress_task_stop');
         },
 
+        /**
+         * 继续执行：页面轮询本来就会补一棒，这里手动催一下并立刻刷新状态
+         */
+        resumeTask: function(e) {
+            if (e) {
+                e.preventDefault();
+            }
+
+            this.taskAction('libre_compress_task_status');
+        },
+
+        /**
+         * 只重跑失败的项目
+         */
+        retryTask: function(e) {
+            if (e) {
+                e.preventDefault();
+            }
+
+            this.taskAction('libre_compress_task_retry');
+        },
+
+        /**
+         * 发送一个任务操作请求
+         */
+        taskAction: function(action) {
+            var self = this;
+
+            this.stopPolling();
+
+            $.ajax({
+                url: this.ajaxUrl,
+                type: 'POST',
+                timeout: 60000,
+                data: {
+                    action: action,
+                    nonce: this.nonce
+                },
+                success: function(response) {
+                    if (!response.success) {
+                        alert((response.data && response.data.message) || self.i18n.error);
+
+                        if (self.taskState && self.taskState.status === 'running') {
+                            self.startPolling();
+                        }
+                        return;
+                    }
+
+                    self.renderTask(response.data);
+
+                    if (response.data && response.data.status === 'running') {
+                        self.startPolling();
+                    }
+                },
+                error: function() {
+                    alert(self.i18n.error);
+
+                    if (self.taskState && self.taskState.status === 'running') {
+                        self.startPolling();
+                    }
+                }
+            });
+        },
+
+        /**
+         * 开始轮询任务状态
+         */
+        startPolling: function() {
+            var self = this;
+
+            this.stopPolling();
+
+            this.taskTimer = setTimeout(function() {
+                self.pollStatus();
+            }, 2000);
+        },
+
+        /**
+         * 停止轮询
+         */
+        stopPolling: function() {
+            if (this.taskTimer) {
+                clearTimeout(this.taskTimer);
+                this.taskTimer = null;
+            }
+        },
+
+        /**
+         * 取一次任务状态
+         */
+        pollStatus: function() {
+            var self = this;
+
+            this.taskTimer = null;
+
+            $.ajax({
+                url: this.ajaxUrl,
+                type: 'POST',
+                timeout: 60000,
+                data: {
+                    action: 'libre_compress_task_status',
+                    nonce: this.nonce
+                },
+                success: function(response) {
+                    if (!response.success) {
+                        self.pollFailed();
+                        return;
+                    }
+
+                    self.taskErrors = 0;
+                    self.renderTask(response.data);
+
+                    if (response.data && response.data.status === 'running') {
+                        self.startPolling();
+                    }
+                },
+                error: function() {
+                    self.pollFailed();
+                }
+            });
+        },
+
+        /**
+         * 一次状态查询失败：连着失败太多次就别再空转，免得一直打服务器
+         */
+        pollFailed: function() {
+            this.taskErrors++;
+
+            if (this.taskErrors < 5) {
+                this.startPolling();
+                return;
+            }
+
+            this.showPanelNote(this.i18n.error);
+        },
+
+        /**
+         * 画出任务面板
+         */
+        renderTask: function(state) {
+            if (!this.$panel || !state || !state.has_task) {
+                if (this.$panel) {
+                    this.$panel.hide();
+                }
+                return;
+            }
+
+            this.taskState = state;
+            this.$panel.show();
+            this.$panel.toggleClass('is-done', state.status === 'done');
+            this.$panel.toggleClass('is-stopped', state.status === 'stopped');
+
+            var percent = Math.max(0, Math.min(100, parseInt(state.percent, 10) || 0));
+            var progress = (state.scanned ? this.i18n.taskScanned : this.i18n.taskProgress)
+                .replace('%1$d', state.progress)
+                .replace('%2$d', state.total);
+            var counts = this.i18n.taskCounts
+                .replace('%1$d', state.success)
+                .replace('%2$d', state.skipped)
+                .replace('%3$d', state.failed);
+            var elapsed = this.i18n.taskElapsed.replace('%s', this.formatDuration(state.elapsed));
+            var current = state.current ? this.i18n.taskCurrent.replace('%s', state.current) : '';
+
+            if (state.stalled && state.status === 'running') {
+                current = this.i18n.taskStalled;
+            }
+
+            this.$panel.find('.task-label').text(state.label || '');
+            this.$panel.find('.task-status').text(this.statusText(state));
+            this.$panel.find('.task-bar-fill').css('width', percent + '%');
+            this.$panel.find('.task-bar-text').text(percent + '%');
+            this.$panel.find('.task-progress').text(progress + '　' + elapsed);
+            this.$panel.find('.task-counts').text(counts);
+            this.$panel.find('.task-current').text(current);
+            this.$panel.find('.task-summary').text(state.summary || '');
+
+            var running = state.status === 'running';
+
+            this.$panel.find('#libre-compress-task-stop').toggle(running);
+            this.$panel.find('#libre-compress-task-resume').toggle(running && !!state.stalled);
+            this.$panel.find('#libre-compress-task-refresh').toggle(!running);
+
+            var retryCount = parseInt(state.retry_count, 10) || 0;
+            var $retry = this.$panel.find('#libre-compress-task-retry');
+
+            $retry.toggle(!running && retryCount > 0);
+
+            if (retryCount > 0) {
+                $retry.text(this.i18n.taskRetry.replace('%d', retryCount));
+            }
+
+            this.lockBatchButtons(running);
+        },
+
+        /**
+         * 面板上的一行提示（轮询彻底失败时用）
+         */
+        showPanelNote: function(text) {
+            if (!this.$panel) {
+                return;
+            }
+
+            this.$panel.show();
+            this.$panel.find('.task-current').text(text);
+        },
+
+        /**
+         * 任务状态文字
+         */
+        statusText: function(state) {
+            if (state.status === 'done') {
+                return this.i18n.taskDone;
+            }
+
+            if (state.status === 'stopped') {
+                return this.i18n.taskStopped;
+            }
+
+            return state.stalled ? this.i18n.taskStalled : this.i18n.taskRunning;
+        },
+
+        /**
+         * 任务跑着的时候禁掉所有批量按钮，避免重复启动
+         */
+        lockBatchButtons: function(disabled) {
+            $.each(this.batchButtons, function(selector) {
+                $(selector).prop('disabled', !!disabled);
+            });
+        },
+
+        /**
+         * 秒数转“几分几秒”
+         */
+        formatDuration: function(seconds) {
+            var value = Math.max(0, parseInt(seconds, 10) || 0);
+
+            if (value < 60) {
+                return this.i18n.taskSeconds.replace('%d', value);
+            }
+
+            return this.i18n.taskMinutes
+                .replace('%1$d', Math.floor(value / 60))
+                .replace('%2$d', value % 60);
+        }
     };
 
     // DOM 加载完成后初始化

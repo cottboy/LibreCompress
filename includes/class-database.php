@@ -339,6 +339,28 @@ class Libre_Compress_Database {
     }
 
     /**
+     * 统计图片附件总数
+     *
+     * 批量压缩与缩略图任务按“看过多少张图”推进进度，分母就是它。
+     *
+     * @return int
+     */
+    public function count_image_attachments(): int {
+        global $wpdb;
+
+        $mimes     = array( 'image/jpeg', 'image/png', 'image/webp', 'image/avif', 'image/gif', 'image/svg+xml' );
+        $mimes_sql = "'" . implode( "','", array_map( 'esc_sql', $mimes ) ) . "'";
+
+        // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+        return (int) $wpdb->get_var(
+            "SELECT COUNT(*) FROM {$wpdb->posts}
+            WHERE post_type = 'attachment'
+            AND post_status != 'trash'
+            AND post_mime_type IN ({$mimes_sql})"
+        );
+    }
+
+    /**
      * 添加备份记录
      *
      * @param array $data 备份数据
@@ -541,6 +563,76 @@ class Libre_Compress_Database {
     }
 
     /**
+     * 统计留有兼容格式回退的附件数
+     *
+     * @return int
+     */
+    public function count_fallback_attachments(): int {
+        global $wpdb;
+
+        // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+        return (int) $wpdb->get_var(
+            $wpdb->prepare(
+                "SELECT COUNT(*) FROM {$wpdb->postmeta} m
+                INNER JOIN {$wpdb->posts} p ON p.ID = m.post_id
+                WHERE m.meta_key = %s
+                  AND p.post_type = 'attachment'
+                  AND p.post_status <> 'trash'",
+                Libre_Compress_Output::OUTPUT_META_KEY
+            )
+        );
+    }
+
+    /**
+     * 按附件 ID 游标获取仍有原图备份索引的附件
+     *
+     * @param int $after_id 上一批最后处理的附件 ID
+     * @param int $limit    本批数量
+     * @return int[]
+     */
+    public function get_backup_attachment_ids_after( $after_id = 0, $limit = 20 ): array {
+        global $wpdb;
+
+        $after_id = absint( $after_id );
+        $limit    = max( 1, min( 100, absint( $limit ) ) );
+
+        // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+        $ids = $wpdb->get_col(
+            $wpdb->prepare(
+                "SELECT b.attachment_id FROM {$this->backups_table} b
+                INNER JOIN {$wpdb->posts} p ON p.ID = b.attachment_id
+                WHERE b.attachment_id > %d
+                  AND p.post_type = 'attachment'
+                  AND p.post_status <> 'trash'
+                GROUP BY b.attachment_id
+                ORDER BY b.attachment_id ASC
+                LIMIT %d",
+                $after_id,
+                $limit
+            )
+        );
+
+        return array_map( 'absint', $ids );
+    }
+
+    /**
+     * 统计仍有原图备份索引的附件数
+     *
+     * @return int
+     */
+    public function count_backup_attachments(): int {
+        global $wpdb;
+
+        // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+        return (int) $wpdb->get_var(
+            "SELECT COUNT( DISTINCT b.attachment_id ) FROM {$this->backups_table} b
+            INNER JOIN {$wpdb->posts} p ON p.ID = b.attachment_id
+            WHERE p.post_type = 'attachment'
+              AND p.post_status <> 'trash'"
+        );
+    }
+
+    /**
      * 按附件 ID 游标获取需要执行恢复流程的附件
      *
      * 包含仍有备份索引的附件，以及引用已还原但残留文件与记录尚未清理的附件。
@@ -628,6 +720,61 @@ class Libre_Compress_Database {
     }
 
     /**
+     * 统计留有处理痕迹的附件数
+     *
+     * @return int
+     */
+    public function count_history_attachments(): int {
+        global $wpdb;
+
+        // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+        return (int) $wpdb->get_var(
+            $wpdb->prepare(
+                "SELECT COUNT(*) FROM (
+                    SELECT DISTINCT attachment_id FROM {$this->records_table}
+                    UNION
+                    SELECT DISTINCT attachment_id FROM {$this->backups_table}
+                    UNION
+                    SELECT DISTINCT post_id AS attachment_id FROM {$wpdb->postmeta}
+                    WHERE meta_key IN (%s, %s)
+                ) history",
+                Libre_Compress_Output::OUTPUT_META_KEY,
+                Libre_Compress_Processor::RESTORE_STATE_META_KEY
+            )
+        );
+    }
+
+    /**
+     * 统计需要执行恢复流程的附件数
+     *
+     * @return int
+     */
+    public function count_restore_attachments(): int {
+        global $wpdb;
+
+        // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+        return (int) $wpdb->get_var(
+            $wpdb->prepare(
+                "SELECT COUNT(*) FROM (
+                    SELECT DISTINCT b.attachment_id
+                    FROM {$this->backups_table} b
+                    INNER JOIN {$wpdb->posts} p ON p.ID = b.attachment_id
+                    WHERE p.post_type = 'attachment'
+                      AND p.post_status <> 'trash'
+                    UNION
+                    SELECT DISTINCT m.post_id AS attachment_id
+                    FROM {$wpdb->postmeta} m
+                    INNER JOIN {$wpdb->posts} p ON p.ID = m.post_id
+                    WHERE m.meta_key = %s
+                      AND p.post_type = 'attachment'
+                      AND p.post_status <> 'trash'
+                ) candidates",
+                Libre_Compress_Processor::RESTORE_STATE_META_KEY
+            )
+        );
+    }
+
+    /**
      * 按附件 ID 游标获取已不存在的附件残留的处理痕迹
      *
      * 附件被永久删除时，删除钩子只做一次尽力而为的清理：拿不到锁就静默放弃，
@@ -669,20 +816,5 @@ class Libre_Compress_Database {
         );
 
         return array_map( 'absint', $ids );
-    }
-
-    /**
-     * 获取所有备份
-     *
-     * @return array
-     */
-    public function get_all_backups() {
-        global $wpdb;
-
-        // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-        return $wpdb->get_results(
-            "SELECT * FROM {$this->backups_table} ORDER BY attachment_id ASC",
-            ARRAY_A
-        );
     }
 }

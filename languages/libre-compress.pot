@@ -6,9 +6,9 @@
 #, fuzzy
 msgid ""
 msgstr ""
-"Project-Id-Version: LibreCompress 1.3.3\n"
+"Project-Id-Version: LibreCompress 1.3.4\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-10 18:21+0800\n"
+"POT-Creation-Date: 2026-10-12 23:54+0800\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -17,979 +17,6 @@ msgstr ""
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-
-#: compression/class-avif.php:136
-msgid "无法确认 AVIF 帧数，已停止压缩以保护动画内容"
-msgstr ""
-
-#: compression/class-avif.php:145
-msgid "动画或多帧 AVIF 暂不支持同格式压缩，已保持原文件不变"
-msgstr ""
-
-#: compression/class-avif.php:275
-msgid "暂无官方包，建议从 GitHub Releases 下载或自行编译"
-msgstr ""
-
-#: compression/class-avif.php:278
-msgid "从 libavif GitHub Releases 下载静态编译的 avifenc.exe 和 avifdec.exe"
-msgstr ""
-
-#: compression/class-cwebp.php:136
-msgid "从 Google 官网下载预编译的二进制文件"
-msgstr ""
-
-#: compression/class-gifsicle.php:133
-msgid "从 eternallybored.org 下载预编译的 gifsicle.exe"
-msgstr ""
-
-#: compression/class-jpegoptim.php:120 compression/class-oxipng.php:90
-msgid "从 GitHub 下载预编译的二进制文件"
-msgstr ""
-
-#: compression/class-pngquant.php:90 compression/class-pngquant.php:104
-#: compression/class-tool-base.php:525 includes/class-compressor.php:604
-#: includes/class-converter.php:432 includes/class-converter.php:472
-msgid "压缩成功"
-msgstr ""
-
-#: compression/class-pngquant.php:191
-msgid "从官网下载预编译的二进制文件"
-msgstr ""
-
-#: compression/class-svgo.php:166
-msgid "需要 Node.js 环境，运行 npm install -g svgo"
-msgstr ""
-
-#: compression/class-tool-base.php:291
-msgid "命令为空"
-msgstr ""
-
-#: compression/class-tool-base.php:298
-msgid "本地命令执行功能不可用"
-msgstr ""
-
-#: compression/class-tool-base.php:314
-msgid "无法创建命令输出缓冲区"
-msgstr ""
-
-#: compression/class-tool-base.php:331
-msgid "无法启动本地命令"
-msgstr ""
-
-#: compression/class-tool-base.php:371
-msgid "本地命令执行超时"
-msgstr ""
-
-#: compression/class-tool-base.php:443
-#, php-format
-msgid "%s 不可用"
-msgstr ""
-
-#: compression/class-tool-base.php:455 includes/class-compressor.php:396
-#: includes/class-converter.php:180
-msgid "文件不存在"
-msgstr ""
-
-#: compression/class-tool-base.php:466
-msgid "不支持的文件格式"
-msgstr ""
-
-#: compression/class-tool-base.php:504
-msgid "压缩结果替换失败，已保留原文件"
-msgstr ""
-
-#: compression/class-tool-base.php:517
-msgid "压缩结果为空文件，已保留原文件"
-msgstr ""
-
-#: includes/class-compressor.php:404 includes/class-converter.php:185
-msgid "文件路径不安全"
-msgstr ""
-
-#: includes/class-compressor.php:413
-msgid "APNG 动图不压缩"
-msgstr ""
-
-#: includes/class-compressor.php:425
-msgid "动画 WebP 不压缩"
-msgstr ""
-
-#: includes/class-compressor.php:438 includes/class-converter.php:316
-msgid "没有可用的压缩工具"
-msgstr ""
-
-#: includes/class-compressor.php:454
-#, php-format
-msgid "文件大小超过限制（最大 %d MB）"
-msgstr ""
-
-#: includes/class-compressor.php:471
-msgid "无法创建回滚副本，已跳过压缩"
-msgstr ""
-
-#: includes/class-compressor.php:489
-msgid "压缩失败且回滚失败，请保留回滚副本并检查磁盘状态"
-msgstr ""
-
-#: includes/class-compressor.php:519
-msgid "压缩结果无效且回滚失败，请保留回滚副本并检查磁盘状态"
-msgstr ""
-
-#: includes/class-compressor.php:541
-msgid "压缩后体积没有变小，已保留原图"
-msgstr ""
-
-#: includes/class-compressor.php:554 includes/class-converter.php:364
-msgid "压缩记录保存失败，请重新压缩"
-msgstr ""
-
-#: includes/class-compressor.php:588
-msgid "压缩记录保存失败，已恢复原文件"
-msgstr ""
-
-#: includes/class-compressor.php:589
-msgid "压缩记录保存失败且回滚失败，请保留回滚副本并检查数据库状态"
-msgstr ""
-
-#: includes/class-converter.php:195
-msgid "该格式未配置格式转换"
-msgstr ""
-
-#: includes/class-converter.php:211
-msgid "无法清理旧的转换结果，已保留原文件"
-msgstr ""
-
-#: includes/class-converter.php:225
-msgid "无法为源文件分配新文件名，已保留原文件"
-msgstr ""
-
-#: includes/class-converter.php:267
-msgid "动画 GIF 压缩为 WebP 需要 gif2webp 工具（libwebp 套件）"
-msgstr ""
-
-#: includes/class-converter.php:268
-msgid "动画 GIF 压缩为 AVIF 需要 ffmpeg"
-msgstr ""
-
-#: includes/class-converter.php:279
-msgid "静态 GIF 压缩需要 GD 扩展"
-msgstr ""
-
-#: includes/class-converter.php:287
-msgid "GIF 压缩预处理失败"
-msgstr ""
-
-#: includes/class-converter.php:297
-msgid "SVG 压缩需要 resvg 工具"
-msgstr ""
-
-#: includes/class-converter.php:305
-msgid "SVG 压缩预处理失败"
-msgstr ""
-
-#: includes/class-converter.php:333 includes/class-media-library.php:143
-msgid "压缩失败"
-msgstr ""
-
-#: includes/class-converter.php:378
-msgid "转换结果没有变小，已保留原图"
-msgstr ""
-
-#: includes/class-converter.php:393
-msgid "压缩结果文件写入失败"
-msgstr ""
-
-#: includes/class-converter.php:402 includes/class-converter.php:459
-msgid "压缩记录保存失败，已保留原文件"
-msgstr ""
-
-#: includes/class-converter.php:409 includes/class-converter.php:412
-msgid "恢复映射保存失败，已保留原文件"
-msgstr ""
-
-#: includes/class-converter.php:502
-msgid "附件路径同步失败，已保留原文件"
-msgstr ""
-
-#: includes/class-converter.php:506
-msgid "附件 MIME 类型同步失败，已保留原文件"
-msgstr ""
-
-#: includes/class-converter.php:510
-msgid "文章图片链接替换失败，已保留原文件"
-msgstr ""
-
-#: includes/class-libre-compress.php:116
-msgid "不允许反序列化单例实例"
-msgstr ""
-
-#: includes/class-libre-compress.php:220
-msgid "操作失败"
-msgstr ""
-
-#: includes/class-libre-compress.php:221
-msgid "确定要清除所有压缩记录和原图备份吗？清除后无法恢复到本轮压缩前的原图。"
-msgstr ""
-
-#: includes/class-libre-compress.php:222
-msgid "确定要恢复所有原图备份吗？此操作不可撤销。"
-msgstr ""
-
-#: includes/class-libre-compress.php:223
-msgid "确定要删除未勾选尺寸的缩略图吗？文章里指向这些尺寸的链接会改到面积最接近的现有尺寸；关闭了自动缩放或缩放图与阈值不符时，也会删除缩放图让主图退回原图。此操作不可撤销。"
-msgstr ""
-
-#: includes/class-libre-compress.php:224
-msgid "确定要为已勾选但缺失的尺寸补生成缩略图吗？开启了自动缩放且主图超过阈值时，还会生成或修正 -scaled 缩放图。这可能需要一些时间。"
-msgstr ""
-
-#: includes/class-libre-compress.php:225
-msgid "确定要删除此图片的备份吗？删除后将无法恢复原图。"
-msgstr ""
-
-#: includes/class-libre-compress.php:226
-msgid "确定要删除所有原图备份吗？删除后将无法恢复原图。"
-msgstr ""
-
-#: includes/class-libre-compress.php:227
-msgid "确定要删除此图片的兼容格式回退吗？删除后不支持新格式的浏览器将直接加载新格式图片，此操作不可撤销。"
-msgstr ""
-
-#: includes/class-libre-compress.php:228
-msgid "确定要删除所有兼容格式回退吗？删除后不支持新格式的浏览器将直接加载新格式图片，此操作不可撤销。"
-msgstr ""
-
-#: includes/class-libre-compress.php:229 includes/class-media-library.php:184
-#: includes/class-media-library.php:240
-msgid "删除备份"
-msgstr ""
-
-#: includes/class-libre-compress.php:230 includes/class-media-library.php:189
-#: includes/class-media-library.php:245
-msgid "删除兼容格式回退"
-msgstr ""
-
-#: includes/class-libre-compress.php:231
-msgid "没有需要压缩的图片"
-msgstr ""
-
-#: includes/class-libre-compress.php:232
-msgid "处理中..."
-msgstr ""
-
-#: includes/class-libre-compress.php:233
-#, php-format
-msgid "已处理 %d 个图片"
-msgstr ""
-
-#: includes/class-libre-compress.php:235
-#, php-format
-msgid "%1$s - 成功: %2$d, 跳过: %3$d, 失败: %4$d"
-msgstr ""
-
-#: includes/class-libre-compress.php:237
-#, php-format
-msgid "%1$s - 成功: %2$d, 失败: %3$d"
-msgstr ""
-
-#: includes/class-libre-compress.php:239
-#, php-format
-msgid "失败附件 ID：%s"
-msgstr ""
-
-#: includes/class-libre-compress.php:241
-#, php-format
-msgid "（共 %d 个，仅显示前 10 个）"
-msgstr ""
-
-#: includes/class-libre-compress.php:242
-#, php-format
-msgid "已恢复 %d 个附件"
-msgstr ""
-
-#: includes/class-libre-compress.php:243
-msgid "恢复完成"
-msgstr ""
-
-#: includes/class-libre-compress.php:245
-#, php-format
-msgid "恢复中断：已完成 %d 个附件，再次执行可继续恢复剩余附件。"
-msgstr ""
-
-#: includes/class-libre-compress.php:246
-#, php-format
-msgid "已清除 %d 个图片"
-msgstr ""
-
-#: includes/class-libre-compress.php:247
-msgid "清除完成"
-msgstr ""
-
-#: includes/class-libre-compress.php:249
-#, php-format
-msgid "清除中断：已完成 %d 个附件，再次执行可继续清除剩余附件。"
-msgstr ""
-
-#: includes/class-libre-compress.php:251 includes/class-libre-compress.php:258
-#, php-format
-msgid "已处理 %d 个附件"
-msgstr ""
-
-#: includes/class-libre-compress.php:253
-#, php-format
-msgid "已删除 %1$d 个未勾选尺寸的缩略图（涉及 %2$d 个附件），替换了 %3$d 个图片链接"
-msgstr ""
-
-#: includes/class-libre-compress.php:255
-#, php-format
-msgid "已为 %1$d 个附件补生成 %2$d 个缩略图（%3$d 个无需处理或已跳过，%4$d 个失败）"
-msgstr ""
-
-#: includes/class-libre-compress.php:256 includes/class-libre-compress.php:264
-msgid "部分正文链接未更新成功，可再次执行本操作继续处理。"
-msgstr ""
-
-#: includes/class-libre-compress.php:257
-msgid "处理中断，再次执行可继续处理剩余附件。"
-msgstr ""
-
-#: includes/class-libre-compress.php:259
-msgid "删除完成"
-msgstr ""
-
-#: includes/class-libre-compress.php:261
-#, php-format
-msgid "删除中断：已完成 %d 个附件，再次执行可继续删除剩余附件的兼容格式回退。"
-msgstr ""
-
-#: includes/class-libre-compress.php:263
-#, php-format
-msgid "已删除 %1$d 个附件上的 %2$d 个兼容格式回退文件，替换了 %3$d 个图片链接"
-msgstr ""
-
-#: includes/class-libre-compress.php:292
-msgid "设置"
-msgstr ""
-
-#: includes/class-media-library.php:55 includes/class-media-library.php:129
-msgid "压缩"
-msgstr ""
-
-#: includes/class-media-library.php:127
-msgid "未压缩"
-msgstr ""
-
-#: includes/class-media-library.php:145
-msgid "重试"
-msgstr ""
-
-#: includes/class-media-library.php:167
-#, php-format
-msgid "部分已压缩 %1$d/%2$d"
-msgstr ""
-
-#: includes/class-media-library.php:175
-msgid "继续压缩"
-msgstr ""
-
-#: includes/class-media-library.php:179 includes/class-media-library.php:235
-msgid "恢复原图"
-msgstr ""
-
-#: includes/class-media-library.php:215
-#, php-format
-msgid "已压缩%s%%"
-msgstr ""
-
-#: includes/class-media-library.php:225
-#, php-format
-msgid "%1$s-%2$s=%3$s"
-msgstr ""
-
-#: includes/class-media-library.php:259 includes/class-media-library.php:295
-#: includes/class-media-library.php:315 includes/class-media-library.php:351
-#: includes/class-media-library.php:383 includes/class-media-library.php:419
-#: includes/class-media-library.php:452 includes/class-media-library.php:484
-#: includes/class-media-library.php:512
-#: includes/class-thumbnail-manager.php:967
-msgid "权限不足"
-msgstr ""
-
-#: includes/class-media-library.php:300 includes/class-media-library.php:459
-#: includes/class-processor.php:258
-msgid "无效的图片附件"
-msgstr ""
-
-#: includes/class-media-library.php:322 includes/class-media-library.php:390
-msgid "无效的附件 ID"
-msgstr ""
-
-#: includes/class-media-library.php:329 includes/class-media-library.php:397
-msgid "没有可用的备份"
-msgstr ""
-
-#: includes/class-media-library.php:336
-msgid "恢复成功"
-msgstr ""
-
-#: includes/class-media-library.php:338
-msgid "恢复失败"
-msgstr ""
-
-#: includes/class-media-library.php:361
-#, php-format
-msgid "本批清除完成，已清除 %1$d 个图片的记录与备份，失败 %2$d 个"
-msgstr ""
-
-#: includes/class-media-library.php:404
-msgid "备份已删除"
-msgstr ""
-
-#: includes/class-media-library.php:406
-msgid "删除失败"
-msgstr ""
-
-#: includes/class-media-library.php:424
-msgid "当前有图片正在处理，请稍后再试"
-msgstr ""
-
-#: includes/class-media-library.php:435
-#, php-format
-msgid "已删除 %d 个备份文件"
-msgstr ""
-
-#: includes/class-media-library.php:465
-msgid "没有可删除的兼容格式回退"
-msgstr ""
-
-#: includes/class-media-library.php:469
-msgid "部分兼容格式回退删除失败，请重试"
-msgstr ""
-
-#: includes/class-media-library.php:472
-msgid "兼容格式回退已删除"
-msgstr ""
-
-#: includes/class-media-library.php:548
-#, php-format
-msgid "本批恢复完成，成功 %1$d 个，失败 %2$d 个"
-msgstr ""
-
-#: includes/class-processor.php:276
-msgid "未找到可压缩的图片文件"
-msgstr ""
-
-#: includes/class-processor.php:284
-msgid "图片已经压缩"
-msgstr ""
-
-#: includes/class-processor.php:289
-msgid "无法创建原图备份，已停止压缩"
-msgstr ""
-
-#: includes/class-processor.php:358
-msgid "附件引用更新失败，已退回原文件"
-msgstr ""
-
-#: includes/class-processor.php:366
-msgid "压缩结果已生成，但附件引用或文章链接更新失败，图片仍指向原文件，可重新压缩继续提交"
-msgstr ""
-
-#: includes/class-processor.php:376
-msgid "图片压缩完成"
-msgstr ""
-
-#: includes/class-processor.php:379
-msgid "图片仅部分压缩完成，仍有文件需要重试"
-msgstr ""
-
-#: includes/class-processor.php:382
-msgid "图片压缩失败"
-msgstr ""
-
-#: includes/class-processor.php:385
-msgid "没有可用的压缩结果"
-msgstr ""
-
-#: includes/class-processor.php:1852
-msgid "插件正在执行维护操作，请稍后重试"
-msgstr ""
-
-#: includes/class-processor.php:1853
-msgid "该图片正在处理中，请稍后重试"
-msgstr ""
-
-#: includes/class-processor.php:1856
-msgid "无法创建锁文件，请检查上传目录的写入权限"
-msgstr ""
-
-#: includes/class-settings.php:145 includes/class-settings.php:146
-#: includes/class-settings.php:260
-msgid "LibreCompress"
-msgstr ""
-
-#: includes/class-settings.php:264
-msgid "基本设置"
-msgstr ""
-
-#: includes/class-settings.php:267
-msgid "压缩工具"
-msgstr ""
-
-#: includes/class-settings.php:307
-msgid "自动压缩"
-msgstr ""
-
-#: includes/class-settings.php:311
-msgid "上传图片时自动压缩"
-msgstr ""
-
-#: includes/class-settings.php:316
-msgid "压缩并发数"
-msgstr ""
-
-#: includes/class-settings.php:322
-msgid "备份原图"
-msgstr ""
-
-#: includes/class-settings.php:326
-msgid "压缩前备份原图"
-msgstr ""
-
-#: includes/class-settings.php:331
-msgid "原图备份保留时长"
-msgstr ""
-
-#: includes/class-settings.php:334
-msgid "天"
-msgstr ""
-
-#: includes/class-settings.php:335
-msgid "填 -1 表示永久保留；填天数则备份到期后自动删除，届时这张图将无法再恢复原图。0 无效，步进时会自动跳过 0。"
-msgstr ""
-
-#: includes/class-settings.php:339
-msgid "图片元数据"
-msgstr ""
-
-#: includes/class-settings.php:343
-msgid "压缩时删除图片元数据"
-msgstr ""
-
-#: includes/class-settings.php:345
-msgid "删除 EXIF、GPS 拍摄位置、设备型号、作者与软件信息等隐私数据，ICC 色彩配置会保留以免偏色。取消勾选则尽量保留元数据，但 WebP 和经 PNG 中转的 AVIF 由编码工具决定，不保证留得住。"
-msgstr ""
-
-#: includes/class-settings.php:349
-msgid "SVG 上传"
-msgstr ""
-
-#: includes/class-settings.php:353
-msgid "允许上传 SVG 文件"
-msgstr ""
-
-#: includes/class-settings.php:355
-msgid "上传时自动清理脚本等危险内容；SVG 可能被用于 XSS 攻击，仅在信任上传者时开启。"
-msgstr ""
-
-#: includes/class-settings.php:359
-msgid "格式转换"
-msgstr ""
-
-#: includes/class-settings.php:363
-msgid "PNG"
-msgstr ""
-
-#: includes/class-settings.php:368
-msgid "JPG"
-msgstr ""
-
-#: includes/class-settings.php:373
-msgid "GIF"
-msgstr ""
-
-#: includes/class-settings.php:378
-msgid "SVG"
-msgstr ""
-
-#: includes/class-settings.php:380
-msgid "勾选的源格式执行压缩时输出为目标格式；未勾选的格式只执行同格式压缩。所有成功结果都记为已压缩。"
-msgstr ""
-
-#: includes/class-settings.php:384
-msgid "兼容格式回退"
-msgstr ""
-
-#: includes/class-settings.php:388
-msgid "为转换后的图片提供旧格式回退"
-msgstr ""
-
-#: includes/class-settings.php:390
-msgid "开启后，格式转换会把旧格式文件原地留下并同样压缩，新的 WebP/AVIF 以“原文件名.webp”“原文件名.avif”的双扩展名形式生成，前台用 <picture> 输出：支持新格式的浏览器加载新格式，不支持的浏览器加载同样压缩过的旧格式。关闭后转换不再保留旧格式文件，新格式直接替换源文件，前台也只输出新格式。此前已转换的图片仍留着旧格式文件，可用下方的“删除所有兼容格式回退”清理。"
-msgstr ""
-
-#: includes/class-settings.php:394
-msgid "目标格式"
-msgstr ""
-
-#: includes/class-settings.php:398
-msgid "WebP"
-msgstr ""
-
-#: includes/class-settings.php:400
-msgid "AVIF"
-msgstr ""
-
-#: includes/class-settings.php:403
-msgid "选择目标格式：AVIF 压缩率更高但压缩更慢，WebP 兼容性更好。"
-msgstr ""
-
-#: includes/class-settings.php:407
-msgid "缩略图尺寸"
-msgstr ""
-
-#: includes/class-settings.php:411
-msgid "自动缩放超尺寸的主图，阈值"
-msgstr ""
-
-#: includes/class-settings.php:413
-msgid "像素"
-msgstr ""
-
-#: includes/class-settings.php:415
-msgid "勾选后，上传或补生成缩略图时，宽或高超过此阈值的主图会另存为 -scaled 缩放图并接管主文件，未缩放的源文件仍留在磁盘上；不勾选则关闭自动缩放，原图直接投入使用。压缩已有图片时不会改动缩放，改动缩放请用下方的“删除未勾选尺寸的缩略图”和“补生成缺失尺寸的缩略图”两个按钮。默认 2560，与 WordPress 默认一致。"
-msgstr ""
-
-#: includes/class-settings.php:417
-msgid "当前没有注册额外的缩略图尺寸。"
-msgstr ""
-
-#: includes/class-settings.php:423
-msgid "自动"
-msgstr ""
-
-#: includes/class-settings.php:424
-msgid "等比"
-msgstr ""
-
-#: includes/class-settings.php:424
-msgid "裁剪"
-msgstr ""
-
-#: includes/class-settings.php:432
-#, php-format
-msgid "%1$s（%2$s，%3$s）"
-msgstr ""
-
-#: includes/class-settings.php:440
-msgid "取消勾选的尺寸在上传图片时不再生成；已经存在的文件用下方“删除未勾选尺寸的缩略图”清理。以后新注册的尺寸默认勾选。"
-msgstr ""
-
-#: includes/class-settings.php:455
-msgid "批量压缩未压缩的图片"
-msgstr ""
-
-#: includes/class-settings.php:459
-msgid "按当前设置压缩媒体库中所有未压缩的图片"
-msgstr ""
-
-#: includes/class-settings.php:465
-msgid "清除压缩记录与原图备份"
-msgstr ""
-
-#: includes/class-settings.php:469
-msgid "同时删除备份文件、备份索引和格式转换映射，之后所有图片都可重新压缩；此操作不可撤销。"
-msgstr ""
-
-#: includes/class-settings.php:475
-msgid "恢复所有原图备份"
-msgstr ""
-
-#: includes/class-settings.php:479
-msgid "将所有已压缩的图片恢复为原图"
-msgstr ""
-
-#: includes/class-settings.php:485
-msgid "删除所有原图备份"
-msgstr ""
-
-#: includes/class-settings.php:489
-msgid "删除所有备份文件，释放磁盘空间"
-msgstr ""
-
-#: includes/class-settings.php:495
-msgid "删除所有兼容格式回退"
-msgstr ""
-
-#: includes/class-settings.php:499
-msgid "删除媒体库中转换后保留的旧格式回退文件，并把文章里指向它们的图片链接改到新格式；删除后不支持新格式的浏览器将直接加载新格式图片"
-msgstr ""
-
-#: includes/class-settings.php:505
-msgid "删除未勾选尺寸的缩略图"
-msgstr ""
-
-#: includes/class-settings.php:509
-msgid "删除未勾选尺寸已存在的缩略图，文章里指向它们的图片链接会改到面积最接近的现有尺寸；若关闭了自动缩放，或现有 -scaled 缩放图与阈值不符，也会删除缩放图让主图退回原图"
-msgstr ""
-
-#: includes/class-settings.php:515
-msgid "补生成缺失尺寸的缩略图"
-msgstr ""
-
-#: includes/class-settings.php:519
-msgid "为已勾选但缺失的尺寸补生成缩略图；若开启了自动缩放且主图超过阈值，还会生成或修正 -scaled 缩放图。不会重建已存在的缩略图，纯缩略图缺失也不改动文章链接"
-msgstr ""
-
-#: includes/class-settings.php:571
-msgid "系统状态"
-msgstr ""
-
-#: includes/class-settings.php:578
-msgid "可用"
-msgstr ""
-
-#: includes/class-settings.php:580
-msgid "不可用"
-msgstr ""
-
-#: includes/class-settings.php:581
-msgid "压缩依赖 exec() 和 proc_open() 函数，请联系主机商启用"
-msgstr ""
-
-#: includes/class-settings.php:588
-msgid "工具状态"
-msgstr ""
-
-#: includes/class-settings.php:592
-msgid "工具"
-msgstr ""
-
-#: includes/class-settings.php:593 includes/class-settings.php:636
-msgid "状态"
-msgstr ""
-
-#: includes/class-settings.php:594
-msgid "安装路径"
-msgstr ""
-
-#: includes/class-settings.php:595
-msgid "链接"
-msgstr ""
-
-#: includes/class-settings.php:604
-msgid "已安装"
-msgstr ""
-
-#: includes/class-settings.php:606
-msgid "未安装"
-msgstr ""
-
-#: includes/class-settings.php:618
-msgid "跳转"
-msgstr ""
-
-#: includes/class-settings.php:627
-msgid "安装方式：① 把可执行文件直接放进 /wp-content/LibreCompress-bin 目录；② 把工具所在文件夹加入系统 Path 环境变量；③ 使用包管理器安装。"
-msgstr ""
-
-#: includes/class-settings.php:630
-msgid "路径支持状态"
-msgstr ""
-
-#: includes/class-settings.php:634
-msgid "路径"
-msgstr ""
-
-#: includes/class-settings.php:635
-msgid "依赖"
-msgstr ""
-
-#: includes/class-settings.php:646
-msgid "支持"
-msgstr ""
-
-#: includes/class-settings.php:648
-msgid "不支持"
-msgstr ""
-
-#: includes/class-settings.php:650
-#, php-format
-msgid "缺少：%s"
-msgstr ""
-
-#: includes/class-settings.php:661
-msgid "压缩参数设置"
-msgstr ""
-
-#: includes/class-settings.php:665 includes/class-settings.php:891
-msgid "JPEG 压缩"
-msgstr ""
-
-#: includes/class-settings.php:668 includes/class-settings.php:694
-#: includes/class-settings.php:722 includes/class-settings.php:751
-#: includes/class-settings.php:778
-msgid "压缩模式"
-msgstr ""
-
-#: includes/class-settings.php:672 includes/class-settings.php:698
-#: includes/class-settings.php:726 includes/class-settings.php:755
-#: includes/class-settings.php:782
-msgid "有损压缩"
-msgstr ""
-
-#: includes/class-settings.php:677 includes/class-settings.php:703
-#: includes/class-settings.php:731 includes/class-settings.php:760
-#: includes/class-settings.php:787
-msgid "无损压缩"
-msgstr ""
-
-#: includes/class-settings.php:682 includes/class-settings.php:736
-#: includes/class-settings.php:765 includes/class-settings.php:792
-msgid "压缩质量"
-msgstr ""
-
-#: includes/class-settings.php:686 includes/class-settings.php:740
-#: includes/class-settings.php:769 includes/class-settings.php:796
-msgid "0-100，数值越高质量越好，文件越大（仅有损压缩有效）"
-msgstr ""
-
-#: includes/class-settings.php:691
-msgid "PNG 压缩"
-msgstr ""
-
-#: includes/class-settings.php:708
-msgid "有损压缩质量"
-msgstr ""
-
-#: includes/class-settings.php:712
-msgid "pngquant 质量参数，0-100"
-msgstr ""
-
-#: includes/class-settings.php:715
-msgid "pngquant 有损 PNG 速度"
-msgstr ""
-
-#: includes/class-settings.php:716
-msgid "oxipng 无损 PNG 级别"
-msgstr ""
-
-#: includes/class-settings.php:719 includes/class-settings.php:893
-msgid "WEBP 压缩"
-msgstr ""
-
-#: includes/class-settings.php:743
-msgid "cwebp 有损 WebP 方法"
-msgstr ""
-
-#: includes/class-settings.php:744
-msgid "cwebp 无损 WebP 级别"
-msgstr ""
-
-#: includes/class-settings.php:745
-msgid "gif2webp 动画 WebP 方法"
-msgstr ""
-
-#: includes/class-settings.php:748 includes/class-settings.php:894
-msgid "AVIF 压缩"
-msgstr ""
-
-#: includes/class-settings.php:772
-msgid "avifenc AVIF 速度"
-msgstr ""
-
-#: includes/class-settings.php:775 includes/class-settings.php:895
-msgid "GIF 压缩"
-msgstr ""
-
-#: includes/class-settings.php:799
-msgid "gifsicle GIF 优化级别"
-msgstr ""
-
-#: includes/class-settings.php:802 includes/class-settings.php:896
-msgid "SVG 压缩"
-msgstr ""
-
-#: includes/class-settings.php:805
-msgid "压缩精度"
-msgstr ""
-
-#: includes/class-settings.php:809
-msgid "坐标小数有效位数 0-8，数值越高越保真，文件越大"
-msgstr ""
-
-#: includes/class-settings.php:813
-msgid "SVGO 多轮优化"
-msgstr ""
-
-#: includes/class-settings.php:817
-msgid "启用多轮优化"
-msgstr ""
-
-#: includes/class-settings.php:819
-msgid "多轮优化压缩更慢，通常文件更小；关闭后只优化一轮，速度更快。"
-msgstr ""
-
-#: includes/class-settings.php:833
-msgid "数值越大速度越快，通常文件越大；数值越小压缩越慢，通常文件越小。"
-msgstr ""
-
-#: includes/class-settings.php:834
-msgid "数值越大压缩越慢，通常文件越小；数值越小速度越快，通常文件越大。"
-msgstr ""
-
-#: includes/class-settings.php:843
-#, php-format
-msgid "范围 %1$d-%2$d，默认 %3$d。"
-msgstr ""
-
-#: includes/class-settings.php:887
-msgid "GD 扩展"
-msgstr ""
-
-#: includes/class-settings.php:892
-msgid "PNG 压缩（按模式使用其中一种）"
-msgstr ""
-
-#: includes/class-settings.php:897
-msgid "PNG/JPG 压缩为 WebP"
-msgstr ""
-
-#: includes/class-settings.php:898
-msgid "PNG/JPG 压缩为 AVIF"
-msgstr ""
-
-#: includes/class-settings.php:899
-msgid "静态 GIF 压缩为 WebP"
-msgstr ""
-
-#: includes/class-settings.php:900
-msgid "静态 GIF 压缩为 AVIF"
-msgstr ""
-
-#: includes/class-settings.php:901
-msgid "动画 GIF 压缩为 WebP"
-msgstr ""
-
-#: includes/class-settings.php:902
-msgid "动画 GIF 压缩为 AVIF"
-msgstr ""
-
-#: includes/class-settings.php:903
-msgid "SVG 压缩为 WebP"
-msgstr ""
-
-#: includes/class-settings.php:904
-msgid "SVG 压缩为 AVIF"
-msgstr ""
-
-#: includes/class-settings.php:937
-msgid "或"
-msgstr ""
-
-#: includes/class-thumbnail-manager.php:1009
-msgid "无效的操作类型"
-msgstr ""
 
 #: libre-compress.php:229
 msgid "服务器缺少 DOM 扩展，无法安全处理 SVG"
@@ -1007,92 +34,1165 @@ msgstr ""
 msgid "无法安全写入清理后的 SVG 文件"
 msgstr ""
 
-#: includes/class-media-library.php
-msgid "占用 %s"
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-compressor.php:396
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-converter.php:180
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-processor.php:337
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-processor.php:363
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\compression\class-tool-base.php:455
+msgid "文件不存在"
 msgstr ""
 
-#: includes/class-media-library.php
-msgid "详情"
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-compressor.php:404
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-converter.php:185
+msgid "文件路径不安全"
 msgstr ""
 
-#: includes/class-media-library.php includes/class-libre-compress.php
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-compressor.php:413
+msgid "APNG 动图不压缩"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-compressor.php:425
+msgid "动画 WebP 不压缩"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-compressor.php:438
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-converter.php:316
+msgid "没有可用的压缩工具"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-compressor.php:454
+#, php-format
+msgid "文件大小超过限制（最大 %d MB）"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-compressor.php:471
+msgid "无法创建回滚副本，已跳过压缩"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-compressor.php:489
+msgid "压缩失败且回滚失败，请保留回滚副本并检查磁盘状态"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-compressor.php:519
+msgid "压缩结果无效且回滚失败，请保留回滚副本并检查磁盘状态"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-compressor.php:541
+msgid "压缩后体积没有变小，已保留原图"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-compressor.php:554
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-converter.php:364
+msgid "压缩记录保存失败，请重新压缩"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-compressor.php:588
+msgid "压缩记录保存失败，已恢复原文件"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-compressor.php:589
+msgid "压缩记录保存失败且回滚失败，请保留回滚副本并检查数据库状态"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-compressor.php:604
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-converter.php:432
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-converter.php:472
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\compression\class-pngquant.php:90
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\compression\class-pngquant.php:104
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\compression\class-tool-base.php:525
+msgid "压缩成功"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-converter.php:195
+msgid "该格式未配置格式转换"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-converter.php:211
+msgid "无法清理旧的转换结果，已保留原文件"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-converter.php:225
+msgid "无法为源文件分配新文件名，已保留原文件"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-converter.php:267
+msgid "动画 GIF 压缩为 WebP 需要 gif2webp 工具（libwebp 套件）"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-converter.php:268
+msgid "动画 GIF 压缩为 AVIF 需要 ffmpeg"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-converter.php:279
+msgid "静态 GIF 压缩需要 GD 扩展"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-converter.php:287
+msgid "GIF 压缩预处理失败"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-converter.php:297
+msgid "SVG 压缩需要 resvg 工具"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-converter.php:305
+msgid "SVG 压缩预处理失败"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-converter.php:333
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-media-library.php:249
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-processor.php:371
+msgid "压缩失败"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-converter.php:378
+msgid "转换结果没有变小，已保留原图"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-converter.php:393
+msgid "压缩结果文件写入失败"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-converter.php:402
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-converter.php:459
+msgid "压缩记录保存失败，已保留原文件"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-converter.php:409
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-converter.php:412
+msgid "恢复映射保存失败，已保留原文件"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-converter.php:502
+msgid "附件路径同步失败，已保留原文件"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-converter.php:506
+msgid "附件 MIME 类型同步失败，已保留原文件"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-converter.php:510
+msgid "文章图片链接替换失败，已保留原文件"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-libre-compress.php:123
+msgid "不允许反序列化单例实例"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-libre-compress.php:229
+msgid "操作失败"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-libre-compress.php:230
 msgid "图片详情"
 msgstr ""
 
-#: includes/class-libre-compress.php
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-libre-compress.php:231
 msgid "关闭"
 msgstr ""
 
-#: includes/class-libre-compress.php
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-libre-compress.php:232
 msgid "类别"
 msgstr ""
 
-#: includes/class-libre-compress.php
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-libre-compress.php:233
 msgid "文件项目"
 msgstr ""
 
-#: includes/class-libre-compress.php
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-libre-compress.php:234
 msgid "格式"
 msgstr ""
 
-#: includes/class-libre-compress.php
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-libre-compress.php:235
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:627
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:670
+msgid "状态"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-libre-compress.php:236
 msgid "压缩前大小"
 msgstr ""
 
-#: includes/class-libre-compress.php
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-libre-compress.php:237
 msgid "当前大小"
 msgstr ""
 
-#: includes/class-libre-compress.php
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-libre-compress.php:238
 msgid "节省大小"
 msgstr ""
 
-#: includes/class-libre-compress.php
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-libre-compress.php:239
 msgid "没有可显示的文件"
 msgstr ""
 
-#: includes/class-processor.php
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-libre-compress.php:240
+msgid "确定要清除所有压缩记录和原图备份吗？清除后无法恢复到本轮压缩前的原图。"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-libre-compress.php:241
+msgid "确定要恢复所有原图备份吗？此操作不可撤销。"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-libre-compress.php:242
+msgid "确定要删除未勾选尺寸的缩略图吗？文章里指向这些尺寸的链接会改到面积最接近的现有尺寸；关闭了自动缩放或缩放图与阈值不符时，也会删除缩放图让主图退回原图。此操作不可撤销。"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-libre-compress.php:243
+msgid "确定要为已勾选但缺失的尺寸补生成缩略图吗？开启了自动缩放且主图超过阈值时，还会生成或修正 -scaled 缩放图。这可能需要一些时间。"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-libre-compress.php:244
+msgid "确定要删除此图片的备份吗？删除后将无法恢复原图。"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-libre-compress.php:245
+msgid "确定要删除所有原图备份吗？删除后将无法恢复原图。"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-libre-compress.php:246
+msgid "确定要删除此图片的兼容格式回退吗？删除后不支持新格式的浏览器将直接加载新格式图片，此操作不可撤销。"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-libre-compress.php:247
+msgid "确定要删除所有兼容格式回退吗？删除后不支持新格式的浏览器将直接加载新格式图片，此操作不可撤销。"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-libre-compress.php:248
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-media-library.php:344
+msgid "删除备份"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-libre-compress.php:249
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-media-library.php:350
+msgid "删除兼容格式回退"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-libre-compress.php:250
+msgid "处理中..."
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-libre-compress.php:251
+msgid "执行中"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-libre-compress.php:252
+msgid "已完成"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-libre-compress.php:253
+msgid "已停止"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-libre-compress.php:254
+msgid "任务已停滞，点“继续执行”接着跑"
+msgstr ""
+
+#. translators: 1: 已处理数量, 2: 总数
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-libre-compress.php:256
+#, php-format
+msgid "已处理 %1$d / %2$d"
+msgstr ""
+
+#. translators: 1: 已检查数量, 2: 图片总数
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-libre-compress.php:258
+#, php-format
+msgid "已检查 %1$d / %2$d 张图片"
+msgstr ""
+
+#. translators: 1: 成功数, 2: 跳过数, 3: 失败数
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-libre-compress.php:260
+#, php-format
+msgid "成功 %1$d，跳过 %2$d，失败 %3$d"
+msgstr ""
+
+#. translators: %s: 正在处理的图片名
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-libre-compress.php:262
+#, php-format
+msgid "正在处理：%s"
+msgstr ""
+
+#. translators: %s: 已用时长
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-libre-compress.php:264
+#, php-format
+msgid "已用时 %s"
+msgstr ""
+
+#. translators: %d: 秒数
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-libre-compress.php:266
+#, php-format
+msgid "%d 秒"
+msgstr ""
+
+#. translators: 1: 分钟数, 2: 秒数
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-libre-compress.php:268
+#, php-format
+msgid "%1$d 分 %2$d 秒"
+msgstr ""
+
+#. translators: %d: 失败数量
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-libre-compress.php:270
+#, php-format
+msgid "重试失败的 %d 个项目"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-libre-compress.php:271
+msgid "确定停止当前任务吗？已经处理完的部分会保留下来。"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-libre-compress.php:299
+msgid "设置"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-media-library.php:51
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-media-library.php:235
+msgid "压缩"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-media-library.php:232
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-processor.php:378
+msgid "未压缩"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-media-library.php:252
+msgid "重试"
+msgstr ""
+
+#. translators: 1: 已成功文件数，2: 总文件数
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-media-library.php:274
+#, php-format
+msgid "部分已压缩 %1$d/%2$d"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-media-library.php:282
+msgid "继续压缩"
+msgstr ""
+
+#. translators: %s: 压缩比例
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-media-library.php:304
+#, php-format
+msgid "已压缩%s%%"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-media-library.php:338
+msgid "恢复原图"
+msgstr ""
+
+#. translators: %s: 当前所有相关文件的总占用空间
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-media-library.php:386
+#, php-format
+msgid "占用 %s"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-media-library.php:391
+msgid "详情"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-media-library.php:404
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-media-library.php:422
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-media-library.php:447
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-media-library.php:483
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-media-library.php:519
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-task.php:207
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-task.php:230
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-task.php:249
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-task.php:263
+msgid "权限不足"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-media-library.php:409
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-media-library.php:427
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-media-library.php:526
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-processor.php:455
+msgid "无效的图片附件"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-media-library.php:432
+msgid "无法读取图片详情"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-media-library.php:454
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-media-library.php:490
+msgid "无效的附件 ID"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-media-library.php:461
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-media-library.php:497
+msgid "没有可用的备份"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-media-library.php:468
+msgid "恢复成功"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-media-library.php:470
+msgid "恢复失败"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-media-library.php:504
+msgid "备份已删除"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-media-library.php:506
+msgid "删除失败"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-media-library.php:532
+msgid "没有可删除的兼容格式回退"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-media-library.php:536
+msgid "部分兼容格式回退删除失败，请重试"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-media-library.php:539
+msgid "兼容格式回退已删除"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-processor.php:306
 msgid "旧兼容格式"
 msgstr ""
 
-#: includes/class-processor.php
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-processor.php:306
 msgid "当前文件"
 msgstr ""
 
-#: includes/class-processor.php
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-processor.php:333
 msgid "原图备份"
 msgstr ""
 
-#: includes/class-processor.php
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-processor.php:334
 msgid "备份文件"
 msgstr ""
 
-#: includes/class-processor.php
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-processor.php:337
 msgid "备份中"
 msgstr ""
 
-#: includes/class-processor.php
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-processor.php:367
+msgid "已压缩"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-processor.php:375
 msgid "已跳过"
 msgstr ""
 
-#: includes/class-processor.php
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-processor.php:390
+msgid "主图"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-processor.php:394
 msgid "未缩放原图"
 msgstr ""
 
-#: includes/class-processor.php
+#. translators: 1: 缩略图尺寸名, 2: 宽度, 3: 高度
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-processor.php:406
 #, php-format
 msgid "缩略图 %1$s（%2$d × %3$d）"
 msgstr ""
 
-#: includes/class-processor.php
+#. translators: %s: 缩略图尺寸名
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-processor.php:415
 #, php-format
 msgid "缩略图 %s"
 msgstr ""
 
-#: includes/class-processor.php
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-processor.php:429
 msgid "未知"
 msgstr ""
 
-#: includes/class-media-library.php
-msgid "无法读取图片详情"
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-processor.php:473
+msgid "未找到可压缩的图片文件"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-processor.php:481
+msgid "图片已经压缩"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-processor.php:499
+msgid "无法创建原图备份，已停止压缩"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-processor.php:570
+msgid "附件引用更新失败，已退回原文件"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-processor.php:578
+msgid "压缩结果已生成，但附件引用或文章链接更新失败，图片仍指向原文件，可重新压缩继续提交"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-processor.php:588
+msgid "图片压缩完成"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-processor.php:591
+msgid "图片仅部分压缩完成，仍有文件需要重试"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-processor.php:594
+msgid "图片压缩失败"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-processor.php:597
+msgid "没有可用的压缩结果"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-processor.php:2239
+msgid "插件正在执行维护操作，请稍后重试"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-processor.php:2240
+msgid "该图片正在处理中，请稍后重试"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-processor.php:2243
+msgid "无法创建锁文件，请检查上传目录的写入权限"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:145
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:146
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:257
+msgid "LibreCompress"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:261
+msgid "基本设置"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:264
+msgid "压缩工具"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:304
+msgid "自动压缩"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:308
+msgid "上传图片时自动压缩"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:313
+msgid "备份原图"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:317
+msgid "压缩前备份原图"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:322
+msgid "原图备份保留时长"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:325
+msgid "天"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:326
+msgid "填 -1 表示永久保留；填天数则备份到期后自动删除，届时这张图将无法再恢复原图。0 无效，步进时会自动跳过 0。"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:330
+msgid "图片元数据"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:334
+msgid "压缩时删除图片元数据"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:336
+msgid "删除 EXIF、GPS 拍摄位置、设备型号、作者与软件信息等隐私数据，ICC 色彩配置会保留以免偏色。取消勾选则尽量保留元数据，但 WebP 和经 PNG 中转的 AVIF 由编码工具决定，不保证留得住。"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:340
+msgid "SVG 上传"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:344
+msgid "允许上传 SVG 文件"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:346
+msgid "上传时自动清理脚本等危险内容；SVG 可能被用于 XSS 攻击，仅在信任上传者时开启。"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:350
+msgid "格式转换"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:354
+msgid "PNG"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:359
+msgid "JPG"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:364
+msgid "GIF"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:369
+msgid "SVG"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:371
+msgid "勾选的源格式执行压缩时输出为目标格式；未勾选的格式只执行同格式压缩。所有成功结果都记为已压缩。"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:375
+msgid "兼容格式回退"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:379
+msgid "为转换后的图片提供旧格式回退"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:381
+msgid "开启后，格式转换会把旧格式文件原地留下并同样压缩，新的 WebP/AVIF 以“原文件名.webp”“原文件名.avif”的双扩展名形式生成，前台用 <picture> 输出：支持新格式的浏览器加载新格式，不支持的浏览器加载同样压缩过的旧格式。关闭后转换不再保留旧格式文件，新格式直接替换源文件，前台也只输出新格式。此前已转换的图片仍留着旧格式文件，可用下方的“删除所有兼容格式回退”清理。"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:385
+msgid "目标格式"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:389
+msgid "WebP"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:391
+msgid "AVIF"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:394
+msgid "选择目标格式：AVIF 压缩率更高但压缩更慢，WebP 兼容性更好。"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:398
+msgid "缩略图尺寸"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:402
+msgid "自动缩放超尺寸的主图，阈值"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:404
+msgid "像素"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:406
+msgid "勾选后，上传或补生成缩略图时，宽或高超过此阈值的主图会另存为 -scaled 缩放图并接管主文件，未缩放的源文件仍留在磁盘上；不勾选则关闭自动缩放，原图直接投入使用。压缩已有图片时不会改动缩放，改动缩放请用下方的“删除未勾选尺寸的缩略图”和“补生成缺失尺寸的缩略图”两个按钮。默认 2560，与 WordPress 默认一致。"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:409
+msgid "当前没有注册额外的缩略图尺寸。"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:418
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:419
+msgid "自动"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:421
+msgid "等比"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:421
+msgid "裁剪"
+msgstr ""
+
+#. translators: 1: 尺寸名, 2: 目标像素, 3: 裁剪方式
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:429
+#, php-format
+msgid "%1$s（%2$s，%3$s）"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:437
+msgid "取消勾选的尺寸在上传图片时不再生成；已经存在的文件用下方“删除未勾选尺寸的缩略图”清理。以后新注册的尺寸默认勾选。"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:453
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-task.php:94
+msgid "批量压缩未压缩的图片"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:457
+msgid "按当前设置压缩媒体库中所有未压缩的图片"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:463
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-task.php:98
+msgid "清除压缩记录与原图备份"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:467
+msgid "同时删除备份文件、备份索引和格式转换映射，之后所有图片都可重新压缩；此操作不可撤销。"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:473
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-task.php:102
+msgid "恢复所有原图备份"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:477
+msgid "将所有已压缩的图片恢复为原图"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:483
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-task.php:106
+msgid "删除所有原图备份"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:487
+msgid "删除所有备份文件，释放磁盘空间"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:493
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-task.php:110
+msgid "删除所有兼容格式回退"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:497
+msgid "删除媒体库中转换后保留的旧格式回退文件，并把文章里指向它们的图片链接改到新格式；删除后不支持新格式的浏览器将直接加载新格式图片"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:503
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-task.php:114
+msgid "删除未勾选尺寸的缩略图"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:507
+msgid "删除未勾选尺寸已存在的缩略图，文章里指向它们的图片链接会改到面积最接近的现有尺寸；若关闭了自动缩放，或现有 -scaled 缩放图与阈值不符，也会删除缩放图让主图退回原图"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:513
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-task.php:118
+msgid "补生成缺失尺寸的缩略图"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:517
+msgid "为已勾选但缺失的尺寸补生成缩略图；若开启了自动缩放且主图超过阈值，还会生成或修正 -scaled 缩放图。不会重建已存在的缩略图，纯缩略图缺失也不改动文章链接"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:557
+msgid "停止任务"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:558
+msgid "继续执行"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:559
+msgid "重试失败的项目"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:560
+msgid "刷新页面"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:605
+msgid "系统状态"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:612
+msgid "可用"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:614
+msgid "不可用"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:615
+msgid "压缩依赖 exec() 和 proc_open() 函数，请联系主机商启用"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:622
+msgid "工具状态"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:626
+msgid "工具"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:628
+msgid "安装路径"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:629
+msgid "链接"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:638
+msgid "已安装"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:640
+msgid "未安装"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:652
+msgid "跳转"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:661
+msgid "安装方式：① 把可执行文件直接放进 /wp-content/LibreCompress-bin 目录；② 把工具所在文件夹加入系统 Path 环境变量；③ 使用包管理器安装。"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:664
+msgid "路径支持状态"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:668
+msgid "路径"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:669
+msgid "依赖"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:680
+msgid "支持"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:682
+msgid "不支持"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:684
+#, php-format
+msgid "缺少：%s"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:695
+msgid "压缩参数设置"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:699
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:925
+msgid "JPEG 压缩"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:702
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:728
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:756
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:785
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:812
+msgid "压缩模式"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:706
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:732
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:760
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:789
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:816
+msgid "有损压缩"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:711
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:737
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:765
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:794
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:821
+msgid "无损压缩"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:716
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:770
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:799
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:826
+msgid "压缩质量"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:720
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:774
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:803
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:830
+msgid "0-100，数值越高质量越好，文件越大（仅有损压缩有效）"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:725
+msgid "PNG 压缩"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:742
+msgid "有损压缩质量"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:746
+msgid "pngquant 质量参数，0-100"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:749
+msgid "pngquant 有损 PNG 速度"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:750
+msgid "oxipng 无损 PNG 级别"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:753
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:927
+msgid "WEBP 压缩"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:777
+msgid "cwebp 有损 WebP 方法"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:778
+msgid "cwebp 无损 WebP 级别"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:779
+msgid "gif2webp 动画 WebP 方法"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:782
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:928
+msgid "AVIF 压缩"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:806
+msgid "avifenc AVIF 速度"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:809
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:929
+msgid "GIF 压缩"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:833
+msgid "gifsicle GIF 优化级别"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:836
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:930
+msgid "SVG 压缩"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:839
+msgid "压缩精度"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:843
+msgid "坐标小数有效位数 0-8，数值越高越保真，文件越大"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:847
+msgid "SVGO 多轮优化"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:851
+msgid "启用多轮优化"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:853
+msgid "多轮优化压缩更慢，通常文件更小；关闭后只优化一轮，速度更快。"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:867
+msgid "数值越大速度越快，通常文件越大；数值越小压缩越慢，通常文件越小。"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:868
+msgid "数值越大压缩越慢，通常文件越小；数值越小速度越快，通常文件越大。"
+msgstr ""
+
+#. translators: 1: 最小档位，2: 最大档位，3: 默认档位。
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:877
+#, php-format
+msgid "范围 %1$d-%2$d，默认 %3$d。"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:921
+msgid "GD 扩展"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:926
+msgid "PNG 压缩（按模式使用其中一种）"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:931
+msgid "PNG/JPG 压缩为 WebP"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:932
+msgid "PNG/JPG 压缩为 AVIF"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:933
+msgid "静态 GIF 压缩为 WebP"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:934
+msgid "静态 GIF 压缩为 AVIF"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:935
+msgid "动画 GIF 压缩为 WebP"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:936
+msgid "动画 GIF 压缩为 AVIF"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:937
+msgid "SVG 压缩为 WebP"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:938
+msgid "SVG 压缩为 AVIF"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-settings.php:971
+msgid "或"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-task.php:269
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-task.php:275
+msgid "没有可重试的失败记录"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-task.php:296
+msgid "无效的操作类型"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-task.php:302
+msgid "已有批量任务正在执行，请等它跑完，或先点“停止任务”"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-task.php:1002
+msgid "没有需要处理的项目"
+msgstr ""
+
+#. translators: %1$s: 任务名称, %2$d: 成功数, %3$d: 跳过数, %4$d: 失败数
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-task.php:1013
+#, php-format
+msgid "%1$s - 成功: %2$d, 跳过: %3$d, 失败: %4$d"
+msgstr ""
+
+#. translators: %1$s: 任务名称, %2$d: 成功数, %3$d: 失败数
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-task.php:1025
+#, php-format
+msgid "%1$s - 成功: %2$d, 失败: %3$d"
+msgstr ""
+
+#. translators: 1: 涉及的附件数, 2: 删除的备份文件数, 3: 失败的附件数
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-task.php:1035
+#, php-format
+msgid "已删除 %1$d 个附件上的 %2$d 个备份文件，失败 %3$d 个"
+msgstr ""
+
+#. translators: 1: 涉及的附件数, 2: 删除的回退文件数, 3: 替换的链接数
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-task.php:1045
+#, php-format
+msgid "已删除 %1$d 个附件上的 %2$d 个兼容格式回退文件，替换了 %3$d 个图片链接"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-task.php:1052
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-task.php:1066
+msgid "部分正文链接未更新成功，可再次执行本操作继续处理。"
+msgstr ""
+
+#. translators: 1: 删除的文件数, 2: 影响的附件数, 3: 替换的链接数
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-task.php:1059
+#, php-format
+msgid "已删除 %1$d 个未勾选尺寸的缩略图（涉及 %2$d 个附件），替换了 %3$d 个图片链接"
+msgstr ""
+
+#. translators: 1: 补生成的附件数, 2: 新增文件数, 3: 跳过的附件数, 4: 失败的附件数
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-task.php:1073
+#, php-format
+msgid "已为 %1$d 个附件补生成 %2$d 个缩略图（%3$d 个无需处理或已跳过，%4$d 个失败）"
+msgstr ""
+
+#. translators: %s: 附件 ID 列表
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-task.php:1091
+#, php-format
+msgid "失败附件 ID：%s"
+msgstr ""
+
+#. translators: %d: 失败附件总数
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-task.php:1098
+#, php-format
+msgid "（共 %d 个，仅显示前 10 个）"
+msgstr ""
+
+#. translators: %d: 已处理的附件数
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-task.php:1107
+#, php-format
+msgid "任务已停止：本次共处理 %d 个附件，可以随时再执行一次继续处理剩余部分。"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\compression\class-avif.php:136
+msgid "无法确认 AVIF 帧数，已停止压缩以保护动画内容"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\compression\class-avif.php:145
+msgid "动画或多帧 AVIF 暂不支持同格式压缩，已保持原文件不变"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\compression\class-avif.php:275
+msgid "暂无官方包，建议从 GitHub Releases 下载或自行编译"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\compression\class-avif.php:278
+msgid "从 libavif GitHub Releases 下载静态编译的 avifenc.exe 和 avifdec.exe"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\compression\class-cwebp.php:136
+msgid "从 Google 官网下载预编译的二进制文件"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\compression\class-gifsicle.php:133
+msgid "从 eternallybored.org 下载预编译的 gifsicle.exe"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\compression\class-jpegoptim.php:120
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\compression\class-oxipng.php:90
+msgid "从 GitHub 下载预编译的二进制文件"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\compression\class-pngquant.php:191
+msgid "从官网下载预编译的二进制文件"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\compression\class-svgo.php:166
+msgid "需要 Node.js 环境，运行 npm install -g svgo"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\compression\class-tool-base.php:291
+msgid "命令为空"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\compression\class-tool-base.php:298
+msgid "本地命令执行功能不可用"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\compression\class-tool-base.php:314
+msgid "无法创建命令输出缓冲区"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\compression\class-tool-base.php:331
+msgid "无法启动本地命令"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\compression\class-tool-base.php:371
+msgid "本地命令执行超时"
+msgstr ""
+
+#. translators: %s: 工具名称
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\compression\class-tool-base.php:443
+#, php-format
+msgid "%s 不可用"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\compression\class-tool-base.php:466
+msgid "不支持的文件格式"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\compression\class-tool-base.php:504
+msgid "压缩结果替换失败，已保留原文件"
+msgstr ""
+
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\compression\class-tool-base.php:517
+msgid "压缩结果为空文件，已保留原文件"
 msgstr ""

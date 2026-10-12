@@ -3,7 +3,7 @@
  * Plugin Name: LibreCompress
  * Plugin URI: https://github.com/cottboy/libre-compress
  * Description: 免费的 WordPress 图片压缩插件。
- * Version: 1.3.3
+ * Version: 1.3.4
  * Author: cottboy
  * Author URI: https://github.com/cottboy
  * License: GPL v2 or later
@@ -24,7 +24,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 /**
  * 插件版本号
  */
-define( 'LIBRE_COMPRESS_VERSION', '1.3.3' );
+define( 'LIBRE_COMPRESS_VERSION', '1.3.4' );
 
 /**
  * 插件文件路径
@@ -277,6 +277,7 @@ function libre_compress_load_dependencies() {
     require_once LIBRE_COMPRESS_PATH . 'includes/class-compressor.php';
     require_once LIBRE_COMPRESS_PATH . 'includes/class-converter.php';
     require_once LIBRE_COMPRESS_PATH . 'includes/class-processor.php';
+    require_once LIBRE_COMPRESS_PATH . 'includes/class-task.php';
     require_once LIBRE_COMPRESS_PATH . 'includes/class-media-library.php';
     require_once LIBRE_COMPRESS_PATH . 'includes/class-thumbnail-manager.php';
     require_once LIBRE_COMPRESS_PATH . 'includes/class-settings.php';
@@ -316,7 +317,6 @@ function libre_compress_activate() {
         'fallback_enabled'      => false,
         'image_scale_enabled'   => true,
         'image_size_threshold'  => 2560,
-        'tool_concurrency'      => 5,
         'output_format'         => 'webp',
     );
 
@@ -372,6 +372,7 @@ function libre_compress_deactivate() {
 
     wp_clear_scheduled_hook( Libre_Compress_Processor::PENDING_SWEEP_HOOK );
     wp_clear_scheduled_hook( Libre_Compress_Processor::BACKUP_PRUNE_HOOK );
+    wp_clear_scheduled_hook( Libre_Compress_Task::WATCHDOG_HOOK );
 
     // 刷新重写规则
     flush_rewrite_rules();

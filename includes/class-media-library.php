@@ -33,17 +33,12 @@ class Libre_Compress_Media_Library {
         add_action( 'manage_media_custom_column', array( $this, 'render_compression_column' ), 10, 2 );
         add_action( 'admin_head-upload.php', array( $this, 'output_media_library_styles' ) );
 
-        // 注册 AJAX 接口
-        add_action( 'wp_ajax_libre_compress_get_uncompressed', array( $this, 'ajax_get_uncompressed' ) );
+        // 注册 AJAX 接口（批量操作统一走后台任务，见 Libre_Compress_Task）
         add_action( 'wp_ajax_libre_compress_compress_single', array( $this, 'ajax_compress_single' ) );
         add_action( 'wp_ajax_libre_compress_get_details', array( $this, 'ajax_get_details' ) );
         add_action( 'wp_ajax_libre_compress_restore', array( $this, 'ajax_restore' ) );
-        add_action( 'wp_ajax_libre_compress_restore_all', array( $this, 'ajax_restore_all' ) );
-        add_action( 'wp_ajax_libre_compress_clear_records', array( $this, 'ajax_clear_records' ) );
         add_action( 'wp_ajax_libre_compress_delete_backup', array( $this, 'ajax_delete_backup' ) );
-        add_action( 'wp_ajax_libre_compress_delete_all_backups', array( $this, 'ajax_delete_all_backups' ) );
         add_action( 'wp_ajax_libre_compress_delete_fallback', array( $this, 'ajax_delete_fallback' ) );
-        add_action( 'wp_ajax_libre_compress_delete_all_fallbacks', array( $this, 'ajax_delete_all_fallbacks' ) );
     }
 
     /**
@@ -400,42 +395,6 @@ class Libre_Compress_Media_Library {
     }
 
     /**
-     * AJAX: 按游标获取未压缩图片列表
-     */
-    public function ajax_get_uncompressed() {
-        check_ajax_referer( 'libre_compress_nonce', 'nonce' );
-
-        if ( ! current_user_can( 'manage_options' ) ) {
-            wp_send_json_error( array( 'message' => __( '权限不足', 'libre-compress' ) ) );
-        }
-
-        $after_id       = isset( $_POST['after'] ) ? absint( $_POST['after'] ) : 0;
-        $batch_size     = 100;
-        $attachment_ids = libre_compress()->database->get_image_attachment_ids_after( $after_id, $batch_size + 1 );
-        $has_more       = count( $attachment_ids ) > $batch_size;
-        $items          = array();
-
-        if ( $has_more ) {
-            array_pop( $attachment_ids );
-        }
-
-        foreach ( $attachment_ids as $attachment_id ) {
-            if ( libre_compress()->processor->has_pending_files( $attachment_id ) ) {
-                $items[] = array( 'attachment_id' => $attachment_id );
-            }
-        }
-
-        $next_after = empty( $attachment_ids ) ? $after_id : max( $attachment_ids );
-        wp_send_json_success(
-            array(
-                'items'      => $items,
-                'next_after' => $next_after,
-                'has_more'   => $has_more,
-            )
-        );
-    }
-
-    /**
      * AJAX: 使用统一流程压缩单个附件
      */
     public function ajax_compress_single() {
@@ -513,38 +472,6 @@ class Libre_Compress_Media_Library {
     }
 
     /**
-     * AJAX: 分页清除压缩记录及其原图备份
-     */
-    public function ajax_clear_records() {
-        // 验证 nonce
-        check_ajax_referer( 'libre_compress_nonce', 'nonce' );
-
-        // 验证权限
-        if ( ! current_user_can( 'manage_options' ) ) {
-            wp_send_json_error( array( 'message' => __( '权限不足', 'libre-compress' ) ) );
-        }
-
-        $after_id = isset( $_POST['after'] ) ? absint( $_POST['after'] ) : 0;
-        $page     = libre_compress()->processor->clear_history_page( $after_id );
-
-        wp_send_json_success(
-            array(
-                'message'       => sprintf(
-                    /* translators: 1: 已清除数量, 2: 失败数量 */
-                    __( '本批清除完成，已清除 %1$d 个图片的记录与备份，失败 %2$d 个', 'libre-compress' ),
-                    $page['cleared_count'],
-                    count( $page['failed_ids'] )
-                ),
-                'cleared_count' => $page['cleared_count'],
-                'failed_count'  => count( $page['failed_ids'] ),
-                'failed_ids'    => $page['failed_ids'],
-                'next_after'    => $page['next_after'],
-                'has_more'      => $page['has_more'],
-            )
-        );
-    }
-
-    /**
      * AJAX: 删除单张图片的备份
      */
     public function ajax_delete_backup() {
@@ -571,46 +498,13 @@ class Libre_Compress_Media_Library {
         }
 
         // 删除备份
-        $result = libre_compress()->processor->delete_backup( $attachment_id );
+        $result = libre_compress()->processor->delete_attachment_backups( $attachment_id );
 
-        if ( $result ) {
+        if ( $result['ok'] ) {
             wp_send_json_success( array( 'message' => __( '备份已删除', 'libre-compress' ) ) );
         } else {
             wp_send_json_error( array( 'message' => __( '删除失败', 'libre-compress' ) ) );
         }
-    }
-
-    /**
-     * AJAX: 删除所有原图备份
-     */
-    public function ajax_delete_all_backups() {
-        // 验证 nonce
-        check_ajax_referer( 'libre_compress_nonce', 'nonce' );
-
-        // 验证权限
-        if ( ! current_user_can( 'manage_options' ) ) {
-            wp_send_json_error( array( 'message' => __( '权限不足', 'libre-compress' ) ) );
-        }
-
-        $lock = libre_compress()->processor->acquire_global_lock( true );
-        if ( false === $lock ) {
-            wp_send_json_error( array( 'message' => __( '当前有图片正在处理，请稍后再试', 'libre-compress' ) ) );
-        }
-
-        $backup = libre_compress()->backup;
-        $count  = $backup->delete_all_backups();
-        libre_compress()->processor->release_attachment_lock( $lock );
-
-        wp_send_json_success(
-            array(
-                'message'       => sprintf(
-                    /* translators: %d: 删除的备份数量 */
-                    __( '已删除 %d 个备份文件', 'libre-compress' ),
-                    $count
-                ),
-                'deleted_count' => $count,
-            )
-        );
     }
 
     /**
@@ -643,92 +537,6 @@ class Libre_Compress_Media_Library {
         }
 
         wp_send_json_success( array( 'message' => __( '兼容格式回退已删除', 'libre-compress' ) ) );
-    }
-
-    /**
-     * AJAX: 分页删除所有兼容格式回退
-     */
-    public function ajax_delete_all_fallbacks() {
-        // 验证 nonce
-        check_ajax_referer( 'libre_compress_nonce', 'nonce' );
-
-        // 验证权限
-        if ( ! current_user_can( 'manage_options' ) ) {
-            wp_send_json_error( array( 'message' => __( '权限不足', 'libre-compress' ) ) );
-        }
-
-        $after_id = isset( $_POST['after'] ) ? absint( $_POST['after'] ) : 0;
-        $page     = libre_compress()->processor->delete_fallbacks_page( $after_id );
-
-        wp_send_json_success(
-            array(
-                'processed'     => $page['processed'],
-                'deleted_files' => $page['deleted_files'],
-                'replaced'      => $page['replaced'],
-                'failed_count'  => count( $page['failed_ids'] ),
-                'failed_ids'    => $page['failed_ids'],
-                'next_after'    => $page['next_after'],
-                'has_more'      => $page['has_more'],
-            )
-        );
-    }
-
-    /**
-     * AJAX: 恢复所有原图备份
-     */
-    public function ajax_restore_all() {
-        // 验证 nonce
-        check_ajax_referer( 'libre_compress_nonce', 'nonce' );
-
-        // 验证权限
-        if ( ! current_user_can( 'manage_options' ) ) {
-            wp_send_json_error( array( 'message' => __( '权限不足', 'libre-compress' ) ) );
-        }
-
-        $after_id       = isset( $_POST['after'] ) ? absint( $_POST['after'] ) : 0;
-        $batch_size     = 20;
-        $database       = libre_compress()->database;
-        $backup         = libre_compress()->backup;
-        $attachment_ids = $database->get_restore_attachment_ids_after( $after_id, $batch_size + 1 );
-        $has_more       = count( $attachment_ids ) > $batch_size;
-        $success_count  = 0;
-        $failed_ids     = array();
-
-        if ( $has_more ) {
-            array_pop( $attachment_ids );
-        }
-
-        foreach ( $attachment_ids as $attachment_id ) {
-            // 备份文件已丢失且没有待收尾的恢复时，直接清理残留索引，避免每次恢复都重复失败。
-            // 仍有待收尾状态时必须走完整恢复，否则转换结果和压缩记录会留在原地。
-            if ( ! $backup->has_backup( $attachment_id ) && ! libre_compress()->processor->has_pending_restore( $attachment_id ) ) {
-                $backup->delete_backup( $attachment_id );
-                continue;
-            }
-
-            if ( libre_compress()->processor->restore_attachment( $attachment_id ) ) {
-                $success_count++;
-            } else {
-                $failed_ids[] = $attachment_id;
-            }
-        }
-
-        $next_after = empty( $attachment_ids ) ? $after_id : max( $attachment_ids );
-        wp_send_json_success(
-            array(
-                'message'       => sprintf(
-                    /* translators: %1$d: 成功数量, %2$d: 失败数量 */
-                    __( '本批恢复完成，成功 %1$d 个，失败 %2$d 个', 'libre-compress' ),
-                    $success_count,
-                    count( $failed_ids )
-                ),
-                'success_count' => $success_count,
-                'failed_count'  => count( $failed_ids ),
-                'failed_ids'    => $failed_ids,
-                'next_after'    => $next_after,
-                'has_more'      => $has_more,
-            )
-        );
     }
 
     /**

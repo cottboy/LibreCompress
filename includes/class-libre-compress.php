@@ -60,6 +60,13 @@ class Libre_Compress {
     public $processor;
 
     /**
+     * 后台批量任务实例
+     *
+     * @var Libre_Compress_Task
+     */
+    public $task;
+
+    /**
      * 媒体库集成模块实例
      *
      * @var Libre_Compress_Media_Library
@@ -138,6 +145,9 @@ class Libre_Compress {
         // 初始化统一图片压缩处理器
         $this->processor = new Libre_Compress_Processor();
 
+        // 初始化后台批量任务引擎
+        $this->task = new Libre_Compress_Task();
+
         // 初始化媒体库集成模块
         $this->media_library = new Libre_Compress_Media_Library();
 
@@ -208,15 +218,14 @@ class Libre_Compress {
         );
 
         // 传递数据到 JavaScript
-        $general_settings = get_option( 'libre_compress_general', array() );
         wp_localize_script(
             'libre-compress-admin',
             'libreCompressData',
             array(
-                'ajaxUrl'     => admin_url( 'admin-ajax.php' ),
-                'nonce'       => wp_create_nonce( 'libre_compress_nonce' ),
-                'concurrency' => max( 1, min( 100, absint( isset( $general_settings['tool_concurrency'] ) ? $general_settings['tool_concurrency'] : 5 ) ) ),
-                'i18n'        => array(
+                'ajaxUrl'   => admin_url( 'admin-ajax.php' ),
+                'nonce'     => wp_create_nonce( 'libre_compress_nonce' ),
+                'taskState' => $this->task->get_state(),
+                'i18n'      => array(
                     'error'                   => __( '操作失败', 'libre-compress' ),
                     'detailsTitle'            => __( '图片详情', 'libre-compress' ),
                     'detailsClose'            => __( '关闭', 'libre-compress' ),
@@ -238,40 +247,28 @@ class Libre_Compress {
                     'confirmDeleteAllFallbacks' => __( '确定要删除所有兼容格式回退吗？删除后不支持新格式的浏览器将直接加载新格式图片，此操作不可撤销。', 'libre-compress' ),
                     'deleteBackup'            => __( '删除备份', 'libre-compress' ),
                     'deleteFallback'          => __( '删除兼容格式回退', 'libre-compress' ),
-                    'noCompressItems'         => __( '没有需要压缩的图片', 'libre-compress' ),
                     'processing'              => __( '处理中...', 'libre-compress' ),
-                    'batchProgress'           => __( '已处理 %d 个图片', 'libre-compress' ),
-                    /* translators: %1$s: 任务名称, %2$d: 成功数, %3$d: 跳过数, %4$d: 失败数 */
-                    'batchSummary'            => __( '%1$s - 成功: %2$d, 跳过: %3$d, 失败: %4$d', 'libre-compress' ),
-                    /* translators: %1$s: 任务名称, %2$d: 成功数, %3$d: 失败数 */
-                    'operationSummary'        => __( '%1$s - 成功: %2$d, 失败: %3$d', 'libre-compress' ),
-                    /* translators: %s: 附件 ID 列表 */
-                    'failedIds'               => __( '失败附件 ID：%s', 'libre-compress' ),
-                    /* translators: %d: 失败附件总数 */
-                    'failedMore'              => __( '（共 %d 个，仅显示前 10 个）', 'libre-compress' ),
-                    'restoreProgress'         => __( '已恢复 %d 个附件', 'libre-compress' ),
-                    'restoreFinished'         => __( '恢复完成', 'libre-compress' ),
-                    /* translators: %d: 已处理附件数 */
-                    'restoreInterrupted'      => __( '恢复中断：已完成 %d 个附件，再次执行可继续恢复剩余附件。', 'libre-compress' ),
-                    'clearProgress'           => __( '已清除 %d 个图片', 'libre-compress' ),
-                    'clearFinished'           => __( '清除完成', 'libre-compress' ),
-                    /* translators: %d: 已处理附件数 */
-                    'clearInterrupted'        => __( '清除中断：已完成 %d 个附件，再次执行可继续清除剩余附件。', 'libre-compress' ),
-                    /* translators: %d: 已处理附件数 */
-                    'thumbnailProgress'       => __( '已处理 %d 个附件', 'libre-compress' ),
-                    /* translators: 1: 删除的文件数, 2: 影响的附件数, 3: 替换的链接数 */
-                    'thumbnailDeleteSummary'  => __( '已删除 %1$d 个未勾选尺寸的缩略图（涉及 %2$d 个附件），替换了 %3$d 个图片链接', 'libre-compress' ),
-                    /* translators: 1: 补生成的附件数, 2: 新增文件数, 3: 跳过的附件数, 4: 失败的附件数 */
-                    'thumbnailGenerateSummary' => __( '已为 %1$d 个附件补生成 %2$d 个缩略图（%3$d 个无需处理或已跳过，%4$d 个失败）', 'libre-compress' ),
-                    'thumbnailContentFailed'  => __( '部分正文链接未更新成功，可再次执行本操作继续处理。', 'libre-compress' ),
-                    'thumbnailInterrupted'    => __( '处理中断，再次执行可继续处理剩余附件。', 'libre-compress' ),
-                    'fallbackProgress'        => __( '已处理 %d 个附件', 'libre-compress' ),
-                    'fallbackFinished'        => __( '删除完成', 'libre-compress' ),
-                    /* translators: %d: 已处理附件数 */
-                    'fallbackInterrupted'     => __( '删除中断：已完成 %d 个附件，再次执行可继续删除剩余附件的兼容格式回退。', 'libre-compress' ),
-                    /* translators: 1: 涉及的附件数, 2: 删除的回退文件数, 3: 替换的链接数 */
-                    'fallbackSummary'         => __( '已删除 %1$d 个附件上的 %2$d 个兼容格式回退文件，替换了 %3$d 个图片链接', 'libre-compress' ),
-                    'fallbackContentFailed'   => __( '部分正文链接未更新成功，可再次执行本操作继续处理。', 'libre-compress' ),
+                    'taskRunning'             => __( '执行中', 'libre-compress' ),
+                    'taskDone'                => __( '已完成', 'libre-compress' ),
+                    'taskStopped'             => __( '已停止', 'libre-compress' ),
+                    'taskStalled'             => __( '任务已停滞，点“继续执行”接着跑', 'libre-compress' ),
+                    /* translators: 1: 已处理数量, 2: 总数 */
+                    'taskProgress'            => __( '已处理 %1$d / %2$d', 'libre-compress' ),
+                    /* translators: 1: 已检查数量, 2: 图片总数 */
+                    'taskScanned'             => __( '已检查 %1$d / %2$d 张图片', 'libre-compress' ),
+                    /* translators: 1: 成功数, 2: 跳过数, 3: 失败数 */
+                    'taskCounts'              => __( '成功 %1$d，跳过 %2$d，失败 %3$d', 'libre-compress' ),
+                    /* translators: %s: 正在处理的图片名 */
+                    'taskCurrent'             => __( '正在处理：%s', 'libre-compress' ),
+                    /* translators: %s: 已用时长 */
+                    'taskElapsed'             => __( '已用时 %s', 'libre-compress' ),
+                    /* translators: %d: 秒数 */
+                    'taskSeconds'             => __( '%d 秒', 'libre-compress' ),
+                    /* translators: 1: 分钟数, 2: 秒数 */
+                    'taskMinutes'             => __( '%1$d 分 %2$d 秒', 'libre-compress' ),
+                    /* translators: %d: 失败数量 */
+                    'taskRetry'               => __( '重试失败的 %d 个项目', 'libre-compress' ),
+                    'taskStopConfirm'         => __( '确定停止当前任务吗？已经处理完的部分会保留下来。', 'libre-compress' ),
                 ),
             )
         );

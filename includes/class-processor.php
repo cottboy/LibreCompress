@@ -61,11 +61,6 @@ class Libre_Compress_Processor {
     const RESTORE_STATE_META_KEY = '_libre_compress_restore_ready';
 
     /**
-     * 清除记录时单次处理的附件数量
-     */
-    const HISTORY_PAGE_SIZE = 20;
-
-    /**
      * 原图备份到期清理任务的钩子名
      */
     const BACKUP_PRUNE_HOOK = 'libre_compress_backup_prune_event';
@@ -74,11 +69,6 @@ class Libre_Compress_Processor {
      * 备份到期清理单批处理的附件数量
      */
     const BACKUP_PRUNE_PAGE_SIZE = 20;
-
-    /**
-     * 删除兼容格式回退时单批处理的附件数量
-     */
-    const FALLBACK_PAGE_SIZE = 20;
 
     /**
      * 单次定时任务最多清理的附件数量，剩余积压延后到补排的任务
@@ -1323,55 +1313,29 @@ class Libre_Compress_Processor {
     }
 
     /**
-     * 分页清除压缩记录及其备份、映射
+     * 给单个附件清除处理痕迹（拿锁的对外入口）
      *
-     * @param int $after_id 上一批最后处理的附件 ID
-     * @return array cleared_count、failed_ids、next_after、has_more
+     * @param int $attachment_id 附件 ID
+     * @return bool 是否全部清除成功
      */
-    public function clear_history_page( int $after_id = 0 ): array {
-        $database = libre_compress()->database;
-        $ids      = $database->get_history_attachment_ids_after( $after_id, self::HISTORY_PAGE_SIZE + 1 );
-        $has_more = count( $ids ) > self::HISTORY_PAGE_SIZE;
-
-        if ( $has_more ) {
-            array_pop( $ids );
+    public function clear_attachment( int $attachment_id ): bool {
+        $lock = $this->acquire_attachment_lock( $attachment_id );
+        if ( false === $lock ) {
+            return false;
         }
 
-        $cleared = 0;
-        $failed  = array();
-
-        foreach ( $ids as $attachment_id ) {
-            $lock = $this->acquire_attachment_lock( $attachment_id );
-            if ( false === $lock ) {
-                $failed[] = $attachment_id;
-                continue;
-            }
-
-            $global_lock = $this->acquire_global_lock( false );
-            if ( false === $global_lock ) {
-                $this->release_attachment_lock( $lock );
-                $failed[] = $attachment_id;
-                continue;
-            }
-
-            try {
-                if ( $this->clear_attachment_history( $attachment_id ) ) {
-                    $cleared++;
-                } else {
-                    $failed[] = $attachment_id;
-                }
-            } finally {
-                $this->release_attachment_lock( $global_lock );
-                $this->release_attachment_lock( $lock );
-            }
+        $global_lock = $this->acquire_global_lock( false );
+        if ( false === $global_lock ) {
+            $this->release_attachment_lock( $lock );
+            return false;
         }
 
-        return array(
-            'cleared_count' => $cleared,
-            'failed_ids'    => $failed,
-            'next_after'    => empty( $ids ) ? $after_id : max( $ids ),
-            'has_more'      => $has_more,
-        );
+        try {
+            return $this->clear_attachment_history( $attachment_id );
+        } finally {
+            $this->release_attachment_lock( $global_lock );
+            $this->release_attachment_lock( $lock );
+        }
     }
 
     /**
@@ -1719,73 +1683,37 @@ class Libre_Compress_Processor {
     }
 
     /**
-     * 分页删除所有附件的兼容格式回退
-     *
-     * @param int $after_id 上一批最后处理的附件 ID
-     * @return array processed、deleted_files、replaced、failed_ids、next_after、has_more
-     */
-    public function delete_fallbacks_page( int $after_id = 0 ): array {
-        $ids      = libre_compress()->database->get_fallback_attachment_ids_after( $after_id, self::FALLBACK_PAGE_SIZE + 1 );
-        $has_more = count( $ids ) > self::FALLBACK_PAGE_SIZE;
-
-        if ( $has_more ) {
-            array_pop( $ids );
-        }
-
-        $deleted_files = 0;
-        $replaced      = 0;
-        $processed     = 0;
-        $failed        = array();
-
-        foreach ( $ids as $attachment_id ) {
-            $result = $this->delete_fallback( $attachment_id );
-
-            $deleted_files += (int) $result['deleted_files'];
-            $replaced      += (int) $result['replaced'];
-
-            if ( (int) $result['deleted_files'] > 0 ) {
-                $processed++;
-            }
-
-            if ( ! empty( $result['failed'] ) ) {
-                $failed[] = $attachment_id;
-            }
-        }
-
-        return array(
-            'processed'     => $processed,
-            'deleted_files' => $deleted_files,
-            'replaced'      => $replaced,
-            'failed_ids'    => $failed,
-            'next_after'    => empty( $ids ) ? $after_id : (int) max( $ids ),
-            'has_more'      => $has_more,
-        );
-    }
-
-    /**
-     * 删除附件备份
+     * 删除附件的原图备份
      *
      * @param int $attachment_id 附件 ID
-     * @return bool
+     * @return array ok：是否全部删除成功；files：删除前记录在案的备份文件数
      */
-    public function delete_backup( int $attachment_id ): bool {
+    public function delete_attachment_backups( int $attachment_id ): array {
+        $result = array(
+            'ok'    => false,
+            'files' => 0,
+        );
+
         $lock = $this->acquire_attachment_lock( $attachment_id );
         if ( false === $lock ) {
-            return false;
+            return $result;
         }
 
         $global_lock = $this->acquire_global_lock( false );
         if ( false === $global_lock ) {
             $this->release_attachment_lock( $lock );
-            return false;
+            return $result;
         }
 
         try {
-            return libre_compress()->backup->delete_backup( $attachment_id );
+            $result['files'] = count( libre_compress()->database->get_backups_by_attachment( $attachment_id ) );
+            $result['ok']    = libre_compress()->backup->delete_backup( $attachment_id );
         } finally {
             $this->release_attachment_lock( $global_lock );
             $this->release_attachment_lock( $lock );
         }
+
+        return $result;
     }
 
     /**

@@ -175,7 +175,6 @@ class Libre_Compress_Settings {
         $sanitized['image_scale_enabled']      = ! empty( $input['image_scale_enabled'] );
         $sanitized['image_size_threshold']   = self::normalize_image_size_threshold( isset( $input['image_size_threshold'] ) ? $input['image_size_threshold'] : null );
         $sanitized['strip_metadata']        = ! empty( $input['strip_metadata'] );
-        $sanitized['tool_concurrency']   = isset( $input['tool_concurrency'] ) ? absint( $input['tool_concurrency'] ) : 5;
         // 缩略图尺寸：每个尺寸都有隐藏域 0 和复选框 1 两个同名输入，后提交的复选框生效，
         // 所以未勾选时也会带上 0；表单里没有这组字段时保留原状态。
         if ( array_key_exists( 'thumbnail_state', $input ) ) {
@@ -193,8 +192,6 @@ class Libre_Compress_Settings {
             $stored                                = isset( $current_general['disabled_thumbnail_sizes'] ) ? (array) $current_general['disabled_thumbnail_sizes'] : array();
             $sanitized['disabled_thumbnail_sizes'] = array_values( array_filter( array_map( 'sanitize_key', $stored ) ) );
         }
-
-        $sanitized['tool_concurrency'] = max( 1, min( 100, $sanitized['tool_concurrency'] ) );
 
         // 压缩输出设置：勾选的源格式输出为目标格式，未勾选格式执行同格式压缩。
         $sanitized['output_png'] = ! empty( $input['output_png'] );
@@ -310,12 +307,6 @@ class Libre_Compress_Settings {
                             <input type="checkbox" name="libre_compress_general[auto_compress]" value="1" <?php checked( ! empty( $options['auto_compress'] ) ); ?>>
                             <?php esc_html_e( '上传图片时自动压缩', 'libre-compress' ); ?>
                         </label>
-                    </td>
-                </tr>
-                <tr>
-                    <th scope="row"><?php esc_html_e( '压缩并发数', 'libre-compress' ); ?></th>
-                    <td>
-                        <input type="number" name="libre_compress_general[tool_concurrency]" value="<?php echo esc_attr( $options['tool_concurrency'] ?? 5 ); ?>" min="1" max="100" class="small-text">
                     </td>
                 </tr>
                 <tr>
@@ -527,11 +518,47 @@ class Libre_Compress_Settings {
                 </td>
             </tr>
         </table>
-        <div id="libre-compress-bulk-progress" style="display: none; margin-top: 10px;">
-            <div class="progress-bar" style="width: 100%; height: 20px; background: #f0f0f0; border-radius: 3px;">
-                <div class="progress-fill" style="width: 0%; height: 100%; background: #0073aa; border-radius: 3px; transition: width 0.3s;"></div>
+
+        <?php
+        // 批量操作由服务器自己在后台一批批地跑（见 Libre_Compress_Task），
+        // 这里的面板只负责把进度摆出来给用户看，初始状态由脚本数据带过去。
+        ?>
+        <style>
+            .libre-compress-task { margin-top: 12px; padding: 12px 14px; max-width: 900px; background: #fff; border: 1px solid #c3c4c7; border-left: 4px solid #2271b1; border-radius: 3px; }
+            .libre-compress-task.is-done { border-left-color: #00a32a; }
+            .libre-compress-task.is-stopped { border-left-color: #dba617; }
+            .libre-compress-task-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 8px; }
+            .libre-compress-task-head .task-label { font-size: 14px; }
+            .libre-compress-task-head .task-status { color: #646970; font-size: 12px; }
+            .libre-compress-task .task-bar { position: relative; height: 22px; background: #f0f0f1; border-radius: 3px; overflow: hidden; }
+            .libre-compress-task .task-bar-fill { width: 0; height: 100%; background: #2271b1; border-radius: 3px; transition: width .3s ease; }
+            .libre-compress-task.is-done .task-bar-fill { background: #00a32a; }
+            .libre-compress-task.is-stopped .task-bar-fill { background: #dba617; }
+            .libre-compress-task .task-bar-text { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 12px; color: #1d2327; }
+            .libre-compress-task .task-line { margin: 8px 0 0; color: #50575e; font-size: 13px; }
+            .libre-compress-task .task-current { word-break: break-all; }
+            .libre-compress-task .task-summary { margin: 10px 0 0; white-space: pre-line; font-size: 13px; color: #1d2327; }
+            .libre-compress-task .task-actions { margin: 10px 0 0; display: flex; flex-wrap: wrap; gap: 8px; }
+        </style>
+        <div id="libre-compress-task" class="libre-compress-task" style="display: none;">
+            <div class="libre-compress-task-head">
+                <strong class="task-label"></strong>
+                <span class="task-status"></span>
             </div>
-            <p class="progress-text" style="margin-top: 5px;"></p>
+            <div class="task-bar">
+                <div class="task-bar-fill"></div>
+                <span class="task-bar-text"></span>
+            </div>
+            <p class="task-line task-progress"></p>
+            <p class="task-line task-counts"></p>
+            <p class="task-line task-current"></p>
+            <p class="task-summary"></p>
+            <p class="task-actions">
+                <button type="button" class="button" id="libre-compress-task-stop"><?php esc_html_e( '停止任务', 'libre-compress' ); ?></button>
+                <button type="button" class="button" id="libre-compress-task-resume"><?php esc_html_e( '继续执行', 'libre-compress' ); ?></button>
+                <button type="button" class="button" id="libre-compress-task-retry"><?php esc_html_e( '重试失败的项目', 'libre-compress' ); ?></button>
+                <button type="button" class="button" id="libre-compress-task-refresh"><?php esc_html_e( '刷新页面', 'libre-compress' ); ?></button>
+            </p>
         </div>
         <?php
     }
