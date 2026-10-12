@@ -63,46 +63,33 @@ class Libre_Compress_Media_Library {
     public function output_media_library_styles() {
         ?>
         <style>
-            /* WordPress 后台表格是固定列宽模式，列宽只能写具体数值，写"按内容伸缩"会被浏览器忽略。
-               这里给压缩列一个通用宽度，真正的自适应交给列内的 libre-compress-grid 小表格：
-               它按各行实际文字量分配左右两栏，所以换语言后文字变长变短都不用改这里，
-               也不会像脚本量宽度那样每次刷新都跳一下。
-               360px 是按"文字一栏 + 按钮最多两行"估的，按钮再多也只会往下折，不会撑破表格 */
+            /* WordPress 后台表格是固定列宽模式，列宽只能写具体数值，写"按内容伸缩"浏览器直接忽略。
+               360px = 左栏 130 + 间距 8 + 右栏 200 + 单元格左右内边距 20 */
             .wp-list-table .column-libre_compress {
                 width: 360px;
             }
 
-            /* 列内两栏：小表格自己算列宽，左栏取各行里最宽的那段文字，
-               右栏 width:100% 吃掉剩下的空间，所以每行的文字左边缘、按钮左边缘都对得齐，
-               表头"压缩"两个字也和内容对得上 */
-            .wp-list-table .libre-compress-grid {
-                width: 100%;
-                border-collapse: collapse;
-                table-layout: auto;
+            /* 左右两栏宽度写死，每行的文字左边缘、按钮左边缘才对齐在一条竖线上，
+               表头"压缩"两个字也和内容对得上，两栏之间只留 8px。
+               文字长过 130px 会自动换行、按钮多过 200px 会自动往下折，
+               都只会多占一行，不会撑破表格，所以换语言也不会散架 */
+            .wp-list-table .column-libre_compress .libre-compress-status {
+                display: grid;
+                grid-template-columns: 130px 200px;
+                align-items: center;
+                gap: 0 8px;
             }
 
-            /* 清掉 WordPress 表格单元格自带的内边距和斑马纹底色，两栏之间只留 8px */
-            .wp-list-table .libre-compress-grid td {
-                border: 0;
-                padding: 0;
-                background: none;
-                vertical-align: middle;
+            .wp-list-table .column-libre_compress .libre-compress-info {
+                min-width: 0;
             }
 
-            .wp-list-table .libre-compress-info {
-                padding-right: 8px;
-                white-space: nowrap;
-            }
-
-            /* 右栏吃掉剩余空间，按钮从左边开始排，排不下就往下折 */
-            .wp-list-table .libre-compress-actions-cell {
-                width: 100%;
-            }
-
+            /* 按钮从栏内左边开始排，排不下就往下折 */
             .libre-compress-actions {
                 display: flex;
                 flex-wrap: wrap;
                 gap: 4px;
+                justify-content: flex-start;
             }
 
             .libre-compress-storage {
@@ -237,15 +224,11 @@ class Libre_Compress_Media_Library {
     private function render_uncompressed_status( int $attachment_id ) {
         ?>
         <div class="libre-compress-status" data-attachment-id="<?php echo esc_attr( $attachment_id ); ?>">
-            <table class="libre-compress-grid">
-                <tr>
-                    <td class="libre-compress-info">
-                        <span class="status-text"><?php esc_html_e( '未压缩', 'libre-compress' ); ?></span>
-                        <?php $this->render_storage_summary( $attachment_id ); ?>
-                    </td>
-                    <?php $this->render_action_buttons( $attachment_id, 'compress', __( '压缩', 'libre-compress' ), false, false, false ); ?>
-                </tr>
-            </table>
+            <div class="libre-compress-info">
+                <span class="status-text"><?php esc_html_e( '未压缩', 'libre-compress' ); ?></span>
+                <?php $this->render_storage_summary( $attachment_id ); ?>
+            </div>
+            <?php $this->render_action_buttons( $attachment_id, 'compress', __( '压缩', 'libre-compress' ), false, false, false ); ?>
         </div>
         <?php
     }
@@ -258,15 +241,11 @@ class Libre_Compress_Media_Library {
     private function render_failed_status( int $attachment_id ) {
         ?>
         <div class="libre-compress-status" data-attachment-id="<?php echo esc_attr( $attachment_id ); ?>">
-            <table class="libre-compress-grid">
-                <tr>
-                    <td class="libre-compress-info">
-                        <span class="status-text" style="color: #d63638;"><?php esc_html_e( '压缩失败', 'libre-compress' ); ?></span>
-                        <?php $this->render_storage_summary( $attachment_id ); ?>
-                    </td>
-                    <?php $this->render_action_buttons( $attachment_id, 'compress', __( '重试', 'libre-compress' ), false, false, false ); ?>
-                </tr>
-            </table>
+            <div class="libre-compress-info">
+                <span class="status-text" style="color: #d63638;"><?php esc_html_e( '压缩失败', 'libre-compress' ); ?></span>
+                <?php $this->render_storage_summary( $attachment_id ); ?>
+            </div>
+            <?php $this->render_action_buttons( $attachment_id, 'compress', __( '重试', 'libre-compress' ), false, false, false ); ?>
         </div>
         <?php
     }
@@ -283,24 +262,20 @@ class Libre_Compress_Media_Library {
     private function render_partial_status( int $attachment_id, array $state, bool $has_backup, bool $can_restore, bool $has_fallback ) {
         ?>
         <div class="libre-compress-status" data-attachment-id="<?php echo esc_attr( $attachment_id ); ?>">
-            <table class="libre-compress-grid">
-                <tr>
-                    <td class="libre-compress-info">
-                        <span class="status-text" style="color: #dba617;">
-                            <?php
-                            printf(
-                                /* translators: 1: 已成功文件数，2: 总文件数 */
-                                esc_html__( '部分已压缩 %1$d/%2$d', 'libre-compress' ),
-                                (int) $state['success_count'],
-                                (int) $state['total_files']
-                            );
-                            ?>
-                        </span>
-                        <?php $this->render_storage_summary( $attachment_id ); ?>
-                    </td>
-                    <?php $this->render_action_buttons( $attachment_id, 'compress', __( '继续压缩', 'libre-compress' ), $can_restore, $has_backup, $has_fallback ); ?>
-                </tr>
-            </table>
+            <div class="libre-compress-info">
+                <span class="status-text" style="color: #dba617;">
+                    <?php
+                    printf(
+                        /* translators: 1: 已成功文件数，2: 总文件数 */
+                        esc_html__( '部分已压缩 %1$d/%2$d', 'libre-compress' ),
+                        (int) $state['success_count'],
+                        (int) $state['total_files']
+                    );
+                    ?>
+                </span>
+                <?php $this->render_storage_summary( $attachment_id ); ?>
+            </div>
+            <?php $this->render_action_buttons( $attachment_id, 'compress', __( '继续压缩', 'libre-compress' ), $can_restore, $has_backup, $has_fallback ); ?>
         </div>
         <?php
     }
@@ -317,23 +292,19 @@ class Libre_Compress_Media_Library {
     private function render_compressed_status( int $attachment_id, array $stats, bool $has_backup, bool $can_restore, bool $has_fallback ) {
         ?>
         <div class="libre-compress-status" data-attachment-id="<?php echo esc_attr( $attachment_id ); ?>">
-            <table class="libre-compress-grid">
-                <tr>
-                    <td class="libre-compress-info">
-                        <span class="status-text" style="color: #00a32a;">
-                            <?php
-                            printf(
-                                /* translators: %s: 压缩比例 */
-                                esc_html__( '已压缩%s%%', 'libre-compress' ),
-                                esc_html( $stats['total_ratio'] )
-                            );
-                            ?>
-                        </span>
-                        <?php $this->render_storage_summary( $attachment_id ); ?>
-                    </td>
-                    <?php $this->render_action_buttons( $attachment_id, '', '', $can_restore, $has_backup, $has_fallback ); ?>
-                </tr>
-            </table>
+            <div class="libre-compress-info">
+                <span class="status-text" style="color: #00a32a;">
+                    <?php
+                    printf(
+                        /* translators: %s: 压缩比例 */
+                        esc_html__( '已压缩%s%%', 'libre-compress' ),
+                        esc_html( $stats['total_ratio'] )
+                    );
+                    ?>
+                </span>
+                <?php $this->render_storage_summary( $attachment_id ); ?>
+            </div>
+            <?php $this->render_action_buttons( $attachment_id, '', '', $can_restore, $has_backup, $has_fallback ); ?>
         </div>
         <?php
     }
@@ -350,30 +321,28 @@ class Libre_Compress_Media_Library {
      */
     private function render_action_buttons( int $attachment_id, string $primary_action, string $primary_label, bool $can_restore, bool $has_backup, bool $has_fallback ) {
         ?>
-        <td class="libre-compress-actions-cell">
-            <div class="libre-compress-actions">
-                <?php if ( '' !== $primary_action ) : ?>
-                    <button type="button" class="button button-small libre-compress-btn" data-action="<?php echo esc_attr( $primary_action ); ?>" data-attachment-id="<?php echo esc_attr( $attachment_id ); ?>">
-                        <?php echo esc_html( $primary_label ); ?>
-                    </button>
-                <?php endif; ?>
-                <?php if ( $can_restore ) : ?>
-                    <button type="button" class="button button-small libre-compress-btn" data-action="restore" data-attachment-id="<?php echo esc_attr( $attachment_id ); ?>">
-                        <?php esc_html_e( '恢复原图', 'libre-compress' ); ?>
-                    </button>
-                <?php endif; ?>
-                <?php if ( $has_backup ) : ?>
-                    <button type="button" class="button button-small libre-compress-btn" data-action="delete-backup" data-attachment-id="<?php echo esc_attr( $attachment_id ); ?>">
-                        <?php esc_html_e( '删除备份', 'libre-compress' ); ?>
-                    </button>
-                <?php endif; ?>
-                <?php if ( $has_fallback ) : ?>
-                    <button type="button" class="button button-small libre-compress-btn" data-action="delete-fallback" data-attachment-id="<?php echo esc_attr( $attachment_id ); ?>">
-                        <?php esc_html_e( '删除兼容格式回退', 'libre-compress' ); ?>
-                    </button>
-                <?php endif; ?>
-            </div>
-        </td>
+        <div class="libre-compress-actions">
+            <?php if ( '' !== $primary_action ) : ?>
+                <button type="button" class="button button-small libre-compress-btn" data-action="<?php echo esc_attr( $primary_action ); ?>" data-attachment-id="<?php echo esc_attr( $attachment_id ); ?>">
+                    <?php echo esc_html( $primary_label ); ?>
+                </button>
+            <?php endif; ?>
+            <?php if ( $can_restore ) : ?>
+                <button type="button" class="button button-small libre-compress-btn" data-action="restore" data-attachment-id="<?php echo esc_attr( $attachment_id ); ?>">
+                    <?php esc_html_e( '恢复原图', 'libre-compress' ); ?>
+                </button>
+            <?php endif; ?>
+            <?php if ( $has_backup ) : ?>
+                <button type="button" class="button button-small libre-compress-btn" data-action="delete-backup" data-attachment-id="<?php echo esc_attr( $attachment_id ); ?>">
+                    <?php esc_html_e( '删除备份', 'libre-compress' ); ?>
+                </button>
+            <?php endif; ?>
+            <?php if ( $has_fallback ) : ?>
+                <button type="button" class="button button-small libre-compress-btn" data-action="delete-fallback" data-attachment-id="<?php echo esc_attr( $attachment_id ); ?>">
+                    <?php esc_html_e( '删除兼容格式回退', 'libre-compress' ); ?>
+                </button>
+            <?php endif; ?>
+        </div>
         <?php
     }
 
