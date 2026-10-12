@@ -64,21 +64,21 @@ class Libre_Compress_Media_Library {
         ?>
         <style>
             /* WordPress 后台表格是固定列宽模式，列宽只能写具体数值，写"按内容伸缩"浏览器直接忽略。
-               354px = 左栏 130 + 间距 8 + 右栏 196 + 单元格左右内边距 20。
-               右栏 196 是四个按钮分两行时较宽那一行的宽度（删除备份 + 删除兼容格式回退），
-               所以最挤的情况下按钮也刚好顶到右边缘，不留空白 */
+               注意表格单元格的 width 不含左右内边距（各 10px），所以这里写的正好是两栏的宽度和：
+               左栏 130 + 间距 4 + 右栏 191 = 325。右栏 191 是四个按钮分两行时较宽那一行的宽度
+               （删除备份 + 删除兼容格式回退），最挤的情况下按钮刚好顶到右边缘，不留空白 */
             .wp-list-table .column-libre_compress {
-                width: 354px;
+                width: 325px;
             }
 
             /* 左右两栏宽度写死，每行的文字左边缘、按钮左边缘才对齐在一条竖线上，
-               表头"压缩"两个字也和内容对得上，两栏之间只留 8px。
-               文字长过 130px 会自动换行，都只会多占一行，不会撑破表格，所以换语言也不会散架 */
+               表头"压缩"两个字也和内容对得上，两栏之间只留 4px。
+               文字长过 130px 会自动换行，只会多占一行，不会撑破表格，所以换语言也不会散架 */
             .wp-list-table .column-libre_compress .libre-compress-status {
                 display: grid;
-                grid-template-columns: 130px 196px;
+                grid-template-columns: 130px 191px;
                 align-items: center;
-                gap: 0 8px;
+                gap: 0 4px;
             }
 
             .wp-list-table .column-libre_compress .libre-compress-info {
