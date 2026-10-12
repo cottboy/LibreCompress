@@ -269,23 +269,25 @@ class Libre_Compress_Thumbnail_Manager {
                 );
             }
 
-            $targets = array();
+            // 要删的尺寸一律删到底，替代尺寸只决定文章链接改到哪里。
+            // 两者捆在一个判断里会让“一个尺寸都没勾选”时没有任何相近尺寸可选，
+            // 结果一个文件都删不掉。
+            $deletions = array();
+            $targets   = array();
 
             foreach ( $victims as $size_name => $size_data ) {
+                $deletions[ $size_name ] = $size_data['file'];
+
                 $replacement = $this->nearest_replacement( $size_data, $kept );
 
-                if ( null === $replacement ) {
-                    continue;
+                // 没有面积相近的尺寸就拿原图顶上：页面重一点，也好过文章里的图打不开
+                if ( null === $replacement && isset( $kept['full'] ) ) {
+                    $replacement = $kept['full'];
                 }
 
-                $targets[ $size_name ] = $replacement['file'];
-            }
-
-            if ( empty( $targets ) ) {
-                return array(
-                    'deleted'  => $deleted_base,
-                    'replaced' => $replaced_base,
-                );
+                if ( null !== $replacement ) {
+                    $targets[ $size_name ] = $replacement['file'];
+                }
             }
 
             // 兼容格式不写进附件元数据，必须按转换映射找到同尺寸的旧文件。
@@ -324,7 +326,7 @@ class Libre_Compress_Thumbnail_Manager {
                 );
             }
 
-            foreach ( array_keys( $targets ) as $size_name ) {
+            foreach ( array_keys( $deletions ) as $size_name ) {
                 unset( $metadata['sizes'][ $size_name ] );
             }
 
@@ -334,9 +336,7 @@ class Libre_Compress_Thumbnail_Manager {
 
             $deleted = 0;
 
-            foreach ( $targets as $size_name => $target_path ) {
-                $path = $victims[ $size_name ]['file'];
-
+            foreach ( $deletions as $size_name => $path ) {
                 if ( ! $this->is_safe_upload_path( $path ) ) {
                     continue;
                 }
@@ -400,8 +400,9 @@ class Libre_Compress_Thumbnail_Manager {
     /**
      * 替代尺寸允许的最大像素面积倍数
      *
-     * 删缩略图是为了省空间，把正文链接改写成完整原图会让页面体积反而暴涨，
-     * 因此面积差超过这个倍数时放弃替换，宁可让浏览器加载不到该尺寸。
+     * 面积差得太远就不算“相近”：删缩略图是为了省空间，把正文链接改写成大得多的图
+     * 会让页面体积明显变重，所以超过这个倍数的候选不采用。
+     * 删除按钮挑不到相近尺寸时改用原图兜底，不在本类里再拦一道。
      */
     const REPLACEMENT_AREA_RATIO = 4;
 
