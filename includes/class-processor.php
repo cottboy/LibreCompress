@@ -190,12 +190,16 @@ class Libre_Compress_Processor {
 
             if ( $complete ) {
                 $state['success_count']++;
-                // 绿色压缩比例保持原来的口径，只统计附件元数据里的文件，
-                // 兼容格式只参与完成状态，不改变这项比例的计算方式。
-                if ( empty( $file['is_fallback'] ) ) {
-                    $state['total_original_size'] += max( 0, (int) $record['original_size'] );
-                    $state['total_compressed_size'] += max( 0, (int) $record['compressed_size'] );
+                // 与媒体详情页同一口径：附件包含的所有文件都参与比例，旧兼容格式回退文件也一起算，
+                // 节省合计 ÷ 压缩前合计。原图备份不是被压缩的对象，不进这项统计。
+                $original_size = max( 0, (int) $record['original_size'] );
+
+                if ( 0 === $original_size ) {
+                    $original_size = (int) filesize( $file['file_path'] );
                 }
+
+                $state['total_original_size']   += $original_size;
+                $state['total_compressed_size'] += min( $original_size, max( 0, (int) $record['compressed_size'] ) );
             } elseif ( $record && 'failed' === $record['status'] ) {
                 $state['failed_count']++;
             } elseif ( $record && 'skipped' === $record['status'] ) {
@@ -645,9 +649,15 @@ class Libre_Compress_Processor {
             return true;
         }
 
-        $original_path = $this->determine_original_image_path( $metadata );
+        $original_path = $this->determine_original_image_path( $attachment_id, $metadata );
 
         if ( '' === $original_path || ! is_file( $original_path ) ) {
+            return true;
+        }
+
+        // 主文件已经是格式转换产物时不再备份：它的原图在第一轮压缩时就存过了，
+        // 把 photo.jpg.webp 这类结果存进备份目录，只会多出一个被误当原图的压缩文件。
+        if ( libre_compress()->output_processor->is_conversion_output( $attachment_id, $original_path ) ) {
             return true;
         }
 
@@ -658,21 +668,20 @@ class Libre_Compress_Processor {
      * 确定附件的主图像路径
      *
      * 有 original_image 时主文件是缩放产物，未缩放源才是真正的主图像；否则主文件即原图。
+     * SVG 这类附件 WordPress 不写 file 元数据，改用附件登记路径取主图像。
      *
-     * @param mixed $metadata 附件元数据
+     * @param int   $attachment_id 附件 ID
+     * @param mixed $metadata      附件元数据
      * @return string 主图像绝对路径，找不到时返回空字符串
      */
-    private function determine_original_image_path( $metadata ): string {
-        if ( ! is_array( $metadata ) || empty( $metadata['file'] ) ) {
-            return '';
-        }
-
+    private function determine_original_image_path( int $attachment_id, $metadata ): string {
         $upload_dir = wp_upload_dir();
         $base_dir   = untrailingslashit( wp_normalize_path( $upload_dir['basedir'] ) );
-        $main_rel   = ltrim( wp_normalize_path( (string) $metadata['file'] ), '/' );
-        $main_path  = $base_dir . '/' . $main_rel;
+        $main_rel   = is_array( $metadata ) && ! empty( $metadata['file'] )
+            ? ltrim( wp_normalize_path( (string) $metadata['file'] ), '/' )
+            : '';
 
-        if ( ! empty( $metadata['original_image'] ) ) {
+        if ( '' !== $main_rel && ! empty( $metadata['original_image'] ) ) {
             $dir_rel  = dirname( $main_rel );
             $orig_rel = ( '.' === $dir_rel ? '' : $dir_rel . '/' ) . wp_basename( (string) $metadata['original_image'] );
             $orig_abs = $base_dir . '/' . ltrim( wp_normalize_path( $orig_rel ), '/' );
@@ -682,7 +691,22 @@ class Libre_Compress_Processor {
             }
         }
 
-        return is_file( $main_path ) ? $main_path : '';
+        if ( '' !== $main_rel ) {
+            $main_path = $base_dir . '/' . $main_rel;
+
+            return is_file( $main_path ) ? $main_path : '';
+        }
+
+        // get_attached_file() 已把 uploads 相对路径补成绝对路径。
+        $attached = get_attached_file( $attachment_id );
+
+        if ( ! is_string( $attached ) || '' === $attached ) {
+            return '';
+        }
+
+        $attached_path = wp_normalize_path( $attached );
+
+        return is_file( $attached_path ) ? $attached_path : '';
     }
 
     /**

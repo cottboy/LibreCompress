@@ -878,6 +878,31 @@ class Libre_Compress_Output {
     }
 
     /**
+     * 该文件是否是本附件的格式转换产物
+     *
+     * 只认转换映射，不靠文件名的双扩展名猜测：映射才是插件确实转换过这个文件的凭据。
+     *
+     * @param int    $attachment_id 附件 ID
+     * @param string $file_path     文件绝对路径
+     * @return bool
+     */
+    public function is_conversion_output( int $attachment_id, string $file_path ): bool {
+        if ( '' === $file_path ) {
+            return false;
+        }
+
+        $candidate = $this->normalized_path( $file_path );
+
+        foreach ( $this->get_output_entries( $attachment_id ) as $entry ) {
+            if ( $this->normalized_path( $entry['to'] ) === $candidate ) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
      * 读取校验后的映射原始数据
      *
      * 映射是持久化数据，取出时按不可信处理：只接受 uploads 内的相对路径。

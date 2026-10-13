@@ -398,10 +398,12 @@ class Libre_Compress_Database {
 
         $attachment_id = absint( $attachment_id );
 
+        // 按建立顺序返回：恢复流程取第一条当原图，旧版本可能为同一附件留下多条，
+        // 最早那条才是未压缩原图，不能交给不确定的返回顺序决定。
         // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
         return $wpdb->get_results(
             $wpdb->prepare(
-                "SELECT * FROM {$this->backups_table} WHERE attachment_id = %d",
+                "SELECT * FROM {$this->backups_table} WHERE attachment_id = %d ORDER BY id ASC",
                 $attachment_id
             ),
             ARRAY_A
