@@ -158,7 +158,7 @@ class Libre_Compress_Task {
     public function get_state(): array {
         $task = $this->get_task();
 
-        if ( ! $task || ! isset( $this->types[ $task['type'] ] ) || ! empty( $task['dismissed'] ) ) {
+        if ( ! $task || ! isset( $this->types[ $task['type'] ] ) ) {
             return array( 'has_task' => false );
         }
 
@@ -308,14 +308,10 @@ class Libre_Compress_Task {
     }
 
     /**
-     * 关掉结果面板：只标记不再显示，任务数据保留
+     * 关掉结果面板：直接把任务工单删掉，没了工单就不再显示
      */
     public function dismiss(): void {
-        $this->mutate(
-            function ( array &$task ) {
-                $task['dismissed'] = 1;
-            }
-        );
+        delete_option( self::OPTION_NAME );
     }
 
     /**
@@ -366,7 +362,6 @@ class Libre_Compress_Task {
             'runner'       => '',
             'runner_until' => 0.0,
             'watchdog'     => 0,
-            'dismissed'    => 0,
             'started_at'   => time(),
             'updated_at'   => time(),
             'finished_at'  => 0,
