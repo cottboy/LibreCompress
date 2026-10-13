@@ -197,7 +197,6 @@ class Libre_Compress_Settings {
         $sanitized['output_png'] = ! empty( $input['output_png'] );
         $sanitized['output_jpg'] = ! empty( $input['output_jpg'] );
         $sanitized['output_gif'] = ! empty( $input['output_gif'] );
-        $sanitized['output_svg'] = ! empty( $input['output_svg'] );
         $sanitized['output_format'] = ( isset( $input['output_format'] ) && in_array( $input['output_format'], array( 'webp', 'avif' ), true ) ) ? $input['output_format'] : 'webp';
 
         // 兼容格式回退开关
@@ -362,11 +361,6 @@ class Libre_Compress_Settings {
                         <label>
                             <input type="checkbox" name="libre_compress_general[output_gif]" value="1" <?php checked( ! empty( $options['output_gif'] ) ); ?>>
                             <?php esc_html_e( 'GIF', 'libre-compress' ); ?>
-                        </label>
-                        &nbsp;&nbsp;
-                        <label>
-                            <input type="checkbox" name="libre_compress_general[output_svg]" value="1" <?php checked( ! empty( $options['output_svg'] ) ); ?>>
-                            <?php esc_html_e( 'SVG', 'libre-compress' ); ?>
                         </label>
                         <p class="description"><?php esc_html_e( '勾选的源格式执行压缩时输出为目标格式；未勾选的格式只执行同格式压缩。所有成功结果都记为已压缩。', 'libre-compress' ); ?></p>
                     </td>
@@ -588,7 +582,6 @@ class Libre_Compress_Settings {
             array( 'name' => 'avifenc', 'tool' => null, 'path' => $output_processor->find_local_tool( 'avifenc' ), 'url' => 'https://github.com/AOMediaCodec/libavif' ),
             array( 'name' => 'avifdec', 'tool' => null, 'path' => $output_processor->find_local_tool( 'avifdec' ), 'url' => 'https://github.com/AOMediaCodec/libavif' ),
             array( 'name' => 'svgo', 'tool' => $tools['svgo'] ),
-            array( 'name' => 'resvg', 'tool' => null, 'path' => $output_processor->find_local_tool( 'resvg' ), 'url' => 'https://github.com/linebender/resvg' ),
         );
 
         // 统一为渲染字段：available(bool)、path、url
@@ -903,7 +896,6 @@ class Libre_Compress_Settings {
         $available['avifdec'] = false !== $output_processor->find_local_tool( 'avifdec' );
         $available['gif2webp'] = false !== $output_processor->find_local_tool( 'gif2webp' );
         $available['ffmpeg']   = false !== $output_processor->find_local_tool( 'ffmpeg' );
-        $available['resvg']    = false !== $output_processor->find_local_tool( 'resvg' );
         $available['gd']       = function_exists( 'imagecreatefromgif' ) && function_exists( 'imagepng' );
 
         $dep_labels = array(
@@ -917,7 +909,6 @@ class Libre_Compress_Settings {
             'svgo'      => 'svgo',
             'gif2webp'  => 'gif2webp',
             'ffmpeg'    => 'ffmpeg',
-            'resvg'     => 'resvg',
             'gd'        => __( 'GD 扩展', 'libre-compress' ),
         );
 
@@ -934,8 +925,6 @@ class Libre_Compress_Settings {
             array( 'label' => __( '静态 GIF 压缩为 AVIF', 'libre-compress' ),          'groups' => array( array( 'gd', 'avifenc' ) ) ),
             array( 'label' => __( '动画 GIF 压缩为 WebP', 'libre-compress' ),          'groups' => array( array( 'gif2webp' ) ) ),
             array( 'label' => __( '动画 GIF 压缩为 AVIF', 'libre-compress' ),          'groups' => array( array( 'ffmpeg', 'avifenc' ) ) ),
-            array( 'label' => __( 'SVG 压缩为 WebP', 'libre-compress' ),              'groups' => array( array( 'resvg', 'cwebp' ) ) ),
-            array( 'label' => __( 'SVG 压缩为 AVIF', 'libre-compress' ),              'groups' => array( array( 'resvg', 'avifenc' ) ) ),
         );
 
         $rows = array();

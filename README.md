@@ -9,7 +9,7 @@
 一次压缩会根据当前设置，为每个文件选择以下一种处理方式：
 
 1. **同格式压缩**：JPEG → JPEG、PNG → PNG、WebP → WebP 等。
-2. **格式转换**：把勾选的 PNG、JPG、GIF、SVG 压缩为 WebP 或 AVIF。
+2. **格式转换**：把勾选的 PNG、JPG、GIF 压缩为 WebP 或 AVIF。
 
 以下入口全部共用同一套处理流程和压缩记录：
 
@@ -25,7 +25,7 @@
 ## 功能特性
 
 - **六种格式压缩**：JPEG、PNG、WebP、AVIF、GIF、SVG。
-- **可配置目标格式**：PNG / JPG / GIF / SVG 可按设置压缩为 WebP 或 AVIF；直接上传的 WebP / AVIF 始终执行同格式压缩。
+- **可配置目标格式**：PNG / JPG / GIF 可按设置压缩为 WebP 或 AVIF；直接上传的 WebP / AVIF 始终执行同格式压缩。
 - **统一批量入口**：设置页的批量按钮都把任务交给服务器自己跑，按附件 ID 游标逐个处理，不存在固定数量上限。
 - **后台批量任务**：任务状态存在选项里，服务器一批接一批地执行（每批限量时长，永远跑不到网关超时线），浏览器只负责显示进度，关掉页面任务照样继续；页面上的进度条是真进度，随时可停止、可只重试失败项。
 - **统一状态**：媒体库、批量操作和上传自动处理使用相同的文件级成功记录。
@@ -74,13 +74,12 @@
 | pngquant | PNG 有损压缩 |
 | oxipng | PNG 无损压缩 |
 | gifsicle | GIF 同格式压缩 |
-| cwebp | WebP 同格式压缩，以及 PNG/JPG/GIF/SVG 输出为 WebP |
+| cwebp | WebP 同格式压缩，以及 PNG/JPG/GIF 输出为 WebP |
 | gif2webp | 动画 GIF 输出为 WebP |
 | avifenc | AVIF 压缩编码器 |
 | avifdec | AVIF 同格式压缩所需解码器 |
 | ffmpeg | 动画 GIF 输出为 AVIF |
 | svgo | SVG 同格式压缩 |
-| resvg | SVG 输出为 WebP/AVIF 前的栅格化处理 |
 
 ### 同格式压缩依赖
 
@@ -103,7 +102,6 @@ PNG 严格按当前有损/无损设置选择工具，不会静默切换压缩模
 | PNG / JPG | cwebp | avifenc |
 | 静态 GIF | GD + cwebp | GD + avifenc |
 | 动画 GIF | gif2webp | ffmpeg + avifenc |
-| SVG | resvg + cwebp | resvg + avifenc |
 
 同格式 AVIF 压缩只支持可确认的单帧文件；动画或多帧 AVIF 会安全跳过，避免静默丢帧。
 
@@ -170,7 +168,7 @@ SVGO 另提供默认开启的“多轮优化”开关：开启时更慢、通常
 
 智能备份只保存主图像（未缩放原图优先）这一份压缩前的逐字节副本，不再逐张备份缩略图，以此节省磁盘；备份只服务于“恢复原图”，恢复时会按当前设置重新生成缩略图，正文链接仍指向原来的尺寸（原来用缩略图还是缩略图，原来用原图还是原图）。目录已禁止直接访问，前台回退用的是媒体库里同样压缩过的旧格式文件，两者都不依赖备份目录对外提供图片。已经压缩过的图片改设置后不会自动重做，需要先清除对应的压缩记录。
 
-兼容格式回退文件与压缩后的图片走同一套元数据处理：JPEG 回退由 jpegoptim 清理，PNG 回退由 oxipng/pngquant 清理，SVG 回退由 svgo 清理，WebP 回退由 cwebp 重新编码。
+兼容格式回退文件与压缩后的图片走同一套元数据处理：JPEG 回退由 jpegoptim 清理，PNG 回退由 oxipng/pngquant 清理，WebP 回退由 cwebp 重新编码。
 
 ### 批量操作
 

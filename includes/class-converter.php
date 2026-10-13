@@ -13,7 +13,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 /**
  * 目标格式输出处理器
  *
- * 将勾选格式的图片（PNG/JPG/GIF/SVG）压缩输出为 WebP 或 AVIF，是统一压缩入口
+ * 将勾选格式的图片（PNG/JPG/GIF）压缩输出为 WebP 或 AVIF，是统一压缩入口
  * 的一部分：结果小于源文件时生成真实的新文件并接管附件引用，同步附件路径、元数据、
  * MIME 和文章内已固化的图片链接。
  *
@@ -74,7 +74,7 @@ class Libre_Compress_Output {
      *
      * @var array
      */
-    private $source_formats = array( 'png', 'jpg', 'gif', 'svg' );
+    private $source_formats = array( 'png', 'jpg', 'gif' );
 
     /**
      * 源格式对应的 MIME 类型
@@ -85,7 +85,6 @@ class Libre_Compress_Output {
         'png' => 'image/png',
         'jpg' => 'image/jpeg',
         'gif' => 'image/gif',
-        'svg' => 'image/svg+xml',
     );
 
     /**
@@ -289,23 +288,6 @@ class Libre_Compress_Output {
                 }
                 $command = $this->build_encode_command( $temp_source, $temp_output, $target );
             }
-        } elseif ( 'svg' === $format ) {
-            // SVG 需先栅格化为 PNG 中间文件
-            $temp_source = $file_path . '.lc-source-' . $temp_token . '.png';
-            if ( false === $this->get_resvg_path() ) {
-                $result_template['status']  = 'skipped';
-                $result_template['message'] = __( 'SVG 压缩需要 resvg 工具', 'libre-compress' );
-                return $result_template;
-            }
-            if ( ! $this->rasterize_svg_to_png( $file_path, $temp_source ) ) {
-                if ( file_exists( $temp_source ) ) {
-                    // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
-                    unlink( $temp_source );
-                }
-                $result_template['message'] = __( 'SVG 压缩预处理失败', 'libre-compress' );
-                return $result_template;
-            }
-            $command = $this->build_encode_command( $temp_source, $temp_output, $target );
         } else {
             // PNG/JPG 由编码工具直接支持
             $command = $this->build_encode_command( $file_path, $temp_output, $target );
@@ -670,7 +652,7 @@ class Libre_Compress_Output {
         }
 
         if ( ! is_array( $metadata ) || empty( $metadata['file'] ) ) {
-            // 允许没有完整元数据的图片（SVG、第三方上传）：按目标图片的真实信息建立，读不到就不伪造。
+            // 允许没有完整元数据的图片（第三方上传）：按目标图片的真实信息建立，读不到就不伪造。
             $first   = null !== $full ? $full : reset( $entries );
             $source  = is_array( $first ) ? $first['to'] : '';
             $created = $this->build_attachment_metadata( $source );
@@ -2079,26 +2061,6 @@ class Libre_Compress_Output {
     }
 
     /**
-     * 用 resvg 将 SVG 栅格化为 PNG
-     *
-     * @param string $svg_path SVG 源路径
-     * @param string $png_path PNG 输出路径
-     * @return bool 是否成功
-     */
-    private function rasterize_svg_to_png( string $svg_path, string $png_path ): bool {
-        $binary = $this->get_resvg_path();
-
-        if ( false === $binary ) {
-            return false;
-        }
-
-        $exec_result = Libre_Compress_Tool_Base::run_command( array( $binary, $svg_path, $png_path ) );
-        clearstatcache( true, $png_path );
-
-        return $exec_result['success'] && file_exists( $png_path ) && filesize( $png_path ) > 0;
-    }
-
-    /**
      * 构建动画 GIF 的目标格式压缩命令
      *
      * WebP 使用 gif2webp（libwebp 套件）直接压缩；
@@ -2180,7 +2142,7 @@ class Libre_Compress_Output {
     }
 
     /**
-     * 查找本地辅助工具（resvg、gif2webp、ffmpeg 等）
+     * 查找本地辅助工具（gif2webp、ffmpeg 等）
      *
      * 优先 wp-content/LibreCompress-bin 目录，其次系统 PATH。
      * 设置页复用此方法展示辅助工具的安装状态与路径。
@@ -2231,17 +2193,6 @@ class Libre_Compress_Output {
 
         $cache[ $name ] = false;
         return false;
-    }
-
-    /**
-     * 查找 resvg 可执行文件
-     *
-     * 优先 wp-content/LibreCompress-bin 目录，其次系统 PATH
-     *
-     * @return string|false 路径或 false
-     */
-    private function get_resvg_path() {
-        return $this->find_local_tool( 'resvg' );
     }
 
     /**
