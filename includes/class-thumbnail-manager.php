@@ -708,7 +708,7 @@ class Libre_Compress_Thumbnail_Manager {
     private function is_double_extension_target( string $path ): bool {
         $extension = strtolower( pathinfo( $path, PATHINFO_EXTENSION ) );
 
-        if ( ! in_array( $extension, array( 'webp', 'avif' ), true ) ) {
+        if ( ! in_array( $extension, array( 'webp', 'avif', 'jxl' ), true ) ) {
             return false;
         }
 

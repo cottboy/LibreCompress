@@ -224,6 +224,13 @@ class Libre_Compress_Avif extends Libre_Compress_Tool_Base {
         } else {
             $encode[] = '-q';
             $encode[] = (string) $quality;
+
+            // 4:2:0 色度抽样：体积更小的主因，--sharpyuv 用来减轻彩边的锯齿
+            if ( Libre_Compress_Animation::prefer_420() ) {
+                $encode[] = '-y';
+                $encode[] = '420';
+                $encode[] = '--sharpyuv';
+            }
         }
 
         $encode[] = $temp_png;

@@ -3,7 +3,7 @@
  * Plugin Name: LibreCompress
  * Plugin URI: https://github.com/cottboy/libre-compress
  * Description: 免费的 WordPress 图片压缩插件。
- * Version: 1.3.4
+ * Version: 1.4.0
  * Author: cottboy
  * Author URI: https://github.com/cottboy
  * License: GPL v2 or later
@@ -24,7 +24,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 /**
  * 插件版本号
  */
-define( 'LIBRE_COMPRESS_VERSION', '1.3.4' );
+define( 'LIBRE_COMPRESS_VERSION', '1.4.0' );
 
 /**
  * 插件文件路径
@@ -70,20 +70,26 @@ function libre_compress_load_textdomain() {
 add_action( 'plugins_loaded', 'libre_compress_load_textdomain' );
 
 /**
- * 允许上传 AVIF 图片
+ * 允许上传 AVIF 与 JPEG XL 图片
  *
- * WordPress 6.5 起原生支持 AVIF，此过滤器保证旧版本也能上传
+ * WordPress 6.5 起原生支持 AVIF，此过滤器保证旧版本也能上传；
+ * JPEG XL 至今不在 WordPress 的允许列表里，一律由插件补上。
  *
  * @param array $mimes 允许的 MIME 类型
  * @return array 修改后的 MIME 类型
  */
-function libre_compress_allow_avif_upload( $mimes ) {
+function libre_compress_allow_extended_uploads( $mimes ) {
     if ( ! isset( $mimes['avif'] ) ) {
         $mimes['avif'] = 'image/avif';
     }
+
+    if ( ! isset( $mimes['jxl'] ) ) {
+        $mimes['jxl'] = 'image/jxl';
+    }
+
     return $mimes;
 }
-add_filter( 'upload_mimes', 'libre_compress_allow_avif_upload' );
+add_filter( 'upload_mimes', 'libre_compress_allow_extended_uploads' );
 
 /**
  * 检查设置中是否允许上传 SVG
@@ -267,6 +273,7 @@ function libre_compress_load_dependencies() {
     require_once LIBRE_COMPRESS_PATH . 'compression/class-oxipng.php';
     require_once LIBRE_COMPRESS_PATH . 'compression/class-cwebp.php';
     require_once LIBRE_COMPRESS_PATH . 'compression/class-avif.php';
+    require_once LIBRE_COMPRESS_PATH . 'compression/class-cjxl.php';
     require_once LIBRE_COMPRESS_PATH . 'compression/class-gifsicle.php';
     require_once LIBRE_COMPRESS_PATH . 'compression/class-svgo.php';
 
@@ -274,6 +281,7 @@ function libre_compress_load_dependencies() {
     require_once LIBRE_COMPRESS_PATH . 'includes/class-database.php';
     require_once LIBRE_COMPRESS_PATH . 'includes/class-backup.php';
     require_once LIBRE_COMPRESS_PATH . 'includes/class-compatible-fallback.php';
+    require_once LIBRE_COMPRESS_PATH . 'includes/class-animation.php';
     require_once LIBRE_COMPRESS_PATH . 'includes/class-compressor.php';
     require_once LIBRE_COMPRESS_PATH . 'includes/class-converter.php';
     require_once LIBRE_COMPRESS_PATH . 'includes/class-processor.php';
@@ -318,6 +326,12 @@ function libre_compress_activate() {
         'image_scale_enabled'   => true,
         'image_size_threshold'  => 2560,
         'output_format'         => 'avif',
+        'animation_enabled'     => true,
+        'animation_convert'     => true,
+        'animation_max_frames'  => 300,
+        'animation_max_edge'    => 1600,
+        'chroma_420'            => true,
+        'cmyk_to_rgb'           => true,
     );
 
     $default_tools = array(
@@ -329,6 +343,8 @@ function libre_compress_activate() {
         'webp_quality'       => 80,
         'avif_mode'          => 'lossy',
         'avif_quality'       => 80,
+        'jxl_mode'           => 'lossy',
+        'jxl_quality'        => 80,
         'gif_mode'           => 'lossy',
         'gif_quality'        => 60,
         'svg_precision'      => 3,

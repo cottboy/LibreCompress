@@ -317,7 +317,7 @@ class Libre_Compress_Database {
 
         $after_id = absint( $after_id );
         $limit    = max( 1, min( 200, absint( $limit ) ) );
-        $mimes    = array( 'image/jpeg', 'image/png', 'image/webp', 'image/avif', 'image/gif', 'image/svg+xml' );
+        $mimes    = array( 'image/jpeg', 'image/png', 'image/webp', 'image/avif', 'image/jxl', 'image/gif', 'image/svg+xml' );
         $mimes_sql = "'" . implode( "','", array_map( 'esc_sql', $mimes ) ) . "'";
 
         // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
@@ -348,7 +348,7 @@ class Libre_Compress_Database {
     public function count_image_attachments(): int {
         global $wpdb;
 
-        $mimes     = array( 'image/jpeg', 'image/png', 'image/webp', 'image/avif', 'image/gif', 'image/svg+xml' );
+        $mimes     = array( 'image/jpeg', 'image/png', 'image/webp', 'image/avif', 'image/jxl', 'image/gif', 'image/svg+xml' );
         $mimes_sql = "'" . implode( "','", array_map( 'esc_sql', $mimes ) ) . "'";
 
         // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared

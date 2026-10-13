@@ -24,8 +24,9 @@
 
 ## 功能特性
 
-- **六种格式压缩**：JPEG、PNG、WebP、AVIF、GIF、SVG。
-- **可配置目标格式**：PNG / JPG / GIF 可按设置压缩为 WebP 或 AVIF；直接上传的 WebP / AVIF 始终执行同格式压缩。
+- **七种格式压缩**：JPEG、PNG、WebP、AVIF、GIF、SVG、JPEG XL。
+- **可配置目标格式**：PNG / JPG / GIF 可按设置压缩为 WebP、AVIF 或 JPEG XL；直接上传的 WebP / AVIF / JPEG XL 默认执行同格式压缩。
+- **动图真正参与压缩**：GIF、APNG、动画 WebP、动画 AVIF、动画 JXL 逐帧拆开压缩再重组，保留每帧播放时长、循环次数和透明通道；处理完核对帧数、总时长与透明，任一项不符就放弃并保留原文件。
 - **统一批量入口**：设置页的批量按钮都把任务交给服务器自己跑，按附件 ID 游标逐个处理，不存在固定数量上限。
 - **后台批量任务**：任务状态存在选项里，服务器一批接一批地执行（每批限量时长，永远跑不到网关超时线），浏览器只负责显示进度，关掉页面任务照样继续；页面上的进度条是真进度，随时可停止、可只重试失败项。
 - **统一状态**：媒体库、批量操作和上传自动处理使用相同的文件级成功记录。
@@ -33,7 +34,8 @@
 - **原图备份**：压缩前可自动备份到 uploads 下的独立目录，同一附件只保留最初那份原图，SVG 同样备份；支持恢复单张或全部原图，也可设置保留天数，到期自动清理。
 - **兼容格式回退**：开启后格式转换生成“源文件名.webp”“源文件名.avif”的双扩展名新文件，旧格式文件原地保留并同样经过压缩，前台用 `<picture>` 让不支持新格式的浏览器加载旧格式；回退地址由新格式名去掉最后一段扩展名确定性推导，不查询数据库。关闭后转换不再保留旧格式文件，提交成功后直接删除源文件，新格式完整替换旧格式，前台也只输出新格式。
 - **隐私保护**：压缩和格式转换时默认清除 EXIF、GPS 拍摄位置、设备与软件信息，保留 ICC 色彩配置以免偏色。
-- **APNG 保护**：识别 `acTL` 块，动图不参与压缩与格式转换，不会被压成静图。
+- **动图保护与上限**：识别 APNG 的 `acTL` 块、WebP 的 `ANMF` 块、AVIF/JXL 的帧计数，绝不让只认单帧的工具把动图压成静图；超过帧数或边长上限的动图直接跳过，避免上百兆的临时帧文件。
+- **色彩一致性**：支持的编码器统一走 4:2:0 色度抽样；CMYK 的 JPEG 先转成 RGB 再压缩或转换，避免浏览器显示反色、编码器产出废图。
 - **附件级排他锁**：同一附件的压缩、恢复和缩略图操作不会并发互相覆盖。
 - **元数据同步**：格式转换后同步 `_wp_attached_file`、附件 metadata、文件大小和 MIME；原本没有完整 metadata 的图片按目标文件的真实尺寸建立，不伪造数据；主文件失败时不会把整个附件错误标记为新格式。
 - **内容 URL 持久替换**：转换时把文章正文里已固化的旧地址按实际映射改写为新文件，保留查询参数、锚点、`srcset` 与区块 JSON 的转义写法；恢复时反向替换。
@@ -72,14 +74,22 @@
 | --- | --- |
 | jpegoptim | JPEG 同格式压缩 |
 | pngquant | PNG 有损压缩 |
-| oxipng | PNG 无损压缩 |
-| gifsicle | GIF 同格式压缩 |
+| oxipng | PNG 无损压缩，APNG 动图逐帧无损优化 |
+| gifsicle | GIF 同格式压缩，动图帧数与每帧时长读取 |
 | cwebp | WebP 同格式压缩，以及 PNG/JPG/GIF 输出为 WebP |
 | gif2webp | 动画 GIF 输出为 WebP |
-| avifenc | AVIF 压缩编码器 |
-| avifdec | AVIF 同格式压缩所需解码器 |
-| ffmpeg | 动画 GIF 输出为 AVIF |
+| img2webp | 动画 WebP 组装（动图互转时用到） |
+| anim_dump | 动画 WebP 逐帧合成为整幅 PNG（libwebp 自带） |
+| webpmux | 动画 WebP 帧序与每帧时长读取 |
+| avifenc | AVIF 编码，含动画 AVIF 组装 |
+| avifdec | AVIF 解码，含动画 AVIF 帧数读取与逐帧解码 |
+| cjxl | JPEG XL 编码（同格式压缩、目标格式输出、动画 GIF 输出为动画 JXL） |
+| djxl | JPEG XL 解码，动画 JXL 拆帧 |
+| jxlinfo | 动画 JXL 帧数与每帧时长读取 |
+| ffmpeg | 动图逐帧解码为 RGBA PNG，CMYK 转 RGB |
 | svgo | SVG 同格式压缩 |
+
+libwebp 与 libjxl 的官方发行包都是压缩包形式：Windows 下把 `img2webp.exe`、`anim_dump.exe`、`webpmux.exe`，以及 `cjxl.exe`、`djxl.exe`、`jxlinfo.exe` 连同 jxl 包内的 `.dll` 一起放进 `LibreCompress-bin` 即可（dll 必须和 exe 同目录）。
 
 ### 同格式压缩依赖
 
@@ -92,20 +102,45 @@
 | AVIF | avifenc + avifdec |
 | GIF | gifsicle |
 | SVG | svgo |
+| JPEG XL | cjxl |
 
 PNG 严格按当前有损/无损设置选择工具，不会静默切换压缩模式。
 
 ### 格式转换依赖
 
-| 源格式 | WebP | AVIF |
-| --- | --- | --- |
-| PNG / JPG | cwebp | avifenc |
-| 静态 GIF | GD + cwebp | GD + avifenc |
-| 动画 GIF | gif2webp | ffmpeg + avifenc |
+| 源格式 | WebP | AVIF | JPEG XL |
+| --- | --- | --- | --- |
+| PNG / JPG | cwebp | avifenc | cjxl |
+| 静态 GIF | GD + cwebp | GD + avifenc | GD + cjxl |
+| 动画 GIF | gif2webp | ffmpeg + avifenc | cjxl |
 
-同格式 AVIF 压缩只支持可确认的单帧文件；动画或多帧 AVIF 会安全跳过，避免静默丢帧。
+### 动图处理
 
-动画 GIF 转换 AVIF 的无损模式使用 4:4:4 YUV 中间帧并进行无损量化编码；RGB 到 YUV 的中转仍可能产生舍入差异，不能保证与 GIF 原始 RGB 像素逐字节一致。
+动图（GIF / APNG / 动画 WebP / 动画 AVIF / 动画 JXL）一律先拆成"带透明的逐帧 PNG + 每帧时长"，再按目标格式重新组装，处理完还要核对产物。
+
+| 源格式 | 同格式压缩 | 输出 WebP | 输出 AVIF | 输出 JXL |
+| --- | --- | --- | --- | --- |
+| 动画 GIF | gifsicle（原生支持） | gif2webp | ffmpeg + avifenc | cjxl |
+| APNG | ffmpeg + oxipng（仅无损模式） | ffmpeg + img2webp | ffmpeg + avifenc | 不支持 |
+| 动画 WebP | webpmux + anim_dump + img2webp | — | webpmux + anim_dump + avifenc | 不支持 |
+| 动画 AVIF | avifdec + avifenc | avifdec + img2webp | — | 不支持 |
+| 动画 JXL | cjxl | djxl + ffmpeg + img2webp | djxl + ffmpeg + avifenc | — |
+
+三条限制都是实测出来的结论，不是保守起见：
+
+- **APNG 有损不压**。逐帧各自调用 pngquant 会让每帧挑一张自己的调色板，动起来就是闪烁；而 APNG 规范要求所有帧共用同一张全局调色板。所以有损 PNG 模式下的 APNG 动图直接跳过，无损模式走 oxipng。
+- **只有动画 GIF 能转成动画 JXL**。cjxl 读 GIF 时逐帧时长完全准确（实测 100/250/400/600 毫秒），但读 APNG 会把首帧时长硬写成 100 毫秒，产出播放速度错乱的动图，因此其余源不转 JXL。
+- **动图不输出为 GIF**。GIF 只有一位透明（要么全透明要么不透明），半透明的 AVIF/WebP 动图转回去必然丢透明；而且插件的目标格式选项本来就只有 WebP / AVIF / JPEG XL。
+
+每次动图处理完成后会核对产物：帧数必须与原图一致、总时长误差不得超过 5%、原图有透明时产物必须有透明通道。任一项不符就整笔放弃并保留原文件——命令行工具在动画上有不少"看起来成功、实际只留第一帧"的坑（例如 ImageMagick 写出的多帧 AVIF 容器，浏览器只认第一帧），这层校验是唯一的兜底。
+
+超出帧数上限或单帧最长边上限的动图直接跳过，避免上百兆的临时帧文件把磁盘占满。两个上限都能在设置页调整。
+
+### 色彩处理
+
+- **4:2:0 色度抽样**：默认开启，AVIF（含动画 AVIF）走有损路径时统一加 `-y 420 --sharpyuv`。WebP 的有损编码本来就是 4:2:0，无需设置；PNG / APNG / GIF 是 RGB 或索引色格式，没有色度抽样可设；JPEG XL 的参考实现不开放这个开关，保持逐像素 4:4:4。对色彩边缘锐利的插画类图片，4:2:0 不必然更小，此时以"压缩结果必须变小"的规则自动回滚。
+- **CMYK 转 RGB**：默认开启。压缩或转换前读取 JPEG 的 SOF 段分量数，等于 4 即判定为 CMYK，先用 ffmpeg 转成 RGB 再交给编码器。这一步是必要的：实测 CMYK 输入会让 avifenc 与 cjxl 直接产出 0 字节文件、让 cwebp 产出几十字节的废图、让 GD 读出反色。转换需要 ffmpeg，缺它时该图会安全跳过。
+- 选 JPEG XL 作为目标格式时建议同时开启"兼容格式回退"：浏览器对动画 JXL 的支持远不如 AVIF/WebP，保留旧格式回退才能让前台正常显示。
 
 ## 使用说明
 

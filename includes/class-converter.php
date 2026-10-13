@@ -57,6 +57,7 @@ class Libre_Compress_Output {
     private $target_tools = array(
         'webp' => 'cwebp',
         'avif' => 'avifenc',
+        'jxl'  => 'cjxl',
     );
 
     /**
@@ -67,6 +68,7 @@ class Libre_Compress_Output {
     private $target_mimes = array(
         'webp' => 'image/webp',
         'avif' => 'image/avif',
+        'jxl'  => 'image/jxl',
     );
 
     /**
@@ -82,10 +84,20 @@ class Libre_Compress_Output {
      * @var array
      */
     private $format_mimes = array(
-        'png' => 'image/png',
-        'jpg' => 'image/jpeg',
-        'gif' => 'image/gif',
+        'png'  => 'image/png',
+        'jpg'  => 'image/jpeg',
+        'gif'  => 'image/gif',
+        'webp' => 'image/webp',
+        'avif' => 'image/avif',
+        'jxl'  => 'image/jxl',
     );
+
+    /**
+     * 可以当作动画源参与转换的扩展名
+     *
+     * @var array
+     */
+    private $animation_sources = array( 'gif', 'png', 'webp', 'avif', 'jxl' );
 
     /**
      * 获取目标格式输出设置
@@ -95,8 +107,10 @@ class Libre_Compress_Output {
     public function get_output_settings(): array {
         $general = get_option( 'libre_compress_general', array() );
 
-        // 默认 AVIF：只有明确存了 webp 时才用 WebP，缺失或非法值一律按 AVIF 处理。
-        $target = ( isset( $general['output_format'] ) && 'webp' === $general['output_format'] ) ? 'webp' : 'avif';
+        // 默认 AVIF：存的目标格式必须在白名单里，缺失或被篡改一律按 AVIF 处理。
+        $target = isset( $general['output_format'] ) && in_array( $general['output_format'], array( 'webp', 'avif', 'jxl' ), true )
+            ? $general['output_format']
+            : 'avif';
 
         $formats = array();
         foreach ( $this->source_formats as $format ) {
@@ -121,13 +135,20 @@ class Libre_Compress_Output {
         $settings = $this->get_output_settings();
         $format   = $this->format_of( $file_path );
 
-        // WebP / AVIF 本身是可直接压缩的格式，不允许再次输出目标格式。
-        if ( in_array( $format, array( 'webp', 'avif' ), true ) ) {
+        // 动画源单独判定：APNG、动画 WebP、动画 AVIF、动画 JXL 之间可以互转，
+        // 但只有动画层确认支持且工具齐备才转，否则保持同格式处理，避免产出静图。
+        if ( in_array( $format, array( 'png', 'webp', 'avif', 'jxl' ), true ) && Libre_Compress_Animation::is_animated( $file_path ) ) {
+            return Libre_Compress_Animation::convert_enabled()
+                && Libre_Compress_Animation::convert_supported( $format, $settings['target'] );
+        }
+
+        // WebP / AVIF 本身是可直接压缩的格式，静图不允许再次输出目标格式。
+        if ( in_array( $format, array( 'webp', 'avif', 'jxl' ), true ) ) {
             return false;
         }
 
-        // APNG 转 WebP/AVIF 同样只剩第一帧，统一不转换。
-        if ( 'png' === $format && Libre_Compress_Compressor::is_apng( $file_path ) ) {
+        // 动画 GIF 也受“动图转换”开关约束：关掉后动图只做同格式压缩
+        if ( 'gif' === $format && Libre_Compress_Compressor::is_animated_gif( $file_path ) && ! Libre_Compress_Animation::convert_enabled() ) {
             return false;
         }
 
@@ -187,12 +208,22 @@ class Libre_Compress_Output {
         }
 
         $settings = $this->get_output_settings();
-        $target   = in_array( $target, array( 'webp', 'avif' ), true ) ? $target : $settings['target'];
+        $target   = in_array( $target, array( 'webp', 'avif', 'jxl' ), true ) ? $target : $settings['target'];
         $format   = $this->format_of( $file_path );
 
-        if ( ! in_array( $format, $settings['formats'], true ) ) {
+        // 动图判定：只有真的多帧才交给动画层，静图沿用原有源格式勾选
+        $animation_plan = in_array( $format, $this->animation_sources, true ) ? Libre_Compress_Animation::analyze( $file_path ) : null;
+        $is_animation   = null !== $animation_plan && $animation_plan['frames'] > 1;
+
+        if ( ! $is_animation && ! in_array( $format, $settings['formats'], true ) ) {
             $result_template['status']  = 'skipped';
             $result_template['message'] = __( '该格式未配置格式转换', 'libre-compress' );
+            return $result_template;
+        }
+
+        if ( $is_animation && ! Libre_Compress_Animation::convert_enabled() ) {
+            $result_template['status']  = 'skipped';
+            $result_template['message'] = __( '动图转换为目标格式已关闭', 'libre-compress' );
             return $result_template;
         }
 
@@ -248,54 +279,72 @@ class Libre_Compress_Output {
         // 没有可接管的结果时重新编码；复用了旧映射的目标名，避免另起新名字留下多余文件。
         $target_path = null !== $entry ? $entry['to'] : $natural_target;
 
-        $temp_token  = wp_generate_password( 12, false, false );
-        $temp_output = $file_path . '.lc-compress-' . $temp_token . '.' . $target;
-        $encode_ok   = false;
-        $error_msg   = '';
-        $temp_source = '';
-        $command     = false;
+        $temp_token     = wp_generate_password( 12, false, false );
+        $temp_output    = $file_path . '.lc-compress-' . $temp_token . '.' . $target;
+        $encode_ok      = false;
+        $error_msg      = '';
+        $temp_source    = '';
+        $command        = false;
+        $animation_done = false;
 
-        if ( 'gif' === $format ) {
-            // 动画 GIF 使用专用工具，静态 GIF 先由 GD 解码为 PNG。
-            if ( Libre_Compress_Compressor::is_animated_gif( $file_path ) ) {
-                $animated = $this->build_animated_gif_command( $file_path, $temp_output, $target );
+        if ( $is_animation ) {
+            if ( 'gif' === $format && 'webp' === $target ) {
+                // GIF → 动画 WebP 有专用的一步式工具，不必拆帧落盘
+                $gif2webp = $this->build_gif2webp_command( $file_path, $temp_output );
 
-                if ( false === $animated ) {
-                    // 缺工具：环境未配齐，不写入压缩记录，保留为待处理。
+                if ( false === $gif2webp ) {
                     $result_template['status']  = 'skipped';
-                    $result_template['message'] = ( 'webp' === $target )
-                        ? __( '动画 GIF 压缩为 WebP 需要 gif2webp 工具（libwebp 套件）', 'libre-compress' )
-                        : __( '动画 GIF 压缩为 AVIF 需要 ffmpeg', 'libre-compress' );
+                    $result_template['message'] = __( '动画 GIF 压缩为 WebP 需要 gif2webp 工具（libwebp 套件）', 'libre-compress' );
                     return $result_template;
                 }
 
-                $command     = $animated['command'];
-                $temp_source = $animated['temp'];
-                $tool_name   = 'webp' === $target ? 'gif2webp' : 'ffmpeg+avifenc';
+                $command   = array( $gif2webp );
+                $tool_name = 'gif2webp';
             } else {
-                $temp_source = $file_path . '.lc-source-' . $temp_token . '.png';
-                if ( ! function_exists( 'imagecreatefromgif' ) || ! function_exists( 'imagepng' ) ) {
-                    $result_template['status']  = 'skipped';
-                    $result_template['message'] = __( '静态 GIF 压缩需要 GD 扩展', 'libre-compress' );
-                    return $result_template;
-                }
-                if ( ! $this->decode_gif_to_png( $file_path, $temp_source ) ) {
-                    if ( file_exists( $temp_source ) ) {
-                        // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
-                        unlink( $temp_source );
-                    }
-                    $result_template['message'] = __( 'GIF 压缩预处理失败', 'libre-compress' );
-                    return $result_template;
-                }
-                $command = $this->build_encode_command( $temp_source, $temp_output, $target );
+                $animation = Libre_Compress_Animation::convert( $file_path, $target, $temp_output );
+
+                $animation_done = true;
+                $encode_ok      = $animation['success'];
+                $error_msg      = $animation['message'];
+                $tool_name      = $animation['tool'];
             }
+        } elseif ( 'gif' === $format ) {
+            // 静态 GIF 先由 GD 解码为 PNG
+            $temp_source = $file_path . '.lc-source-' . $temp_token . '.png';
+            if ( ! function_exists( 'imagecreatefromgif' ) || ! function_exists( 'imagepng' ) ) {
+                $result_template['status']  = 'skipped';
+                $result_template['message'] = __( '静态 GIF 压缩需要 GD 扩展', 'libre-compress' );
+                return $result_template;
+            }
+            if ( ! $this->decode_gif_to_png( $file_path, $temp_source ) ) {
+                if ( file_exists( $temp_source ) ) {
+                    // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
+                    unlink( $temp_source );
+                }
+                $result_template['message'] = __( 'GIF 压缩预处理失败', 'libre-compress' );
+                return $result_template;
+            }
+            $command = $this->build_encode_command( $temp_source, $temp_output, $target );
         } else {
-            // PNG/JPG 由编码工具直接支持
+            // CMYK JPEG 会让 cwebp/avifenc/cjxl 产出废图，先转成 RGB 再编码
+            $cmyk = Libre_Compress_Compressor::normalize_cmyk( $file_path );
+
+            if ( '' !== $cmyk ) {
+                $result_template['status']  = 'skipped';
+                $result_template['message'] = $cmyk;
+                return $result_template;
+            }
+
             $command = $this->build_encode_command( $file_path, $temp_output, $target );
         }
 
-        if ( false === $command ) {
-            // 缺编码工具（cwebp/avifenc）：环境未配齐，不写入压缩记录，保留为待处理。
+        if ( $animation_done ) {
+            // 动画层已经执行完命令并核对过帧数、时长与透明，这里不再跑命令链
+            if ( ! $encode_ok && '' === $error_msg ) {
+                $error_msg = __( '动图转换失败', 'libre-compress' );
+            }
+        } elseif ( false === $command ) {
+            // 缺编码工具（cwebp/avifenc/cjxl）：环境未配齐，不写入压缩记录，保留为待处理。
             $error_msg                 = __( '没有可用的压缩工具', 'libre-compress' );
             $result_template['status'] = 'skipped';
         } else {
@@ -330,6 +379,9 @@ class Libre_Compress_Output {
             // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
             unlink( $temp_source );
         }
+
+        // 动画层与命令链都可能在本次请求内刚写出目标文件，必须绕过 stat 缓存取真实大小
+        clearstatcache( true, $temp_output );
 
         if ( ! $encode_ok ) {
             $result_template['message'] = $error_msg;
@@ -1101,7 +1153,8 @@ class Libre_Compress_Output {
         foreach ( $entries as $entry ) {
             $format = $this->format_of( $entry['to'] );
 
-            if ( 'webp' === $format || 'avif' === $format ) {
+            // 以目标格式映射表为准，新增格式时不会再漏掉这里
+            if ( isset( $this->target_mimes[ $format ] ) ) {
                 return $format;
             }
         }
@@ -2010,6 +2063,12 @@ class Libre_Compress_Output {
             return array( array( $binary, '-quiet', '-mt', '-q', (string) $quality, '-m', (string) Libre_Compress_Settings::tool_speed( 'webp_method' ), $source, '-o', $output ) );
         }
 
+        if ( 'jxl' === $target ) {
+            $command = Libre_Compress_Animation::build_cjxl_command( $source, $output );
+
+            return false === $command ? false : array( $command );
+        }
+
         $mode = isset( $settings['avif_mode'] ) ? $settings['avif_mode'] : 'lossy';
 
         // avifenc 默认会把输入图片里的 EXIF/XMP 原样搬进 AVIF，而转换结果正是对外访问的那张图
@@ -2027,6 +2086,12 @@ class Libre_Compress_Output {
             $quality = max( 0, min( 100, $quality ) );
             $encode[] = '-q';
             $encode[] = (string) $quality;
+
+            if ( Libre_Compress_Animation::prefer_420() ) {
+                $encode[] = '-y';
+                $encode[] = '420';
+                $encode[] = '--sharpyuv';
+            }
         }
 
         $encode[] = $source;
@@ -2062,84 +2127,34 @@ class Libre_Compress_Output {
     }
 
     /**
-     * 构建动画 GIF 的目标格式压缩命令
+     * 构建动画 GIF → 动画 WebP 命令
      *
-     * WebP 使用 gif2webp（libwebp 套件）直接压缩；
-     * AVIF 无 GIF 输入能力，先由 ffmpeg 无损解码为 Y4M 序列，再由 avifenc 编码为动画 AVIF
+     * gif2webp 一步就能保留帧序、每帧时长与透明，比拆帧再组装省掉大量临时文件。
      *
      * @param string $gif_path GIF 源路径
      * @param string $output   输出文件路径
-     * @param string $target   目标格式 webp|avif
-     * @return array|false array( command, temp )，工具不可用时返回 false
+     * @return array|false 单条命令，缺工具返回 false
      */
-    private function build_animated_gif_command( string $gif_path, string $output, string $target ) {
-        $settings = get_option( 'libre_compress_tools', array() );
+    private function build_gif2webp_command( string $gif_path, string $output ) {
+        $binary = self::find_local_tool( 'gif2webp' );
 
-        if ( 'webp' === $target ) {
-            $binary = $this->find_local_tool( 'gif2webp' );
-
-            if ( false === $binary ) {
-                return false;
-            }
-
-            $mode = isset( $settings['webp_mode'] ) ? $settings['webp_mode'] : 'lossy';
-            $method = (string) Libre_Compress_Settings::tool_speed( 'gif2webp_method' );
-
-            // gif2webp 默认即无损编码，有损模式需显式开启并指定质量
-            if ( 'lossy' !== $mode ) {
-                $command = array( $binary, '-m', $method, $gif_path, '-o', $output );
-            } else {
-                $quality = isset( $settings['webp_quality'] ) ? absint( $settings['webp_quality'] ) : 80;
-                $quality = max( 0, min( 100, $quality ) );
-
-                $command = array( $binary, '-m', $method, '-lossy', '-q', (string) $quality, $gif_path, '-o', $output );
-            }
-
-            return array(
-                'command' => array( $command ),
-                'temp'    => '',
-            );
-        }
-
-        $ffmpeg  = $this->find_local_tool( 'ffmpeg' );
-        $avifenc = $this->find_local_tool( 'avifenc' );
-
-        if ( false === $ffmpeg || false === $avifenc ) {
+        if ( false === $binary ) {
             return false;
         }
 
-        // Y4M 中间文件保留 GIF 的完整帧序列，由 avifenc 读取全部帧
-        $temp_y4m = $gif_path . '.lc-animation-' . wp_generate_password( 12, false, false ) . '.y4m';
+        $settings = get_option( 'libre_compress_tools', array() );
+        $mode     = isset( $settings['webp_mode'] ) ? $settings['webp_mode'] : 'lossy';
+        $method   = (string) Libre_Compress_Settings::tool_speed( 'gif2webp_method' );
 
-        $mode    = isset( $settings['avif_mode'] ) ? $settings['avif_mode'] : 'lossy';
-        $quality = isset( $settings['avif_quality'] ) ? absint( $settings['avif_quality'] ) : 80;
-        $quality = max( 0, min( 100, $quality ) );
-
-        $decode = array(
-            $ffmpeg, '-y', '-loglevel', 'error', '-i', $gif_path,
-            '-pix_fmt', 'lossless' === $mode ? 'yuv444p' : 'yuv420p', '-f', 'yuv4mpegpipe', $temp_y4m,
-        );
-
-        $encode = array( $avifenc, '-j', '4', '-s', (string) Libre_Compress_Settings::tool_speed( 'avif_speed' ) );
-
-        if ( 'lossless' === $mode ) {
-            // 对 YUV 中间帧使用无损量化，保留其实际色彩矩阵；RGB 无损预设不接受此输入。
-            $encode[] = '-q';
-            $encode[] = '100';
-            $encode[] = '--cicp';
-            $encode[] = '1/13/6';
-        } else {
-            $encode[] = '-q';
-            $encode[] = (string) $quality;
+        // gif2webp 默认即无损编码，有损模式需显式开启并指定质量
+        if ( 'lossy' !== $mode ) {
+            return array( $binary, '-m', $method, $gif_path, '-o', $output );
         }
 
-        $encode[] = $temp_y4m;
-        $encode[] = $output;
+        $quality = isset( $settings['webp_quality'] ) ? absint( $settings['webp_quality'] ) : 80;
+        $quality = max( 0, min( 100, $quality ) );
 
-        return array(
-            'command' => array( $decode, $encode ),
-            'temp'    => $temp_y4m,
-        );
+        return array( $binary, '-m', $method, '-lossy', '-q', (string) $quality, $gif_path, '-o', $output );
     }
 
     /**
@@ -2151,7 +2166,7 @@ class Libre_Compress_Output {
      * @param string $name 可执行文件名
      * @return string|false 路径或 false
      */
-    public function find_local_tool( string $name ) {
+    public static function find_local_tool( string $name ) {
         static $cache = array();
 
         if ( isset( $cache[ $name ] ) ) {

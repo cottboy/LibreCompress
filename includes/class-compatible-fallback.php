@@ -102,7 +102,7 @@ class Libre_Compress_Compatible_Fallback {
      */
     private function replace_images( string $html ): string {
         // 没有新格式链接的正文直接返回，省掉整棵树的标签解析。
-        if ( false === stripos( $html, '.webp' ) && false === stripos( $html, '.avif' ) ) {
+        if ( false === stripos( $html, '.webp' ) && false === stripos( $html, '.avif' ) && false === stripos( $html, '.jxl' ) ) {
             return $html;
         }
 
@@ -174,7 +174,7 @@ class Libre_Compress_Compatible_Fallback {
         $relative = $this->relative_url_path( $src );
         $format   = strtolower( pathinfo( $relative, PATHINFO_EXTENSION ) );
 
-        if ( ! in_array( $format, array( 'webp', 'avif' ), true ) ) {
+        if ( ! in_array( $format, array( 'webp', 'avif', 'jxl' ), true ) ) {
             return null;
         }
 
@@ -243,7 +243,7 @@ class Libre_Compress_Compatible_Fallback {
         // 取原始大小写的扩展名做截断：先 lower 再算长度会让 .WEBP 少截一个字符。
         $extension = pathinfo( $relative, PATHINFO_EXTENSION );
 
-        if ( ! in_array( strtolower( $extension ), array( 'webp', 'avif' ), true ) ) {
+        if ( ! in_array( strtolower( $extension ), array( 'webp', 'avif', 'jxl' ), true ) ) {
             return '';
         }
 

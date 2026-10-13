@@ -118,7 +118,7 @@ class Libre_Compress_Processor {
      * @return array
      */
     public function get_supported_mimes(): array {
-        return array( 'image/jpeg', 'image/png', 'image/webp', 'image/avif', 'image/gif', 'image/svg+xml' );
+        return array( 'image/jpeg', 'image/png', 'image/webp', 'image/avif', 'image/jxl', 'image/gif', 'image/svg+xml' );
     }
 
     /**
