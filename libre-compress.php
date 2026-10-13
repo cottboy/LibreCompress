@@ -317,7 +317,7 @@ function libre_compress_activate() {
         'fallback_enabled'      => false,
         'image_scale_enabled'   => true,
         'image_size_threshold'  => 2560,
-        'output_format'         => 'webp',
+        'output_format'         => 'avif',
     );
 
     $default_tools = array(

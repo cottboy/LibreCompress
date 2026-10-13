@@ -35,7 +35,7 @@ msgid "无法安全写入清理后的 SVG 文件"
 msgstr ""
 
 #: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-compressor.php:396
-#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-converter.php:179
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-converter.php:180
 #: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-processor.php:337
 #: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-processor.php:363
 #: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\compression\class-tool-base.php:455
@@ -43,7 +43,7 @@ msgid "文件不存在"
 msgstr ""
 
 #: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-compressor.php:404
-#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-converter.php:184
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-converter.php:185
 msgid "文件路径不安全"
 msgstr ""
 
@@ -56,7 +56,7 @@ msgid "动画 WebP 不压缩"
 msgstr ""
 
 #: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-compressor.php:438
-#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-converter.php:298
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-converter.php:299
 msgid "没有可用的压缩工具"
 msgstr ""
 
@@ -82,7 +82,7 @@ msgid "压缩后体积没有变小，已保留原图"
 msgstr ""
 
 #: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-compressor.php:554
-#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-converter.php:346
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-converter.php:347
 msgid "压缩记录保存失败，请重新压缩"
 msgstr ""
 
@@ -95,75 +95,75 @@ msgid "压缩记录保存失败且回滚失败，请保留回滚副本并检查�
 msgstr ""
 
 #: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-compressor.php:604
-#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-converter.php:414
-#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-converter.php:454
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-converter.php:415
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-converter.php:455
 #: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\compression\class-pngquant.php:90
 #: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\compression\class-pngquant.php:104
 #: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\compression\class-tool-base.php:525
 msgid "压缩成功"
 msgstr ""
 
-#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-converter.php:194
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-converter.php:195
 msgid "该格式未配置格式转换"
 msgstr ""
 
-#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-converter.php:210
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-converter.php:211
 msgid "无法清理旧的转换结果，已保留原文件"
 msgstr ""
 
-#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-converter.php:224
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-converter.php:225
 msgid "无法为源文件分配新文件名，已保留原文件"
 msgstr ""
 
-#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-converter.php:266
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-converter.php:267
 msgid "动画 GIF 压缩为 WebP 需要 gif2webp 工具（libwebp 套件）"
 msgstr ""
 
-#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-converter.php:267
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-converter.php:268
 msgid "动画 GIF 压缩为 AVIF 需要 ffmpeg"
 msgstr ""
 
-#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-converter.php:278
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-converter.php:279
 msgid "静态 GIF 压缩需要 GD 扩展"
 msgstr ""
 
-#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-converter.php:286
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-converter.php:287
 msgid "GIF 压缩预处理失败"
 msgstr ""
 
-#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-converter.php:315
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-converter.php:316
 #: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-media-library.php:249
 #: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-processor.php:371
 msgid "压缩失败"
 msgstr ""
 
-#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-converter.php:360
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-converter.php:361
 msgid "转换结果没有变小，已保留原图"
 msgstr ""
 
-#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-converter.php:375
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-converter.php:376
 msgid "压缩结果文件写入失败"
 msgstr ""
 
-#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-converter.php:384
-#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-converter.php:441
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-converter.php:385
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-converter.php:442
 msgid "压缩记录保存失败，已保留原文件"
 msgstr ""
 
-#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-converter.php:391
-#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-converter.php:394
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-converter.php:392
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-converter.php:395
 msgid "恢复映射保存失败，已保留原文件"
 msgstr ""
 
-#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-converter.php:484
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-converter.php:485
 msgid "附件路径同步失败，已保留原文件"
 msgstr ""
 
-#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-converter.php:488
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-converter.php:489
 msgid "附件 MIME 类型同步失败，已保留原文件"
 msgstr ""
 
-#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-converter.php:492
+#: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\includes\class-converter.php:493
 msgid "文章图片链接替换失败，已保留原文件"
 msgstr ""
 
@@ -1185,4 +1185,3 @@ msgstr ""
 #: C:\EServer-data\www\ceshi.ceshi\wp-content\plugins\LibreCompress\compression\class-tool-base.php:517
 msgid "压缩结果为空文件，已保留原文件"
 msgstr ""
-

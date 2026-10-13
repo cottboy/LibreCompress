@@ -197,7 +197,7 @@ class Libre_Compress_Settings {
         $sanitized['output_png'] = ! empty( $input['output_png'] );
         $sanitized['output_jpg'] = ! empty( $input['output_jpg'] );
         $sanitized['output_gif'] = ! empty( $input['output_gif'] );
-        $sanitized['output_format'] = ( isset( $input['output_format'] ) && in_array( $input['output_format'], array( 'webp', 'avif' ), true ) ) ? $input['output_format'] : 'webp';
+        $sanitized['output_format'] = ( isset( $input['output_format'] ) && in_array( $input['output_format'], array( 'webp', 'avif' ), true ) ) ? $input['output_format'] : 'avif';
 
         // 兼容格式回退开关
         $sanitized['fallback_enabled'] = ! empty( $input['fallback_enabled'] );
@@ -379,9 +379,9 @@ class Libre_Compress_Settings {
                     <th scope="row"><?php esc_html_e( '目标格式', 'libre-compress' ); ?></th>
                     <td>
                         <span class="libre-compress-seg">
-                            <input type="radio" name="libre_compress_general[output_format]" value="webp" id="libre-compress-seg-webp" <?php checked( ( $options['output_format'] ?? 'webp' ), 'webp' ); ?>>
+                            <input type="radio" name="libre_compress_general[output_format]" value="webp" id="libre-compress-seg-webp" <?php checked( ( $options['output_format'] ?? 'avif' ), 'webp' ); ?>>
                             <label for="libre-compress-seg-webp"><?php esc_html_e( 'WebP', 'libre-compress' ); ?></label>
-                            <input type="radio" name="libre_compress_general[output_format]" value="avif" id="libre-compress-seg-avif" <?php checked( ( $options['output_format'] ?? 'webp' ), 'avif' ); ?>>
+                            <input type="radio" name="libre_compress_general[output_format]" value="avif" id="libre-compress-seg-avif" <?php checked( ( $options['output_format'] ?? 'avif' ), 'avif' ); ?>>
                             <label for="libre-compress-seg-avif"><?php esc_html_e( 'AVIF', 'libre-compress' ); ?></label>
                             <span class="seg-thumb"></span>
                         </span>

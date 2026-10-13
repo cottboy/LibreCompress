@@ -95,7 +95,8 @@ class Libre_Compress_Output {
     public function get_output_settings(): array {
         $general = get_option( 'libre_compress_general', array() );
 
-        $target = ( isset( $general['output_format'] ) && 'avif' === $general['output_format'] ) ? 'avif' : 'webp';
+        // 默认 AVIF：只有明确存了 webp 时才用 WebP，缺失或非法值一律按 AVIF 处理。
+        $target = ( isset( $general['output_format'] ) && 'webp' === $general['output_format'] ) ? 'webp' : 'avif';
 
         $formats = array();
         foreach ( $this->source_formats as $format ) {
