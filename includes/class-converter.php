@@ -367,12 +367,6 @@ class Libre_Compress_Output {
         clearstatcache( true, $temp_output );
 
         if ( ! $encode_ok ) {
-            // 动画层可能因工具能力边界主动跳过（avifenc 不写 alpha 平面、拆帧丢透明）：
-            // 记 skipped，与"缺工具"一致按待处理外的不重试语义记录。
-            if ( isset( $animation['status'] ) && 'skipped' === $animation['status'] ) {
-                $result_template['status'] = 'skipped';
-            }
-
             $result_template['message'] = $error_msg;
             return $result_template;
         }

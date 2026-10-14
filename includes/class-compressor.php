@@ -657,23 +657,6 @@ class Libre_Compress_Compressor {
         $result        = $tool->compress( $file_path, $options );
 
         if ( ! $result['success'] ) {
-            // 动画层可能因工具能力边界主动跳过（avifenc 不写 alpha 平面、拆帧丢透明）：
-            // 这类文件重试也不会成功，按 skipped 记录，避免每轮批量都重跑一遍。
-            if ( 'skipped' === ( isset( $result['status'] ) ? $result['status'] : '' ) ) {
-                $this->record_skipped_file( $attachment_id, $file_path, $size_type, $result['message'] );
-
-                // 文件一个字节都没动，回滚副本直接删除即可
-                $this->cleanup_rollback( $rollback_path );
-
-                return array(
-                    'success'         => false,
-                    'message'         => $result['message'],
-                    'status'          => 'skipped',
-                    'original_size'   => $original_size,
-                    'compressed_size' => $original_size,
-                );
-            }
-
             // 工具执行失败后必须成功还原，才能清理回滚副本。
             $rolled_back = $this->rollback_file( $rollback_path, $file_path );
             $message     = $rolled_back
