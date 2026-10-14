@@ -660,6 +660,17 @@ class Libre_Compress_Animation {
             return $fail( __( '动图拆帧失败', 'libre-compress' ) );
         }
 
+        // 兜底：源容器表明确实带透明（GIF 的透明索引、APNG 的色彩类型、WebP 的 ALPH 块，
+        // 都由 gifsicle / 自读容器 / webpmux 给出，与拆帧工具无关），拆出来的帧却没有透明通道，
+        // 说明这台机器的拆帧工具把透明丢了，重组必然产出丢透明的图——直接放弃，原文件不动。
+        // 动画 AVIF 不在这条之列：它的声明与帧都出自同一个 avifdec，没有第二个证据可比，
+        // alpha 平面全不透明时 avifdec 本来就会写成不带通道的 PNG，这一路交给 verify() 核对。
+        if ( $plan['alpha'] && ! self::frames_have_alpha( $frames ) && in_array( $plan['format'], array( 'gif', 'png', 'webp' ), true ) ) {
+            self::cleanup( $temps );
+
+            return $fail( __( '这台机器的动图拆帧工具会丢失透明通道，已放弃这次压缩并保留原文件', 'libre-compress' ) );
+        }
+
         $commands = self::build_encode_commands( $extension, $frames, $plan['delays'], $plan['loop'], $temp_out );
 
         if ( false === $commands ) {
@@ -788,6 +799,17 @@ class Libre_Compress_Animation {
             self::cleanup( $temps );
 
             $result['message'] = __( '动图拆帧失败', 'libre-compress' );
+            return $result;
+        }
+
+        // 兜底：拆帧工具把源图的透明通道丢了就不能继续，理由与"同格式压缩"那一处相同。
+        // 这里的源只会是 GIF 与 APNG（convert_supported() 已限定），两者的透明声明都来自
+        // gifsicle 与自读的 PNG 块，与拆帧工具无关，可以放心拿来对照。
+        if ( $plan['alpha'] && ! self::frames_have_alpha( $frames ) ) {
+            self::cleanup( $temps );
+
+            $result['message'] = __( '这台机器的动图拆帧工具会丢失透明通道，已放弃这次转换并保留原文件', 'libre-compress' );
+
             return $result;
         }
 
