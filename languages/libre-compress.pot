@@ -5,7 +5,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: LibreCompress 1.4.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-14 13:12+0000\n"
+"POT-Creation-Date: 2026-10-14 14:36+0000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -153,12 +153,12 @@ msgstr ""
 msgid "JPG"
 msgstr ""
 
-#: includes/class-animation.php:599, includes/class-animation.php:600
-#: includes/class-animation.php:763, includes/class-animation.php:764
+#: includes/class-animation.php:602, includes/class-animation.php:603
+#: includes/class-animation.php:766, includes/class-animation.php:767
 msgid "JXL 压缩工具 cjxl 不可用"
 msgstr ""
 
-#: includes/class-animation.php:616, includes/class-animation.php:617
+#: includes/class-animation.php:619, includes/class-animation.php:620
 msgid "JXL 重压后帧数、时长或透明通道与原图不一致，已放弃"
 msgstr ""
 
@@ -226,11 +226,11 @@ msgstr ""
 msgid "cjxl JPEG XL 压缩级别"
 msgstr ""
 
-#: includes/class-animation.php:610, includes/class-animation.php:611
+#: includes/class-animation.php:613, includes/class-animation.php:614
 msgid "cjxl 压缩失败"
 msgstr ""
 
-#: includes/class-animation.php:770, includes/class-animation.php:771
+#: includes/class-animation.php:773, includes/class-animation.php:774
 msgid "cjxl 转换失败"
 msgstr ""
 
@@ -415,18 +415,18 @@ msgstr ""
 msgid "删除未勾选尺寸的缩略图"
 msgstr ""
 
-#: includes/class-animation.php:1137, includes/class-animation.php:1138
+#: includes/class-animation.php:1140, includes/class-animation.php:1141
 msgid "动图处理命令执行失败"
 msgstr ""
 
 #. translators: %s: 工具名称
 #, php-format
-#: includes/class-animation.php:1308, includes/class-animation.php:1309
+#: includes/class-animation.php:1311, includes/class-animation.php:1312
 msgid "动图处理需要 %s 工具，当前环境未配齐，已跳过"
 msgstr ""
 
-#: includes/class-animation.php:659, includes/class-animation.php:660
-#: includes/class-animation.php:800, includes/class-animation.php:801
+#: includes/class-animation.php:662, includes/class-animation.php:663
+#: includes/class-animation.php:803, includes/class-animation.php:804
 msgid "动图拆帧失败"
 msgstr ""
 
@@ -512,8 +512,8 @@ msgstr ""
 msgid "压缩工具"
 msgstr ""
 
-#: includes/class-animation.php:630, includes/class-animation.php:631
-#: includes/class-animation.php:715, includes/class-animation.php:716
+#: includes/class-animation.php:633, includes/class-animation.php:634
+#: includes/class-animation.php:718, includes/class-animation.php:719
 #: includes/class-compressor.php:778, includes/class-compressor.php:779
 #: includes/class-converter.php:449, includes/class-converter.php:450
 #: includes/class-converter.php:489, includes/class-converter.php:490
@@ -540,11 +540,11 @@ msgstr ""
 msgid "压缩精度"
 msgstr ""
 
-#: includes/class-animation.php:698, includes/class-animation.php:699
+#: includes/class-animation.php:701, includes/class-animation.php:702
 msgid "压缩结果与原动图的帧数、时长或透明通道不一致，已放弃"
 msgstr ""
 
-#: includes/class-animation.php:692, includes/class-animation.php:693
+#: includes/class-animation.php:695, includes/class-animation.php:696
 #: compression/class-tool-base.php:513, compression/class-tool-base.php:514
 msgid "压缩结果为空文件，已保留原文件"
 msgstr ""
@@ -561,8 +561,8 @@ msgstr ""
 msgid "压缩结果无效且回滚失败，请保留回滚副本并检查磁盘状态"
 msgstr ""
 
-#: includes/class-animation.php:623, includes/class-animation.php:624
-#: includes/class-animation.php:704, includes/class-animation.php:705
+#: includes/class-animation.php:626, includes/class-animation.php:627
+#: includes/class-animation.php:707, includes/class-animation.php:708
 #: compression/class-tool-base.php:500, compression/class-tool-base.php:501
 msgid "压缩结果替换失败，已保留原文件"
 msgstr ""
@@ -947,8 +947,8 @@ msgstr ""
 msgid "无法为源文件分配新文件名，已保留原文件"
 msgstr ""
 
-#: includes/class-animation.php:651, includes/class-animation.php:652
-#: includes/class-animation.php:791, includes/class-animation.php:792
+#: includes/class-animation.php:654, includes/class-animation.php:655
+#: includes/class-animation.php:794, includes/class-animation.php:795
 msgid "无法创建动图临时目录，已保留原文件"
 msgstr ""
 
@@ -988,11 +988,11 @@ msgstr ""
 msgid "无法读取上传的 SVG 文件"
 msgstr ""
 
-#: includes/class-animation.php:639, includes/class-animation.php:640
+#: includes/class-animation.php:642, includes/class-animation.php:643
 msgid "无法读取动图信息，已停止压缩以保护内容"
 msgstr ""
 
-#: includes/class-animation.php:749, includes/class-animation.php:750
+#: includes/class-animation.php:752, includes/class-animation.php:753
 msgid "无法读取动图信息，已停止转换以保护内容"
 msgstr ""
 
@@ -1012,7 +1012,7 @@ msgstr ""
 msgid "暂无官方包，建议从 GitHub Releases 下载或自行编译"
 msgstr ""
 
-#: includes/class-animation.php:1286, includes/class-animation.php:1287
+#: includes/class-animation.php:1289, includes/class-animation.php:1290
 msgid "有损 PNG 压缩会逐帧各自调色让 APNG 闪烁，已跳过；要压 APNG 请开启\"APNG 自动无损压缩\"或把 PNG 设为无损"
 msgstr ""
 
@@ -1306,12 +1306,12 @@ msgstr ""
 msgid "跳转"
 msgstr ""
 
-#: includes/class-animation.php:777, includes/class-animation.php:778
-#: includes/class-animation.php:843, includes/class-animation.php:844
+#: includes/class-animation.php:780, includes/class-animation.php:781
+#: includes/class-animation.php:846, includes/class-animation.php:847
 msgid "转换结果与原动图的帧数、时长或透明通道不一致，已放弃"
 msgstr ""
 
-#: includes/class-animation.php:836, includes/class-animation.php:837
+#: includes/class-animation.php:839, includes/class-animation.php:840
 msgid "转换结果为空文件"
 msgstr ""
 
@@ -1319,11 +1319,11 @@ msgstr ""
 msgid "转换结果没有变小，已保留原图"
 msgstr ""
 
-#: includes/class-animation.php:670, includes/class-animation.php:671
+#: includes/class-animation.php:673, includes/class-animation.php:674
 msgid "这台机器的动图拆帧工具会丢失透明通道，已放弃这次压缩并保留原文件"
 msgstr ""
 
-#: includes/class-animation.php:810, includes/class-animation.php:811
+#: includes/class-animation.php:813, includes/class-animation.php:814
 msgid "这台机器的动图拆帧工具会丢失透明通道，已放弃这次转换并保留原文件"
 msgstr ""
 

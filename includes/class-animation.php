@@ -94,7 +94,7 @@ class Libre_Compress_Animation {
     /**
      * 读取动图的帧数、每帧时长、循环次数、是否含透明
      *
-     * 时长统一成 1/100 秒（GIF 与 APNG 的原生单位）。读不出结论返回 null，
+     * 时长统一成毫秒（WebP 与 JPEG XL 的原生单位，GIF / APNG 换算过来也是精确值）。读不出结论返回 null，
      * 调用方一律按"不处理"处理，绝不带着猜测去覆盖用户的图。
      *
      * @param string $file_path 文件绝对路径
@@ -187,7 +187,7 @@ class Libre_Compress_Animation {
             'frames'  => $frames,
             'delays'  => array_map(
                 static function ( $seconds ) {
-                    return self::centiseconds( (float) $seconds, 1 );
+                    return self::milliseconds( (float) $seconds, 1 );
                 },
                 array_slice( $delays[1], 0, $frames )
             ),
@@ -224,7 +224,7 @@ class Libre_Compress_Animation {
                 return null;
             }
 
-            $delays[] = self::centiseconds( $delay['num'] / $delay['den'], 1 );
+            $delays[] = self::milliseconds( $delay['num'] / $delay['den'], 1 );
         }
 
         if ( $frames < 1 || count( $delays ) !== $frames ) {
@@ -285,7 +285,7 @@ class Libre_Compress_Animation {
         $alpha  = false !== stripos( $info, 'transparency' );
 
         foreach ( $rows as $row ) {
-            $delays[] = self::centiseconds( (int) $row[6] / 1000, 1 );
+            $delays[] = self::milliseconds( (int) $row[6] / 1000, 1 );
 
             if ( 'yes' === $row[3] ) {
                 $alpha = true;
@@ -342,11 +342,11 @@ class Libre_Compress_Animation {
 
         if ( count( $per_frame ) === $frames && $timescale > 0 ) {
             foreach ( $per_frame as $frame ) {
-                $delays[] = self::centiseconds( (int) $frame[2] / $timescale, 0 );
+                $delays[] = self::milliseconds( (int) $frame[2] / $timescale, 0 );
             }
         } elseif ( preg_match_all( '/duration\s+([0-9.]+)/', $info, $secs ) && count( $secs[1] ) === $frames ) {
             foreach ( $secs[1] as $seconds ) {
-                $delays[] = self::centiseconds( (float) $seconds, 0 );
+                $delays[] = self::milliseconds( (float) $seconds, 0 );
             }
         } else {
             return null;
@@ -398,7 +398,7 @@ class Libre_Compress_Animation {
             'frames'  => $frames,
             'delays'  => array_map(
                 static function ( $ms ) {
-                    return self::centiseconds( (float) $ms / 1000, 0 );
+                    return self::milliseconds( (float) $ms / 1000, 0 );
                 },
                 $delays[1]
             ),
@@ -411,14 +411,17 @@ class Libre_Compress_Animation {
     }
 
     /**
-     * 秒换算成 1/100 秒，至少 1
+     * 秒换算成毫秒
+     *
+     * 内部时长单位统一为毫秒：WebP 原生就是毫秒，AVIF 用 1000 的时间基准，
+     * JPEG XL 由 jxlinfo 直接报毫秒，GIF / APNG 换算过来都是精确值。
      *
      * @param float $seconds 秒
-     * @param int   $guard   为 1 时对 0 值兜底（GIF 允许 0 延时，但重组时 0 会改变播放语义）
+     * @param int   $guard   传 1 时把 0 抬到 1 毫秒（GIF 允许 0 延时，但重组时 0 会改变播放语义）
      * @return int
      */
-    private static function centiseconds( float $seconds, int $guard ): int {
-        $value = (int) round( $seconds * 100 );
+    private static function milliseconds( float $seconds, int $guard ): int {
+        $value = (int) round( $seconds * 1000 );
 
         if ( $value < 1 ) {
             return $guard > 0 ? 1 : max( 0, $value );
@@ -1001,7 +1004,7 @@ class Libre_Compress_Animation {
      *
      * @param string   $target  目标扩展名
      * @param string[] $frames  帧文件绝对路径
-     * @param int[]    $delays  每帧时长（1/100 秒）
+     * @param int[]    $delays  每帧时长（毫秒）
      * @param int      $loop    额外循环次数，0 表示无限
      * @param string   $output  输出路径
      * @return array[]|false 命令链，缺工具返回 false
@@ -1025,9 +1028,9 @@ class Libre_Compress_Animation {
                     '4',
                     '-s',
                     (string) Libre_Compress_Settings::tool_speed( 'avif_speed' ),
-                    // 时间基准设成 100，让每帧时长直接沿用 GIF/APNG 的 1/100 秒
+                    // 时间基准设成 1000：一格正好 1 毫秒，与插件内部的时长单位一致
                     '--timescale',
-                    '100',
+                    '1000',
                 ),
             );
 
@@ -1102,9 +1105,9 @@ class Libre_Compress_Animation {
             }
 
             foreach ( $frames as $index => $frame ) {
-                // img2webp 的帧选项作用于其后的文件，时长单位是毫秒
+                // img2webp 的帧选项作用于其后的文件，-d 的单位就是毫秒，与内部单位一致无需换算
                 $command[] = '-d';
-                $command[] = (string) ( max( 1, (int) $delays[ $index ] ) * 10 );
+                $command[] = (string) max( 1, (int) $delays[ $index ] );
                 $command[] = basename( $frame );
             }
 
