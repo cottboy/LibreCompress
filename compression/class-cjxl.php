@@ -128,7 +128,7 @@ class Libre_Compress_Cjxl extends Libre_Compress_Tool_Base {
             'centos'  => __( '暂无官方包，建议从 GitHub Releases 下载', 'libre-compress' ),
             'fedora'  => 'sudo dnf install libjxl-tools',
             'macos'   => 'brew install libjxl',
-            'windows' => __( '从 libjxl GitHub Releases 下载 jxl-x64-windows.zip，把 bin 目录里的 cjxl.exe、djxl.exe、jxlinfo.exe 与其依赖的 dll 一起放进 LibreCompress-bin', 'libre-compress' ),
+            'windows' => __( '从 libjxl GitHub Releases 下载 jxl-x64-windows.zip，把 bin 目录里的 cjxl.exe、jxlinfo.exe 与其依赖的 dll 一起放进 LibreCompress-bin', 'libre-compress' ),
         );
     }
 }

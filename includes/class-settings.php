@@ -200,11 +200,7 @@ class Libre_Compress_Settings {
         $sanitized['output_gif'] = ! empty( $input['output_gif'] );
         $sanitized['output_format'] = ( isset( $input['output_format'] ) && in_array( $input['output_format'], array( 'webp', 'avif', 'jxl' ), true ) ) ? $input['output_format'] : 'avif';
 
-        // 动画与色彩：动图处理、帧数与边长上限、4:2:0 抽样、CMYK 转 RGB
-        $sanitized['animation_enabled']    = ! empty( $input['animation_enabled'] );
-        $sanitized['animation_convert']    = ! empty( $input['animation_convert'] );
-        $sanitized['animation_max_frames'] = Libre_Compress_Animation::clamp( $input['animation_max_frames'] ?? null, Libre_Compress_Animation::FRAME_LIMIT_RANGE );
-        $sanitized['animation_max_edge']   = Libre_Compress_Animation::clamp( $input['animation_max_edge'] ?? null, Libre_Compress_Animation::EDGE_LIMIT_RANGE );
+        // 色彩处理：4:2:0 抽样与 CMYK 转 RGB
         $sanitized['chroma_420']           = ! empty( $input['chroma_420'] );
         $sanitized['cmyk_to_rgb']          = ! empty( $input['cmyk_to_rgb'] );
 
@@ -230,6 +226,7 @@ class Libre_Compress_Settings {
 
         $sanitized['png_mode']           = isset( $input['png_mode'] ) && in_array( $input['png_mode'], array( 'lossy', 'lossless' ), true ) ? $input['png_mode'] : 'lossy';
         $sanitized['png_lossy_quality']  = isset( $input['png_lossy_quality'] ) ? absint( $input['png_lossy_quality'] ) : 80;
+        $sanitized['apng_lossless']      = ! empty( $input['apng_lossless'] );
 
         $sanitized['webp_mode']    = isset( $input['webp_mode'] ) && in_array( $input['webp_mode'], array( 'lossy', 'lossless' ), true ) ? $input['webp_mode'] : 'lossy';
         $sanitized['webp_quality'] = isset( $input['webp_quality'] ) ? absint( $input['webp_quality'] ) : 80;
@@ -377,7 +374,7 @@ class Libre_Compress_Settings {
                             <input type="checkbox" name="libre_compress_general[output_gif]" value="1" <?php checked( ! empty( $options['output_gif'] ) ); ?>>
                             <?php esc_html_e( 'GIF', 'libre-compress' ); ?>
                         </label>
-                        <p class="description"><?php esc_html_e( '勾选的源格式执行压缩时输出为目标格式；未勾选的格式只执行同格式压缩。所有成功结果都记为已压缩。', 'libre-compress' ); ?></p>
+                        <p class="description"><?php esc_html_e( '勾选的源格式执行压缩时输出为目标格式；未勾选的格式只执行同格式压缩。所有成功结果都记为已压缩。只有 PNG、JPG、GIF 能转换格式，动图同样按这两个勾选走：APNG 看 PNG，动画 GIF 看 GIF；WebP、AVIF、JPEG XL 无论静图动图都只做同格式压缩，不会再来一遍转换。动图逐帧拆开压缩再重组，每帧播放时长、循环次数和透明背景都保留，处理完还会核对帧数、时长与透明通道，对不上就放弃这次压缩、保留原文件。', 'libre-compress' ); ?></p>
                     </td>
                 </tr>
                 <tr>
@@ -402,29 +399,7 @@ class Libre_Compress_Settings {
                             <label for="libre-compress-seg-jxl"><?php esc_html_e( 'JPEG XL', 'libre-compress' ); ?></label>
                             <span class="seg-thumb"></span>
                         </span>
-                        <p class="description"><?php esc_html_e( '选择目标格式：AVIF 压缩率更高但压缩更慢，WebP 兼容性最好，JPEG XL 同画质体积最小但浏览器支持仍不完整（动画 JXL 更是只有少数浏览器能播），选 JPEG XL 时建议同时开启下面的“兼容格式回退”。', 'libre-compress' ); ?></p>
-                    </td>
-                </tr>
-                <tr>
-                    <th scope="row"><?php esc_html_e( '动画图片', 'libre-compress' ); ?></th>
-                    <td>
-                        <label style="display:block;">
-                            <input type="checkbox" name="libre_compress_general[animation_enabled]" value="1" <?php checked( $options['animation_enabled'] ?? true ); ?>>
-                            <?php esc_html_e( '压缩动图（GIF / APNG / 动画 WebP / 动画 AVIF / 动画 JXL）', 'libre-compress' ); ?>
-                        </label>
-                        <label style="display:block;">
-                            <input type="checkbox" name="libre_compress_general[animation_convert]" value="1" <?php checked( $options['animation_convert'] ?? true ); ?>>
-                            <?php esc_html_e( '动图也转换到上面选定的目标格式', 'libre-compress' ); ?>
-                        </label>
-                        <div style="margin-top:8px;">
-                            <label><?php esc_html_e( '帧数上限', 'libre-compress' ); ?></label>
-                            <input type="number" name="libre_compress_general[animation_max_frames]" value="<?php echo esc_attr( Libre_Compress_Animation::max_frames() ); ?>" min="<?php echo esc_attr( Libre_Compress_Animation::FRAME_LIMIT_RANGE[0] ); ?>" max="<?php echo esc_attr( Libre_Compress_Animation::FRAME_LIMIT_RANGE[1] ); ?>" step="1" class="small-text">
-                            &nbsp;
-                            <label><?php esc_html_e( '单帧最长边上限', 'libre-compress' ); ?></label>
-                            <input type="number" name="libre_compress_general[animation_max_edge]" value="<?php echo esc_attr( Libre_Compress_Animation::max_edge() ); ?>" min="<?php echo esc_attr( Libre_Compress_Animation::EDGE_LIMIT_RANGE[0] ); ?>" max="<?php echo esc_attr( Libre_Compress_Animation::EDGE_LIMIT_RANGE[1] ); ?>" step="1" class="small-text">
-                            <?php esc_html_e( '像素', 'libre-compress' ); ?>
-                        </div>
-                        <p class="description"><?php esc_html_e( '动图会被逐帧拆开处理再重新组装，超过上限的直接跳过，避免几十兆的临时文件把磁盘和内存吃满。透明背景与每帧播放时长都会原样保留，处理完还会核对帧数、时长和透明通道，对不上就放弃这次压缩、保留原文件。', 'libre-compress' ); ?></p>
+                        <p class="description"><?php esc_html_e( '选择目标格式：AVIF 压缩率更高但压缩更慢，WebP 兼容性最好，JPEG XL 同画质体积最小但浏览器支持仍不完整（动画 JXL 更是只有少数浏览器能播），选 JPEG XL 时建议同时开启上面的“兼容格式回退”。', 'libre-compress' ); ?></p>
                     </td>
                 </tr>
                 <tr>
@@ -438,7 +413,7 @@ class Libre_Compress_Settings {
                             <input type="checkbox" name="libre_compress_general[cmyk_to_rgb]" value="1" <?php checked( $options['cmyk_to_rgb'] ?? true ); ?>>
                             <?php esc_html_e( '把 CMYK 的 JPEG 转成 RGB', 'libre-compress' ); ?>
                         </label>
-                        <p class="description"><?php esc_html_e( '4:2:0 把色彩信息减半，照片类图片能明显变小；AVIF 会同时启用更锐利的转换算法，JPEG XL 本身不接受这种抽样、WebP 有损本来就是 4:2:0，所以这两项不受影响。CMYK 的 JPEG 多数来自印刷排版，浏览器常常显示成反色，转成 RGB 后才能正常显示，也能让各编码器读懂——转换需要 ffmpeg。', 'libre-compress' ); ?></p>
+                        <p class="description"><?php esc_html_e( 'AVIF 编码器默认输出 4:4:4，改成 4:2:0 后照片类实测小 1%～2%，同时启用的锐利色彩转换让边缘颜色更准，但纯色块的小图可能反而大几百字节。WebP 有损格式本来就是 4:2:0，这一项对它只切换色彩转换算法；JPEG XL 编码器没有这种抽样参数，勾选与否都不影响它。CMYK 的 JPEG 多数来自印刷排版，浏览器常常显示成反色，转成 RGB 后才能正常显示，也能让各编码器读懂——转换需要 ffmpeg。', 'libre-compress' ); ?></p>
                     </td>
                 </tr>
                 <tr>
@@ -638,7 +613,6 @@ class Libre_Compress_Settings {
             array( 'name' => 'avifenc', 'tool' => null, 'path' => $output_processor->find_local_tool( 'avifenc' ), 'url' => 'https://github.com/AOMediaCodec/libavif' ),
             array( 'name' => 'avifdec', 'tool' => null, 'path' => $output_processor->find_local_tool( 'avifdec' ), 'url' => 'https://github.com/AOMediaCodec/libavif' ),
             array( 'name' => 'cjxl', 'tool' => isset( $tools['cjxl'] ) ? $tools['cjxl'] : null, 'path' => $output_processor->find_local_tool( 'cjxl' ), 'url' => 'https://github.com/libjxl/libjxl/releases' ),
-            array( 'name' => 'djxl', 'tool' => null, 'path' => $output_processor->find_local_tool( 'djxl' ), 'url' => 'https://github.com/libjxl/libjxl/releases' ),
             array( 'name' => 'jxlinfo', 'tool' => null, 'path' => $output_processor->find_local_tool( 'jxlinfo' ), 'url' => 'https://github.com/libjxl/libjxl/releases' ),
             array( 'name' => 'svgo', 'tool' => $tools['svgo'] ),
         );
@@ -796,6 +770,16 @@ class Libre_Compress_Settings {
                         <input type="range" name="libre_compress_tools[png_lossy_quality]" value="<?php echo esc_attr( $options['png_lossy_quality'] ?? 80 ); ?>" min="0" max="100" oninput="this.nextElementSibling.value = this.value">
                         <output><?php echo esc_html( $options['png_lossy_quality'] ?? 80 ); ?></output>
                         <p class="description"><?php esc_html_e( 'pngquant 质量参数，0-100', 'libre-compress' ); ?></p>
+                    </td>
+                </tr>
+                <tr>
+                    <th scope="row"><?php esc_html_e( 'APNG 动图', 'libre-compress' ); ?></th>
+                    <td>
+                        <label style="display:block;">
+                            <input type="checkbox" name="libre_compress_tools[apng_lossless]" value="1" <?php checked( ! empty( $options['apng_lossless'] ) ); ?>>
+                            <?php esc_html_e( 'APNG 一律自动无损压缩', 'libre-compress' ); ?>
+                        </label>
+                        <p class="description"><?php esc_html_e( '有损 PNG 靠 pngquant 逐帧各自挑 256 色调色板，APNG 这样处理会闪烁，所以默认不压 APNG。勾选后不管 PNG 选有损还是无损，检测到 APNG 都改用 oxipng 做无损压缩，动图只减体积不变画质；不勾选且 PNG 为有损时 APNG 原样保留。PNG 本身选无损时，APNG 一直会走 oxipng，与本项无关。', 'libre-compress' ); ?></p>
                     </td>
                 </tr>
                 <?php $this->render_speed_field( 'pngquant_speed', __( 'pngquant 有损 PNG 速度', 'libre-compress' ), $options ); ?>
@@ -985,7 +969,7 @@ class Libre_Compress_Settings {
         $available['gd']       = function_exists( 'imagecreatefromgif' ) && function_exists( 'imagepng' );
 
         // 动图处理用到的 libwebp 与 libjxl 附带工具按可执行文件独立判定
-        foreach ( array( 'img2webp', 'anim_dump', 'webpmux', 'djxl', 'jxlinfo' ) as $helper ) {
+        foreach ( array( 'img2webp', 'anim_dump', 'webpmux', 'jxlinfo' ) as $helper ) {
             $available[ $helper ] = false !== $output_processor->find_local_tool( $helper );
         }
 
@@ -997,7 +981,6 @@ class Libre_Compress_Settings {
             'avifenc'   => 'avifenc',
             'avifdec'   => 'avifdec',
             'cjxl'      => 'cjxl',
-            'djxl'      => 'djxl',
             'jxlinfo'   => 'jxlinfo',
             'gifsicle'  => 'gifsicle',
             'svgo'      => 'svgo',
@@ -1022,15 +1005,17 @@ class Libre_Compress_Settings {
             array( 'label' => __( 'PNG/JPG 压缩为 JPEG XL', 'libre-compress' ),       'groups' => array( array( 'cjxl' ) ) ),
             array( 'label' => __( '静态 GIF 压缩为 WebP', 'libre-compress' ),          'groups' => array( array( 'gd', 'cwebp' ) ) ),
             array( 'label' => __( '静态 GIF 压缩为 AVIF', 'libre-compress' ),          'groups' => array( array( 'gd', 'avifenc' ) ) ),
-            array( 'label' => __( '动画 GIF 压缩为 WebP', 'libre-compress' ),          'groups' => array( array( 'gif2webp' ) ) ),
+            array( 'label' => __( '静态 GIF 压缩为 JPEG XL', 'libre-compress' ),       'groups' => array( array( 'gd', 'cjxl' ) ) ),
+            array( 'label' => __( '动画 GIF 压缩为 WebP', 'libre-compress' ),          'groups' => array( array( 'gif2webp' ), array( 'ffmpeg', 'img2webp' ) ) ),
             array( 'label' => __( '动画 GIF 压缩为 AVIF', 'libre-compress' ),          'groups' => array( array( 'ffmpeg', 'avifenc' ) ) ),
             array( 'label' => __( '动画 GIF 压缩为 JPEG XL', 'libre-compress' ),       'groups' => array( array( 'cjxl' ) ) ),
-            array( 'label' => __( 'APNG 同格式压缩（仅无损模式）', 'libre-compress' ), 'groups' => array( array( 'ffmpeg', 'oxipng' ) ) ),
+            array( 'label' => __( 'APNG 同格式压缩（需 PNG 无损或开启 APNG 自动无损）', 'libre-compress' ), 'groups' => array( array( 'oxipng' ) ) ),
+            array( 'label' => __( 'APNG 压缩为 WebP', 'libre-compress' ),              'groups' => array( array( 'ffmpeg', 'img2webp' ) ) ),
+            array( 'label' => __( 'APNG 压缩为 AVIF', 'libre-compress' ),              'groups' => array( array( 'ffmpeg', 'avifenc' ) ) ),
+            array( 'label' => __( 'APNG 压缩为 JPEG XL', 'libre-compress' ),            'groups' => array( array( 'cjxl' ) ) ),
             array( 'label' => __( '动画 WebP 同格式压缩', 'libre-compress' ),          'groups' => array( array( 'webpmux', 'anim_dump', 'img2webp' ) ) ),
             array( 'label' => __( '动画 AVIF 同格式压缩', 'libre-compress' ),          'groups' => array( array( 'avifdec', 'avifenc' ) ) ),
             array( 'label' => __( '动画 JPEG XL 同格式压缩', 'libre-compress' ),       'groups' => array( array( 'cjxl', 'jxlinfo' ) ) ),
-            array( 'label' => __( 'APNG 动图转换为目标格式', 'libre-compress' ),       'groups' => array( array( 'ffmpeg', 'img2webp' ), array( 'ffmpeg', 'avifenc' ), array( 'ffmpeg', 'cjxl' ) ) ),
-            array( 'label' => __( '动画 WebP / AVIF 转换为目标格式', 'libre-compress' ), 'groups' => array( array( 'webpmux', 'anim_dump', 'img2webp' ), array( 'avifdec', 'img2webp' ), array( 'webpmux', 'anim_dump', 'avifenc' ), array( 'avifdec', 'avifenc' ) ) ),
             array( 'label' => __( 'CMYK 转 RGB', 'libre-compress' ),                   'groups' => array( array( 'ffmpeg' ) ) ),
         );
 

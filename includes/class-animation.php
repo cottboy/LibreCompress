@@ -19,30 +19,6 @@ if ( ! defined( 'ABSPATH' ) ) {
 class Libre_Compress_Animation {
 
     /**
-     * 单张动图允许的最大帧数默认值
-     */
-    const MAX_FRAMES_DEFAULT = 300;
-
-    /**
-     * 单帧允许的最大边长默认值（像素）
-     */
-    const MAX_EDGE_DEFAULT = 1600;
-
-    /**
-     * 帧数上限的取值范围：min, max, default
-     *
-     * @var array
-     */
-    const FRAME_LIMIT_RANGE = array( 2, 1000, 300 );
-
-    /**
-     * 单帧边长上限的取值范围：min, max, default
-     *
-     * @var array
-     */
-    const EDGE_LIMIT_RANGE = array( 16, 8000, 1600 );
-
-    /**
      * 同格式压缩受支持的动画格式
      *
      * gif 由 gifsicle 原生处理（它自己就能读写动画，不需要本层），
@@ -52,72 +28,32 @@ class Libre_Compress_Animation {
      */
     private static $same_format_targets = array( 'webp', 'avif', 'jxl' );
 
+    /**
+     * 允许参与格式转换的动图源扩展名
+     *
+     * WebP / AVIF / JXL 无论静图动图都只做同格式压缩，不进出转换链路。
+     *
+     * @var array
+     */
+    private static $convert_sources = array( 'gif', 'png' );
+
     /* ---------------------------------------------------------------------
      * 设置读取
      * ------------------------------------------------------------------- */
 
     /**
-     * 动画处理总开关
+     * APNG 是否强制走无损通道
      *
-     * 选项缺失时按开启处理：默认关闭会让动图继续被"跳过不压缩"，
-     * 而跳过才是会让用户困惑的意外行为。
-     *
-     * @return bool
-     */
-    public static function enabled(): bool {
-        $general = get_option( 'libre_compress_general', array() );
-
-        return ! isset( $general['animation_enabled'] ) || ! empty( $general['animation_enabled'] );
-    }
-
-    /**
-     * 动图是否允许转换为目标格式
+     * 有损 PNG 靠 pngquant 逐帧各自挑 256 色调色板，APNG 逐帧处理必然闪烁，
+     * 所以 PNG 为有损时，只有开启这一项才压 APNG。它与 PNG 的压缩模式同属一张表，
+     * 因此也存在压缩工具选项里，默认关闭。
      *
      * @return bool
      */
-    public static function convert_enabled(): bool {
-        $general = get_option( 'libre_compress_general', array() );
+    public static function apng_lossless_enabled(): bool {
+        $tools = get_option( 'libre_compress_tools', array() );
 
-        return ! isset( $general['animation_convert'] ) || ! empty( $general['animation_convert'] );
-    }
-
-    /**
-     * 帧数上限
-     *
-     * @return int
-     */
-    public static function max_frames(): int {
-        $general = get_option( 'libre_compress_general', array() );
-
-        return self::clamp( $general['animation_max_frames'] ?? null, self::FRAME_LIMIT_RANGE );
-    }
-
-    /**
-     * 单帧边长上限
-     *
-     * @return int
-     */
-    public static function max_edge(): int {
-        $general = get_option( 'libre_compress_general', array() );
-
-        return self::clamp( $general['animation_max_edge'] ?? null, self::EDGE_LIMIT_RANGE );
-    }
-
-    /**
-     * 归一化整数设置
-     *
-     * @param mixed $value 原始值
-     * @param array $range array( min, max, default )
-     * @return int
-     */
-    public static function clamp( $value, array $range ): int {
-        list( $min, $max, $default ) = $range;
-
-        if ( ( ! is_int( $value ) && ! is_string( $value ) ) || ! preg_match( '/^-?\d+$/D', (string) $value ) ) {
-            return (int) $default;
-        }
-
-        return (int) max( $min, min( $max, (float) $value ) );
+        return ! empty( $tools['apng_lossless'] );
     }
 
     /**
@@ -496,63 +432,115 @@ class Libre_Compress_Animation {
      * ------------------------------------------------------------------- */
 
     /**
-     * 该格式的动画能否同格式压缩
+     * 该路径需要的命令行工具
      *
-     * png 只在无损模式下支持：pngquant 逐帧各自选调色板会让动画闪烁，
-     * 而 APNG 帧必须共用一张全局调色板，所以有损 APNG 宁可不压。
+     * 返回的是"或"关系的多组，组内是"与"关系；目标为空表示同格式压缩。
+     * 能力判定与提示文案共用这一张表，避免同一件事在两处各写一遍。
      *
-     * @param string $extension 扩展名
-     * @param array  $plan      analyze() 结果
+     * @param string $source 源扩展名
+     * @param string $target 目标扩展名
+     * @return string[][]
+     */
+    public static function required_tool_groups( string $source, string $target = '' ): array {
+        $target    = '' === $target ? $source : $target;
+        $encoder   = 'avif' === $target ? 'avifenc' : 'img2webp';
+
+        if ( 'jxl' === $target ) {
+            // cjxl 原生读 GIF 与 APNG 的逐帧时长，不需要拆帧
+            return array( array( 'cjxl' ) );
+        }
+
+        if ( 'gif' === $source && 'webp' === $target ) {
+            return array( array( 'gif2webp' ), array( 'ffmpeg', 'img2webp' ) );
+        }
+
+        if ( 'webp' === $source ) {
+            return array( array( 'webpmux', 'anim_dump', $encoder ) );
+        }
+
+        if ( 'avif' === $source ) {
+            return array( array( 'avifdec', $encoder ) );
+        }
+
+        // gif / png 源逐帧拆开后重组
+        return array( array( 'ffmpeg', $encoder ) );
+    }
+
+    /**
+     * 该路径的工具是否至少配齐了一组
+     *
+     * @param string $source 源扩展名
+     * @param string $target 目标扩展名，空字符串表示同格式压缩
      * @return bool
      */
-    public static function same_format_supported( string $extension, array $plan ): bool {
+    public static function tools_available( string $source, string $target = '' ): bool {
+        foreach ( self::required_tool_groups( $source, $target ) as $group ) {
+            $complete = true;
+
+            foreach ( $group as $name ) {
+                if ( false === self::tool( $name ) ) {
+                    $complete = false;
+                    break;
+                }
+            }
+
+            if ( $complete ) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * 该格式的动画能否同格式压缩
+     *
+     * png 不在这里：APNG 由 native_tool_for() 决定交给 oxipng 还是直接跳过。
+     *
+     * @param string $extension 扩展名
+     * @return bool
+     */
+    public static function same_format_supported( string $extension ): bool {
         if ( ! in_array( $extension, self::$same_format_targets, true ) ) {
             return false;
         }
 
-        if ( 'webp' === $extension ) {
-            return false !== self::tool( 'webpmux' ) && false !== self::tool( 'anim_dump' ) && false !== self::tool( 'img2webp' );
-        }
-
-        if ( 'avif' === $extension ) {
-            return false !== self::tool( 'avifdec' ) && false !== self::tool( 'avifenc' );
-        }
-
-        return false !== self::tool( 'cjxl' );
+        return self::tools_available( $extension );
     }
 
     /**
-     * 该动图能否直接交给常规单文件工具处理
+     * 该动图应交给哪个常规单文件工具原地处理
      *
-     * APNG 属于这种：实测 oxipng 在 --strip=safe/--strip=none 下会完整保留 acTL/fcTL/fdAT
-     * 的帧结构与每帧时长（--strip=all 会把动图毁成一张静图，所以工具类本来就不用它）。
-     * 于是 APNG 不需要拆帧重组，但有损 PNG 模式仍然危险——pngquant 逐帧各自选调色板，
-     * 动图会闪烁，而 APNG 规范要求所有帧共用一张全局调色板。
+     * APNG 属于这种情况：实测 oxipng 在 --strip=safe/--strip=none 下会完整保留
+     * acTL/fcTL/fdAT 的帧结构与每帧时长（--strip=all 会把动图毁成一张静图，
+     * 工具类本来就不用它），所以整只 APNG 直接优化即可，不必拆帧。
+     * 有损 PNG 模式仍危险——pngquant 逐帧各自选调色板，动图会闪烁，
+     * 而 APNG 规范要求所有帧共用一张全局调色板，因此只有用户明确开启
+     * "APNG 自动无损压缩"时才在有损模式下走这里。
      *
      * @param string $extension 扩展名
-     * @return bool
+     * @return string 工具注册名，空字符串表示不交给单文件工具
      */
-    public static function handled_by_native_tool( string $extension ): bool {
+    public static function native_tool_for( string $extension ): string {
         if ( 'png' !== $extension ) {
-            return false;
+            return '';
         }
 
         $settings = get_option( 'libre_compress_tools', array() );
 
-        if ( 'lossless' !== ( isset( $settings['png_mode'] ) ? $settings['png_mode'] : 'lossy' ) ) {
-            return false;
+        if ( 'lossless' !== ( isset( $settings['png_mode'] ) ? $settings['png_mode'] : 'lossy' ) && ! self::apng_lossless_enabled() ) {
+            return '';
         }
 
-        $tool = isset( libre_compress()->compressor->get_tools()['oxipng'] ) ? libre_compress()->compressor->get_tools()['oxipng'] : null;
+        $tools = libre_compress()->compressor->get_tools();
 
-        return null !== $tool && $tool->is_tool_available();
+        return isset( $tools['oxipng'] ) && $tools['oxipng']->is_tool_available() ? 'oxipng' : '';
     }
 
     /**
      * 动画源能否转换成目标格式
      *
-     * cjxl 只能从 GIF 读动画时长（实测：喂 APNG 时首帧时长会被硬写成 100ms），
-     * 所以非 GIF 源不转 JXL，避免产出时长错乱的动图。
+     * 只有 PNG（APNG）与 GIF 参与转换，且必须至少一组工具齐备。
      *
      * @param string $source 源扩展名
      * @param string $target 目标扩展名
@@ -563,37 +551,11 @@ class Libre_Compress_Animation {
             return false;
         }
 
-        if ( ! in_array( $source, array( 'gif', 'png', 'webp', 'avif', 'jxl' ), true ) ) {
+        if ( ! in_array( $source, self::$convert_sources, true ) ) {
             return false;
         }
 
-        // cjxl 只有从 GIF 读动画时时长可靠：喂 APNG 时首帧时长会被固定成 100ms
-        if ( 'jxl' === $target ) {
-            return 'gif' === $source && false !== self::tool( 'cjxl' );
-        }
-
-        $needed = array( 'avif' === $target ? 'avifenc' : 'img2webp' );
-
-        if ( 'gif' === $source || 'png' === $source ) {
-            $needed[] = 'ffmpeg';
-        } elseif ( 'webp' === $source ) {
-            $needed[] = 'webpmux';
-            $needed[] = 'anim_dump';
-        } elseif ( 'avif' === $source ) {
-            $needed[] = 'avifdec';
-        } else {
-            // 动画 JXL 先解成 APNG，再交给 ffmpeg 拆帧
-            $needed[] = 'djxl';
-            $needed[] = 'ffmpeg';
-        }
-
-        foreach ( $needed as $name ) {
-            if ( false === self::tool( $name ) ) {
-                return false;
-            }
-        }
-
-        return true;
+        return self::tools_available( $source, $target );
     }
 
     /**
@@ -629,10 +591,6 @@ class Libre_Compress_Animation {
                 'compressed_size' => $original,
             );
         };
-
-        if ( ! self::enabled() ) {
-            return $fail( __( '动图处理已关闭', 'libre-compress' ) );
-        }
 
         if ( 'jxl' === $extension ) {
             // cjxl 能直接读动画 JXL 并重压，无需拆帧
@@ -682,19 +640,13 @@ class Libre_Compress_Animation {
             return $fail( __( '无法读取动图信息，已停止压缩以保护内容', 'libre-compress' ) );
         }
 
-        $limit = self::limit_message( $plan );
-
-        if ( '' !== $limit ) {
-            return $fail( $limit );
-        }
-
-        if ( ! self::same_format_supported( $extension, $plan ) ) {
+        if ( ! self::same_format_supported( $extension ) ) {
             return $fail( self::skip_reason( $extension ) );
         }
 
-        $token    = wp_generate_password( 12, false, false );
-        $prefix   = $file_path . '.lc-anim-' . $token;
-        $temp_out = $prefix . '.' . $extension;
+        $token    = wp_generate_password( 6, false, false );
+        $prefix   = dirname( $file_path ) . '/lc-' . $token . '-f';
+        $temp_out = $prefix . 'out.' . $extension;
         $temps    = array( $temp_out );
 
         $frames = self::decode_frames( $file_path, $prefix, $plan, $temps );
@@ -727,7 +679,7 @@ class Libre_Compress_Animation {
             return $fail( __( '压缩结果为空文件，已保留原文件', 'libre-compress' ) );
         }
 
-        if ( ! self::verify( $file_path, $temp_out ) ) {
+        if ( ! self::verify( $file_path, $temp_out, $frames ) ) {
             self::cleanup( $temps );
 
             return $fail( __( '压缩结果与原动图的帧数、时长或透明通道不一致，已放弃', 'libre-compress' ) );
@@ -778,22 +730,10 @@ class Libre_Compress_Animation {
             'tool'    => 'animation',
         );
 
-        if ( ! self::enabled() || ! self::convert_enabled() ) {
-            $result['message'] = __( '动图处理已关闭', 'libre-compress' );
-            return $result;
-        }
-
         $plan = self::analyze( $source );
 
         if ( null === $plan ) {
             $result['message'] = __( '无法读取动图信息，已停止转换以保护内容', 'libre-compress' );
-            return $result;
-        }
-
-        $limit = self::limit_message( $plan );
-
-        if ( '' !== $limit ) {
-            $result['message'] = $limit;
             return $result;
         }
 
@@ -802,7 +742,7 @@ class Libre_Compress_Animation {
             return $result;
         }
 
-        // 动图转 JXL 直接交给 cjxl 读源 GIF：实测它能逐帧保留时长与透明
+        // 动图转 JXL 直接把源交给 cjxl：实测它读 GIF 与 APNG 都能逐帧保留时长与透明
         if ( 'jxl' === $target ) {
             $command = Libre_Compress_Cjxl::build_command( $source, $output );
 
@@ -831,8 +771,8 @@ class Libre_Compress_Animation {
             return $result;
         }
 
-        $token  = wp_generate_password( 12, false, false );
-        $prefix = $source . '.lc-anim-' . $token;
+        $token  = wp_generate_password( 6, false, false );
+        $prefix = dirname( $source ) . '/lc-' . $token . '-f';
         $temps  = array( $output );
         $frames = self::decode_frames( $source, $prefix, $plan, $temps );
 
@@ -848,7 +788,7 @@ class Libre_Compress_Animation {
         if ( false === $commands ) {
             self::cleanup( $temps );
 
-            $result['message'] = self::missing_tool_message( $target );
+            $result['message'] = self::missing_tool_message( $source_format, $target );
             return $result;
         }
 
@@ -868,7 +808,7 @@ class Libre_Compress_Animation {
             return $result;
         }
 
-        if ( ! self::verify( $source, $output ) ) {
+        if ( ! self::verify( $source, $output, $frames ) ) {
             self::cleanup( $temps );
 
             $result['message'] = __( '转换结果与原动图的帧数、时长或透明通道不一致，已放弃', 'libre-compress' );
@@ -897,14 +837,14 @@ class Libre_Compress_Animation {
      * @param string $prefix  帧文件前缀
      * @param array  $plan    analyze() 结果
      * @param array  $temps   临时件清单（引用）
-     * @return string[]|false 帧路径数组
+     * @return string[]|null 帧路径数组
      */
     private static function decode_frames( string $source, string $prefix, array $plan, array &$temps ): ?array {
         $format = $plan['format'];
         $frames = array();
 
         for ( $i = 0; $i < $plan['frames']; $i++ ) {
-            $frames[] = sprintf( '%s-%03d.png', $prefix, $i );
+            $frames[] = sprintf( '%s%05d.png', $prefix, $i );
             $temps[]  = $frames[ $i ];
         }
 
@@ -914,16 +854,16 @@ class Libre_Compress_Animation {
             $ffmpeg = self::tool( 'ffmpeg' );
 
             if ( false === $ffmpeg ) {
-                return false;
+                return null;
             }
 
             // -fps_mode passthrough 是关键：默认会按固定帧率重复凑帧，4 帧被灌成 27 帧
-            $commands[] = array( $ffmpeg, '-y', '-loglevel', 'error', '-i', $source, '-fps_mode', 'passthrough', $prefix . '-%03d.png' );
+            $commands[] = array( $ffmpeg, '-y', '-loglevel', 'error', '-i', $source, '-fps_mode', 'passthrough', $prefix . '%05d.png' );
             // ffmpeg 的序号从 1 开始，拆完再改名对齐到确定性路径
             $renamed    = array();
 
             for ( $i = 0; $i < $plan['frames']; $i++ ) {
-                $renamed[] = sprintf( '%s-%03d.png', $prefix, $i + 1 );
+                $renamed[] = sprintf( '%s%05d.png', $prefix, $i + 1 );
                 $temps[]   = $renamed[ $i ]; // 中途失败时这些序号文件也要清掉
             }
 
@@ -959,42 +899,18 @@ class Libre_Compress_Animation {
                 $decoded[] = sprintf( '%s/anim_%04d.png', $folder, $i );
             }
         } else {
-            // avif 逐帧取，jxl 先解成 APNG 再走 ffmpeg
+            // 动画 AVIF 用 avifdec 逐帧取整幅画布
             $decoder = self::tool( 'avifdec' );
 
-            if ( 'jxl' === $format ) {
-                $djxl = self::tool( 'djxl' );
-                $apng = $prefix . '.apng';
-
-                if ( false === $djxl || false === self::tool( 'ffmpeg' ) ) {
-                    return null;
-                }
-
-                $temps[]  = $apng;
-                $commands = array(
-                    array( $djxl, $source, $apng ),
-                    array( self::tool( 'ffmpeg' ), '-y', '-loglevel', 'error', '-i', $apng, '-fps_mode', 'passthrough', $prefix . '-%03d.png' ),
-                );
-
-                $numbered = array();
-
-                for ( $i = 0; $i < $plan['frames']; $i++ ) {
-                    $numbered[] = sprintf( '%s-%03d.png', $prefix, $i + 1 );
-                    $temps[]    = $numbered[ $i ];
-                }
-
-                $decoded = $numbered;
-            } else {
-                if ( false === $decoder ) {
-                    return null;
-                }
-
-                for ( $i = 0; $i < $plan['frames']; $i++ ) {
-                    $commands[] = array( $decoder, '--index', (string) $i, $source, $frames[ $i ] );
-                }
-
-                $decoded = $frames;
+            if ( false === $decoder ) {
+                return null;
             }
+
+            for ( $i = 0; $i < $plan['frames']; $i++ ) {
+                $commands[] = array( $decoder, '--index', (string) $i, $source, $frames[ $i ] );
+            }
+
+            $decoded = $frames;
         }
 
         $error = self::run_commands( $commands );
@@ -1024,9 +940,10 @@ class Libre_Compress_Animation {
             $final[] = $target;
         }
 
-        // 帧必须是 8 位 RGBA：各编码器的输入约定建立在这之上，拿到别的格式说明解码工具行为异常
+        // 帧必须是 8 位 PNG：各编码器的输入约定建立在这之上，拿到 16 位或浮点格式说明解码工具行为异常
+        // 透明平面全不透明时 avifdec 会写成无 alpha 的 RGB PNG，这也是合法输入
         foreach ( $final as $frame ) {
-            if ( ! self::is_rgba8_png( $frame ) ) {
+            if ( ! self::is_decodable_png( $frame ) ) {
                 return null;
             }
         }
@@ -1173,11 +1090,12 @@ class Libre_Compress_Animation {
      *
      * 这是防住"静默毁掉动画"的唯一手段，任何一项对不上就判定失败。
      *
-     * @param string $source 原动图
-     * @param string $output 产物
+     * @param string       $source 原动图
+     * @param string       $output 产物
+     * @param string[]|null $frames 本次拆出的帧，用于判断原图是否真的有透明像素
      * @return bool
      */
-    private static function verify( string $source, string $output ): bool {
+    private static function verify( string $source, string $output, ?array $frames = null ): bool {
         $expected = self::analyze( $source );
         $actual   = self::analyze( $output );
 
@@ -1194,7 +1112,7 @@ class Libre_Compress_Animation {
             return false;
         }
 
-        if ( $expected['alpha'] && ! $actual['alpha'] ) {
+        if ( $expected['alpha'] && ! $actual['alpha'] && ( null === $frames || self::frames_have_alpha( $frames ) ) ) {
             return false;
         }
 
@@ -1256,49 +1174,48 @@ class Libre_Compress_Animation {
     }
 
     /**
-     * 判断是否 8 位 RGBA PNG
+     * 判断解码出的帧是否是编码器能吃的 8 位 PNG
      *
      * @param string $path PNG 路径
      * @return bool
      */
-    private static function is_rgba8_png( string $path ): bool {
+    private static function is_decodable_png( string $path ): bool {
         $ihdr = self::png_chunks( $path )['IHDR'];
 
-        return 13 === strlen( $ihdr ) && 8 === ord( $ihdr[8] ) && 6 === ord( $ihdr[9] );
+        return 13 === strlen( $ihdr ) && 8 === ord( $ihdr[8] ) && in_array( ord( $ihdr[9] ), array( 0, 2, 3, 4, 6 ), true );
+    }
+
+    /**
+     * 拆出来的帧里是否真的有透明像素
+     *
+     * 容器声明的"有 alpha 平面"和"这张图真的透明"是两件事：GIF 转出的 AVIF 带一整层全不透明
+     * alpha，avifdec 解码时直接给出 RGB 帧。拿容器声明去要求产物，会把这种动图永久判成失败。
+     *
+     * @param string[] $frames 帧路径
+     * @return bool
+     */
+    private static function frames_have_alpha( array $frames ): bool {
+        foreach ( $frames as $frame ) {
+            $chunks = self::png_chunks( $frame );
+
+            if ( ! empty( $chunks['tRNS'] ) ) {
+                return true;
+            }
+
+            $color = isset( $chunks['IHDR'][9] ) ? ord( $chunks['IHDR'][9] ) : 0;
+
+            if ( 4 === $color || 6 === $color ) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
 
     /* ---------------------------------------------------------------------
      * 辅助
      * ------------------------------------------------------------------- */
-
-    /**
-     * 帧数与尺寸上限检查
-     *
-     * @param array $plan analyze() 结果
-     * @return string 空字符串表示通过
-     */
-    private static function limit_message( array $plan ): string {
-        $edge = self::max_edge();
-
-        if ( $plan['frames'] > self::max_frames() ) {
-            return sprintf(
-                /* translators: %d: 帧数上限 */
-                __( '动图帧数超过上限（最大 %d 帧），已跳过', 'libre-compress' ),
-                self::max_frames()
-            );
-        }
-
-        if ( $plan['width'] > $edge || $plan['height'] > $edge ) {
-            return sprintf(
-                /* translators: %d: 边长上限 */
-                __( '动图尺寸超过上限（最大边 %d 像素），已跳过', 'libre-compress' ),
-                $edge
-            );
-        }
-
-        return '';
-    }
 
     /**
      * 不支持时的原因文案
@@ -1308,36 +1225,31 @@ class Libre_Compress_Animation {
      * @return string
      */
     public static function skip_reason( string $extension, string $target = '' ): string {
-        if ( 'png' === $extension && '' === $target && 'lossy' === ( get_option( 'libre_compress_tools', array() )['png_mode'] ?? 'lossy' ) ) {
-            return __( '动画 APNG 暂不和有损 PNG 压缩（逐帧各自调色会让画面闪烁），已跳过', 'libre-compress' );
+        if ( 'png' === $extension && '' === $target ) {
+            return __( '有损 PNG 压缩会逐帧各自调色让 APNG 闪烁，已跳过；要压 APNG 请开启"APNG 自动无损压缩"或把 PNG 设为无损', 'libre-compress' );
         }
 
-        if ( 'jxl' === $target ) {
-            return __( '只有 GIF 动画能可靠地转成动画 JXL，其余源会丢失每帧时长，已跳过', 'libre-compress' );
-        }
-
-        return self::missing_tool_message( '' === $target ? $extension : $target );
+        return self::missing_tool_message( $extension, $target );
     }
 
     /**
      * 缺工具时的提示文案
      *
-     * @param string $name 相关格式
+     * @param string $source 源扩展名
+     * @param string $target 目标扩展名，空字符串表示同格式压缩
      * @return string
      */
-    private static function missing_tool_message( string $name ): string {
-        $tools = array(
-            'gif'  => 'gifsicle + ffmpeg',
-            'png'  => 'ffmpeg + oxipng',
-            'webp' => 'webpmux + anim_dump + img2webp',
-            'avif' => 'avifdec + avifenc',
-            'jxl'  => 'cjxl',
-        );
+    private static function missing_tool_message( string $source, string $target = '' ): string {
+        $groups = array();
+
+        foreach ( self::required_tool_groups( $source, $target ) as $group ) {
+            $groups[] = implode( ' + ', $group );
+        }
 
         return sprintf(
             /* translators: %s: 工具名称 */
             __( '动图处理需要 %s 工具，当前环境未配齐，已跳过', 'libre-compress' ),
-            isset( $tools[ $name ] ) ? $tools[ $name ] : $name
+            implode( ' 或 ', $groups )
         );
     }
 
@@ -1396,7 +1308,7 @@ class Libre_Compress_Animated_Handler {
     }
 
     /**
-     * 不额外限制体积，帧数与边长上限由动画层负责
+     * 不额外限制体积
      *
      * @return int
      */

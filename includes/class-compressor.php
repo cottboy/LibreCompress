@@ -344,7 +344,6 @@ class Libre_Compress_Compressor {
 
         // 只为换色彩空间，用高质量写回，避免再叠加一层可见损失
         $saved = imagejpeg( $image, $temp_jpg, 90 );
-        imagedestroy( $image );
         self::cleanup_cmyk_temp( $temp_png );
 
         if ( ! $saved || ! file_exists( $temp_jpg ) || 0 === (int) filesize( $temp_jpg ) || self::is_cmyk_jpeg( $temp_jpg ) ) {
@@ -564,8 +563,8 @@ class Libre_Compress_Compressor {
 
         $extension      = strtolower( pathinfo( $file_path, PATHINFO_EXTENSION ) );
 
-        // 动图只能交给动画层：pngquant、oxipng、cwebp、avifenc 都只认第一帧，
-        // 直接调用会把动图压成静图。动画层负责拆帧、重组并校验，撑不住时整张跳过。
+        // 动图不能交给只认第一帧的单文件工具：pngquant、cwebp、avifenc 都会把动图压成静图。
+        // APNG 由 oxipng 整只无损优化（见 APNG 自动无损压缩开关），其余动图由动画层拆帧重组并校验。
         $plan   = in_array( $extension, array( 'png', 'webp', 'avif', 'jxl' ), true )
             ? Libre_Compress_Animation::analyze( $file_path )
             : null;
@@ -573,13 +572,12 @@ class Libre_Compress_Compressor {
 
         if ( null !== $plan && $plan['frames'] > 1 ) {
             $message = '';
+            $native  = Libre_Compress_Animation::native_tool_for( $extension );
 
-            if ( ! Libre_Compress_Animation::enabled() ) {
-                $message = __( '动画处理已关闭，动图不压缩', 'libre-compress' );
-            } elseif ( Libre_Compress_Animation::handled_by_native_tool( $extension ) ) {
-                // APNG 无损模式：oxipng 实测能安全优化整只 APNG，不必拆帧
-                $tool = $this->get_tool_for_format( $extension );
-            } elseif ( Libre_Compress_Animation::same_format_supported( $extension, $plan ) ) {
+            if ( '' !== $native && isset( $this->tools[ $native ] ) ) {
+                // APNG 整只交给 oxipng：实测它能保住帧结构与每帧时长，不必拆帧
+                $tool = $this->tools[ $native ];
+            } elseif ( Libre_Compress_Animation::same_format_supported( $extension ) ) {
                 $tool = new Libre_Compress_Animated_Handler( $extension );
             } else {
                 $message = Libre_Compress_Animation::skip_reason( $extension );
