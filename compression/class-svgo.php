@@ -105,7 +105,7 @@ class Libre_Compress_Svgo extends Libre_Compress_Tool_Base {
      * @return string|false 完整路径或 false
      */
     protected function find_in_system_path( string $executable_name ) {
-        if ( ! $this->is_exec_available() ) {
+        if ( ! self::is_command_execution_available() ) {
             return false;
         }
 

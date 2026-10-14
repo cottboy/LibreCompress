@@ -148,15 +148,6 @@ abstract class Libre_Compress_Tool_Base {
     }
 
     /**
-     * 检查 exec() 函数是否可用
-     *
-     * @return bool 是否可用
-     */
-    public function is_exec_available(): bool {
-        return self::is_command_execution_available();
-    }
-
-    /**
      * 获取可执行文件路径
      *
      * 优先查找 wp-content/LibreCompress-bin 目录，然后查找系统 PATH
@@ -202,7 +193,7 @@ abstract class Libre_Compress_Tool_Base {
      * @return string|false 完整路径或 false
      */
     protected function find_in_system_path( string $executable_name ) {
-        if ( ! $this->is_exec_available() ) {
+        if ( ! self::is_command_execution_available() ) {
             return false;
         }
 
@@ -244,7 +235,7 @@ abstract class Libre_Compress_Tool_Base {
      * @return bool 是否可用
      */
     public function is_tool_available(): bool {
-        if ( ! $this->is_exec_available() ) {
+        if ( ! self::is_command_execution_available() ) {
             return false;
         }
 
@@ -276,11 +267,12 @@ abstract class Libre_Compress_Tool_Base {
      * 命令以参数数组传入：PHP 会直接 CreateProcess 而不经过 shell，
      * 路径里的 % & 等字符不会被解释，也不会构成命令注入。
      *
-     * @param array $command 可执行文件加参数的数组
-     * @param int   $timeout 超时秒数
+     * @param array       $command 可执行文件加参数的数组
+     * @param int         $timeout 超时秒数
+     * @param string|null $cwd     工作目录；动图逐帧编码靠它把参数缩成裸文件名
      * @return array{success:bool,output:string,return_code:int}
      */
-    public static function run_command( array $command, int $timeout = 120 ): array {
+    public static function run_command( array $command, int $timeout = 120, ?string $cwd = null ): array {
         $command = array_values( array_filter( $command, static function ( $part ) {
             return '' !== $part && null !== $part;
         } ) );
@@ -322,7 +314,7 @@ abstract class Libre_Compress_Tool_Base {
             2 => array( 'file', $stderr_path, 'w' ),
         );
         $pipes       = array();
-        $process     = proc_open( $command, $descriptors, $pipes );
+        $process     = proc_open( $command, $descriptors, $pipes, $cwd );
         if ( ! is_resource( $process ) ) {
             unlink( $stdout_path );
             unlink( $stderr_path );
@@ -383,15 +375,19 @@ abstract class Libre_Compress_Tool_Base {
     /**
      * 检查本地命令执行依赖
      *
+     * 插件只用 proc_open()：命令以参数数组直接启动进程，不经过 shell，
+     * 因此不存在 exec() 那种"字符串交给 shell 解析"的注入面，也不需要它。
+     *
      * @return bool
      */
     public static function is_command_execution_available(): bool {
-        if ( ! function_exists( 'proc_open' ) || ! function_exists( 'exec' ) ) {
+        if ( ! function_exists( 'proc_open' ) ) {
             return false;
         }
 
         $disabled = array_map( 'trim', explode( ',', (string) ini_get( 'disable_functions' ) ) );
-        return ! in_array( 'proc_open', $disabled, true ) && ! in_array( 'exec', $disabled, true );
+
+        return ! in_array( 'proc_open', $disabled, true );
     }
 
     /**
@@ -402,10 +398,11 @@ abstract class Libre_Compress_Tool_Base {
      */
     private static function terminate_process( $process, int $pid ): void {
         if ( 'WIN' === strtoupper( substr( PHP_OS, 0, 3 ) ) && $pid > 0 ) {
-            // Windows 的 proc_terminate 不保证结束 cmd.exe 的子进程，使用 taskkill /T。
-            // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.system_calls_exec
-            @exec( 'taskkill /F /T /PID ' . absint( $pid ) . ' >NUL 2>&1', $taskkill_output, $taskkill_rc );
-            if ( 0 === (int) $taskkill_rc ) {
+            // Windows 的 proc_terminate 不保证结束子进程，用 taskkill /T 连子进程一起端掉
+            $kill = proc_open( array( 'taskkill', '/F', '/T', '/PID', (string) $pid ), array( array( 'pipe', 'r' ), array( 'file', 'NUL', 'w' ), array( 'file', 'NUL', 'w' ) ), $kill_pipes );
+            if ( is_resource( $kill ) ) {
+                foreach ( $kill_pipes as $pipe ) { fclose( $pipe ); }
+                proc_close( $kill );
                 return;
             }
         }

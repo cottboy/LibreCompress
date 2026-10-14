@@ -413,7 +413,7 @@ class Libre_Compress_Settings {
                             <input type="checkbox" name="libre_compress_general[cmyk_to_rgb]" value="1" <?php checked( $options['cmyk_to_rgb'] ?? true ); ?>>
                             <?php esc_html_e( '把 CMYK 的 JPEG 转成 RGB', 'libre-compress' ); ?>
                         </label>
-                        <p class="description"><?php esc_html_e( 'AVIF 编码器默认输出 4:4:4，改成 4:2:0 后照片类实测小 1%～2%，同时启用的锐利色彩转换让边缘颜色更准，但纯色块的小图可能反而大几百字节。WebP 有损格式本来就是 4:2:0，这一项对它只切换色彩转换算法；JPEG XL 编码器没有这种抽样参数，勾选与否都不影响它。CMYK 的 JPEG 多数来自印刷排版，浏览器常常显示成反色，转成 RGB 后才能正常显示，也能让各编码器读懂——转换需要 ffmpeg。', 'libre-compress' ); ?></p>
+                        <p class="description"><?php esc_html_e( '色度抽样只存在于有损的 YUV 格式：AVIF 编码器默认输出 4:4:4，改成 4:2:0 后照片类实测小 1%～2%，同时启用的锐利色彩转换让边缘颜色更准，但纯色块的小图可能反而大几百字节；WebP 有损格式本来就是 4:2:0，这一项对它只切换色彩转换算法；JPEG 理论上也能选 4:2:0，但插件用的 jpegoptim 改不了抽样，只能保持原图的方式；PNG、APNG、GIF、SVG 是 RGB 或索引色，没有色度可设；JPEG XL 的命令行工具也没开放这个参数。CMYK 方面：真正会碰到 CMYK 的只有 JPEG（印刷排版导出），浏览器常显示成反色，各编码器也会读错，转成 RGB 后才能正常显示和压缩——转换需要 ffmpeg；其他格式里不存在可用的 CMYK。', 'libre-compress' ); ?></p>
                     </td>
                 </tr>
                 <tr>
@@ -592,11 +592,7 @@ class Libre_Compress_Settings {
         $output_processor = libre_compress()->output_processor;
         $tools            = $compressor->get_tools();
 
-        $disabled_functions = array_map( 'trim', explode( ',', (string) ini_get( 'disable_functions' ) ) );
-        $exec_available = function_exists( 'exec' )
-            && function_exists( 'proc_open' )
-            && ! in_array( 'exec', $disabled_functions, true )
-            && ! in_array( 'proc_open', $disabled_functions, true );
+        $proc_open_available = Libre_Compress_Tool_Base::is_command_execution_available();
 
         // 全部压缩工具，按格式相邻排序
         $all_tools = array(
@@ -634,11 +630,11 @@ class Libre_Compress_Settings {
                 <td style="width: 120px;"><strong>proc_open()</strong></td>
                 <td style="width: 150px;"></td>
                 <td>
-                    <?php if ( $exec_available ) : ?>
+                    <?php if ( $proc_open_available ) : ?>
                         <span style="color: #00a32a;">✓ <?php esc_html_e( '可用', 'libre-compress' ); ?></span>
                     <?php else : ?>
                         <span style="color: #d63638;">✗ <?php esc_html_e( '不可用', 'libre-compress' ); ?></span>
-                        <p class="description"><?php esc_html_e( '压缩依赖 exec() 和 proc_open() 函数，请联系主机商启用', 'libre-compress' ); ?></p>
+                        <p class="description"><?php esc_html_e( '插件的所有压缩都靠 proc_open() 直接启动命令行工具，请联系主机商启用', 'libre-compress' ); ?></p>
                     <?php endif; ?>
                 </td>
                 <td></td>
@@ -772,18 +768,18 @@ class Libre_Compress_Settings {
                         <p class="description"><?php esc_html_e( 'pngquant 质量参数，0-100', 'libre-compress' ); ?></p>
                     </td>
                 </tr>
+                <?php $this->render_speed_field( 'pngquant_speed', __( 'pngquant 有损 PNG 速度', 'libre-compress' ), $options ); ?>
+                <?php $this->render_speed_field( 'oxipng_level', __( 'oxipng 无损 PNG 级别', 'libre-compress' ), $options ); ?>
                 <tr>
                     <th scope="row"><?php esc_html_e( 'APNG 动图', 'libre-compress' ); ?></th>
                     <td>
                         <label style="display:block;">
-                            <input type="checkbox" name="libre_compress_tools[apng_lossless]" value="1" <?php checked( ! empty( $options['apng_lossless'] ) ); ?>>
+                            <input type="checkbox" name="libre_compress_tools[apng_lossless]" value="1" <?php checked( $options['apng_lossless'] ?? true ); ?>>
                             <?php esc_html_e( 'APNG 一律自动无损压缩', 'libre-compress' ); ?>
                         </label>
-                        <p class="description"><?php esc_html_e( '有损 PNG 靠 pngquant 逐帧各自挑 256 色调色板，APNG 这样处理会闪烁，所以默认不压 APNG。勾选后不管 PNG 选有损还是无损，检测到 APNG 都改用 oxipng 做无损压缩，动图只减体积不变画质；不勾选且 PNG 为有损时 APNG 原样保留。PNG 本身选无损时，APNG 一直会走 oxipng，与本项无关。', 'libre-compress' ); ?></p>
+                        <p class="description"><?php esc_html_e( '有损 PNG 靠 pngquant 逐帧各自挑 256 色调色板，APNG 这样处理会闪烁，所以 APNG 只走 oxipng 的无损通道：不管 PNG 选有损还是无损，检测到 APNG 都只减体积不变画质。取消勾选后，PNG 为有损时 APNG 原样保留不压；PNG 为无损时本来就走 oxipng，与本项无关。', 'libre-compress' ); ?></p>
                     </td>
                 </tr>
-                <?php $this->render_speed_field( 'pngquant_speed', __( 'pngquant 有损 PNG 速度', 'libre-compress' ), $options ); ?>
-                <?php $this->render_speed_field( 'oxipng_level', __( 'oxipng 无损 PNG 级别', 'libre-compress' ), $options ); ?>
             </table>
 
             <h3><?php esc_html_e( 'WEBP 压缩', 'libre-compress' ); ?></h3>

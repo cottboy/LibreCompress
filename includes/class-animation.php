@@ -45,15 +45,15 @@ class Libre_Compress_Animation {
      * APNG 是否强制走无损通道
      *
      * 有损 PNG 靠 pngquant 逐帧各自挑 256 色调色板，APNG 逐帧处理必然闪烁，
-     * 所以 PNG 为有损时，只有开启这一项才压 APNG。它与 PNG 的压缩模式同属一张表，
-     * 因此也存在压缩工具选项里，默认关闭。
+     * 所以这一项决定的是"检测到 APNG 就改用 oxipng 无损压"还是"干脆不压"。
+     * 默认开启：只减体积不变画质，没有副作用。
      *
      * @return bool
      */
     public static function apng_lossless_enabled(): bool {
         $tools = get_option( 'libre_compress_tools', array() );
 
-        return ! empty( $tools['apng_lossless'] );
+        return ! isset( $tools['apng_lossless'] ) || ! empty( $tools['apng_lossless'] );
     }
 
     /**
@@ -645,11 +645,11 @@ class Libre_Compress_Animation {
         }
 
         $token    = wp_generate_password( 6, false, false );
-        $prefix   = dirname( $file_path ) . '/lc-' . $token . '-f';
-        $temp_out = $prefix . 'out.' . $extension;
+        $dir      = self::frame_dir( $token );
+        $temp_out = $file_path . '.lc-anim-' . $token . '.' . $extension;
         $temps    = array( $temp_out );
 
-        $frames = self::decode_frames( $file_path, $prefix, $plan, $temps );
+        $frames = self::decode_frames( $file_path, $dir, $plan, $temps );
 
         if ( null === $frames ) {
             self::cleanup( $temps );
@@ -665,7 +665,7 @@ class Libre_Compress_Animation {
             return $fail( self::missing_tool_message( $extension ) );
         }
 
-        $executed = self::run_commands( $commands );
+        $executed = self::run_commands( $commands, $dir );
 
         if ( '' !== $executed ) {
             self::cleanup( $temps );
@@ -772,9 +772,9 @@ class Libre_Compress_Animation {
         }
 
         $token  = wp_generate_password( 6, false, false );
-        $prefix = dirname( $source ) . '/lc-' . $token . '-f';
+        $dir    = self::frame_dir( $token );
         $temps  = array( $output );
-        $frames = self::decode_frames( $source, $prefix, $plan, $temps );
+        $frames = self::decode_frames( $source, $dir, $plan, $temps );
 
         if ( null === $frames ) {
             self::cleanup( $temps );
@@ -792,7 +792,7 @@ class Libre_Compress_Animation {
             return $result;
         }
 
-        $error = self::run_commands( $commands );
+        $error = self::run_commands( $commands, $dir );
 
         if ( '' !== $error ) {
             self::cleanup( $temps );
@@ -829,24 +829,46 @@ class Libre_Compress_Animation {
      * ------------------------------------------------------------------- */
 
     /**
-     * 把动图拆成 RGBA PNG 帧
+     * 逐帧临时目录
      *
-     * 帧路径确定性生成，便于兜底清理；临时件路径统一追加进 $temps 引用参数。
+     * 放在系统临时目录里，一是帧文件不该出现在公开的 uploads 里，二是配合"以该目录为
+     * 工作目录执行编码器"，让命令里每个帧只占一个裸文件名（约 8 字符），把 Windows
+     * 命令行长度的天花板从实测 350 帧抬到 1000 帧以上。
      *
-     * @param string $source  动图源路径
-     * @param string $prefix  帧文件前缀
-     * @param array  $plan    analyze() 结果
-     * @param array  $temps   临时件清单（引用）
+     * @param string $token 本次调度的随机标识
+     * @return string
+     */
+    private static function frame_dir( string $token ): string {
+        return rtrim( sys_get_temp_dir(), '/\\' ) . '/lc-' . $token;
+    }
+
+    /**
+     * 把动图拆成逐帧 PNG
+     *
+     * 帧文件名固定为 0.png、1.png……；所有临时件（含目录本身）追加进 $temps 引用参数，
+     * 由调用方统一清理。
+     *
+     * @param string $source 动图源路径
+     * @param string $dir    帧目录
+     * @param array  $plan   analyze() 结果
+     * @param array  $temps  临时件清单（引用）
      * @return string[]|null 帧路径数组
      */
-    private static function decode_frames( string $source, string $prefix, array $plan, array &$temps ): ?array {
+    private static function decode_frames( string $source, string $dir, array $plan, array &$temps ): ?array {
+        if ( ! is_dir( $dir ) && ! wp_mkdir_p( $dir ) ) {
+            return null;
+        }
+
         $format = $plan['format'];
         $frames = array();
 
         for ( $i = 0; $i < $plan['frames']; $i++ ) {
-            $frames[] = sprintf( '%s%05d.png', $prefix, $i );
+            $frames[] = $dir . '/' . $i . '.png';
             $temps[]  = $frames[ $i ];
         }
+
+        // 目录要在帧之后清理，位置不能挪
+        $temps[] = $dir;
 
         $commands = array();
 
@@ -858,45 +880,30 @@ class Libre_Compress_Animation {
             }
 
             // -fps_mode passthrough 是关键：默认会按固定帧率重复凑帧，4 帧被灌成 27 帧
-            $commands[] = array( $ffmpeg, '-y', '-loglevel', 'error', '-i', $source, '-fps_mode', 'passthrough', $prefix . '%05d.png' );
-            // ffmpeg 的序号从 1 开始，拆完再改名对齐到确定性路径
-            $renamed    = array();
-
-            for ( $i = 0; $i < $plan['frames']; $i++ ) {
-                $renamed[] = sprintf( '%s%05d.png', $prefix, $i + 1 );
-                $temps[]   = $renamed[ $i ]; // 中途失败时这些序号文件也要清掉
-            }
-
-            $decoded = $renamed;
+            // -start_number 0 让 ffmpeg 的序号与本层的 0.png 起点对齐，不必再改名
+            $commands[] = array( $ffmpeg, '-y', '-loglevel', 'error', '-i', $source, '-fps_mode', 'passthrough', '-start_number', '0', $dir . '/%d.png' );
+            $decoded    = $frames;
         } elseif ( 'webp' === $format ) {
             // 动画 WebP 的帧是增量小块，webpmux 取出来不是整幅画布；
             // anim_dump 走 libwebp 的动画解码器，输出的正是合成后的整幅 RGBA 帧。
             $anim_dump = self::tool( 'anim_dump' );
-            $folder    = $prefix . '-dir';
 
             if ( false === $anim_dump ) {
                 return null;
             }
 
-            if ( ! is_dir( $folder ) && ! wp_mkdir_p( $folder ) ) {
-                return null;
-            }
-
-            // 帧文件先删，最后再移除目录
             for ( $i = 0; $i < $plan['frames']; $i++ ) {
-                $temps[] = sprintf( '%s/anim_%04d.png', $folder, $i );
+                $temps[] = sprintf( '%s/anim_%04d.png', $dir, $i );
             }
-
-            $temps[] = $folder;
 
             $commands = array(
-                array( $anim_dump, '-folder', $folder, '-prefix', 'anim_', $source ),
+                array( $anim_dump, '-folder', $dir, '-prefix', 'anim_', $source ),
             );
 
             $decoded = array();
 
             for ( $i = 0; $i < $plan['frames']; $i++ ) {
-                $decoded[] = sprintf( '%s/anim_%04d.png', $folder, $i );
+                $decoded[] = sprintf( '%s/anim_%04d.png', $dir, $i );
             }
         } else {
             // 动画 AVIF 用 avifdec 逐帧取整幅画布
@@ -954,8 +961,10 @@ class Libre_Compress_Animation {
     /**
      * 构建动画组装命令
      *
+     * 命令以帧目录为工作目录执行，所以这里只写帧的裸文件名，输出路径保持绝对。
+     *
      * @param string   $target  目标扩展名
-     * @param string[] $frames  帧路径
+     * @param string[] $frames  帧文件绝对路径
      * @param int[]    $delays  每帧时长（1/100 秒）
      * @param int      $loop    额外循环次数，0 表示无限
      * @param string   $output  输出路径
@@ -1008,7 +1017,7 @@ class Libre_Compress_Animation {
             foreach ( $frames as $index => $frame ) {
                 $commands[0][] = '--duration';
                 $commands[0][] = (string) max( 1, (int) $delays[ $index ] );
-                $commands[0][] = $frame;
+                $commands[0][] = basename( $frame );
             }
 
             $commands[0][] = '--repetition-count';
@@ -1048,7 +1057,7 @@ class Libre_Compress_Animation {
                 // img2webp 的帧选项作用于其后的文件，时长单位是毫秒
                 $command[] = '-d';
                 $command[] = (string) ( max( 1, (int) $delays[ $index ] ) * 10 );
-                $command[] = $frame;
+                $command[] = basename( $frame );
             }
 
             $command[] = '-loop';
@@ -1066,12 +1075,13 @@ class Libre_Compress_Animation {
     /**
      * 顺序执行命令，返回空字符串表示全部成功
      *
-     * @param array[] $commands 命令链
+     * @param array[]       $commands 命令链
+     * @param string|null   $cwd      工作目录，逐帧编码时用于把路径缩成裸文件名
      * @return string 失败原因
      */
-    private static function run_commands( array $commands ): string {
+    private static function run_commands( array $commands, ?string $cwd = null ): string {
         foreach ( $commands as $command ) {
-            $result = Libre_Compress_Tool_Base::run_command( $command, 300 );
+            $result = Libre_Compress_Tool_Base::run_command( $command, 300, $cwd );
 
             if ( empty( $result['success'] ) ) {
                 $output = trim( (string) $result['output'] );
@@ -1254,24 +1264,32 @@ class Libre_Compress_Animation {
     }
 
     /**
-     * 清理临时文件
+     * 清理临时件
+     *
+     * 先删完所有文件再移除目录，清单里的先后顺序就不会影响结果。
      *
      * @param array $paths 路径清单
      */
     private static function cleanup( array $paths ): void {
+        $dirs = array();
+
         foreach ( $paths as $path ) {
             if ( ! is_string( $path ) || '' === $path ) {
                 continue;
             }
 
             if ( is_dir( $path ) ) {
-                @rmdir( $path );
+                $dirs[] = $path;
                 continue;
             }
 
             if ( file_exists( $path ) ) {
                 unlink( $path ); // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
             }
+        }
+
+        foreach ( $dirs as $dir ) {
+            @rmdir( $dir );
         }
     }
 }

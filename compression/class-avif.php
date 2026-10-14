@@ -122,7 +122,7 @@ class Libre_Compress_Avif extends Libre_Compress_Tool_Base {
     public function compress( string $file_path, array $options = array() ): array {
         $decoder = $this->get_decoder_path();
 
-        if ( false === $decoder || ! $this->is_exec_available() ) {
+        if ( false === $decoder || ! self::is_command_execution_available() ) {
             return parent::compress( $file_path, $options );
         }
 

@@ -2155,7 +2155,7 @@ class Libre_Compress_Output {
             return $cache[ $name ];
         }
 
-        // 没有 exec() 就不能执行本地工具，直接返回不可用，避免后续调用不存在的函数。
+        // proc_open() 不可用就执行不了本地工具，直接判为找不到，避免后续调用失败的函数。
         if ( ! Libre_Compress_Tool_Base::is_command_execution_available() ) {
             $cache[ $name ] = false;
             return false;
