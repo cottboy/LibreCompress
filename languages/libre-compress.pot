@@ -430,6 +430,16 @@ msgstr ""
 msgid "动图拆帧失败"
 msgstr ""
 
+#: includes/class-animation.php:680, includes/class-animation.php:681
+#: includes/class-animation.php:829, includes/class-animation.php:830
+msgid "avifenc 无法为多帧图像保留透明通道，已跳过；可改用 WebP 或 JPEG XL 目标"
+msgstr ""
+
+#: includes/class-animation.php:688, includes/class-animation.php:689
+#: includes/class-animation.php:840, includes/class-animation.php:841
+msgid "拆帧未能保留原图的透明通道，已跳过以保护内容"
+msgstr ""
+
 #: includes/class-converter.php:326, includes/class-converter.php:327
 msgid "动图转换失败"
 msgstr ""
@@ -467,7 +477,7 @@ msgid "勾选后，上传或补生成缩略图时，宽或高超过此阈值的�
 msgstr ""
 
 #: includes/class-settings.php:376, includes/class-settings.php:377
-msgid "勾选的源格式执行压缩时输出为目标格式；未勾选的格式只执行同格式压缩。所有成功结果都记为已压缩。只有 PNG、JPG、GIF 能转换格式，动图同样按这两个勾选走：APNG 看 PNG，动画 GIF 看 GIF；WebP、AVIF、JPEG XL 无论静图动图都只做同格式压缩，不会再来一遍转换。动图逐帧拆开压缩再重组，每帧播放时长、循环次数和透明背景都保留，处理完还会核对帧数、时长与透明通道，对不上就放弃这次压缩、保留原文件。"
+msgid "勾选的源格式执行压缩时输出为目标格式；未勾选的格式只执行同格式压缩。所有成功结果都记为已压缩。只有 PNG、JPG、GIF 能转换格式，动图同样按这两个勾选走：APNG 看 PNG，动画 GIF 看 GIF；WebP、AVIF、JPEG XL 无论静图动图都只做同格式压缩，不会再来一遍转换。动图逐帧拆开压缩再重组，每帧播放时长、循环次数和透明背景都保留，处理完还会核对帧数、时长与透明通道，对不上就放弃这次压缩、保留原文件。带真实透明像素的动图压 AVIF 或转 AVIF 会跳过：avifenc 的多帧序列模式不写 alpha 平面，压出来必然丢透明，可改用 WebP 或 JPEG XL 目标。"
 msgstr ""
 
 #. translators: %s: 当前所有相关文件的总占用空间

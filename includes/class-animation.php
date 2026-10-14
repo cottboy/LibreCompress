@@ -592,6 +592,17 @@ class Libre_Compress_Animation {
             );
         };
 
+        // 能力边界导致的主动跳过：文件未动，记为已处理，避免每轮批量都重跑一遍
+        $skip = static function ( string $message ) use ( $original ) {
+            return array(
+                'success'         => false,
+                'status'          => 'skipped',
+                'message'         => $message,
+                'original_size'   => $original,
+                'compressed_size' => $original,
+            );
+        };
+
         if ( 'jxl' === $extension ) {
             // cjxl 能直接读动画 JXL 并重压，无需拆帧
             $command = Libre_Compress_Cjxl::build_command( $file_path, $file_path . '.lc-anim-jxl.jxl' );
@@ -658,6 +669,23 @@ class Libre_Compress_Animation {
             self::cleanup( $temps );
 
             return $fail( __( '动图拆帧失败', 'libre-compress' ) );
+        }
+
+        // 透明通道保护：avifenc 的多帧序列模式不写 alpha 平面（实测 libavif 1.4.2：
+        // 日志显示 alpha quality 但产物 Alpha total size: 0 bytes，ffmpeg 的
+        // libaom-av1 / SVT-AV1 包装同样丢失），带真实透明像素的帧压出的 AVIF 必然丢透明。
+        if ( 'avif' === $extension && self::frames_have_real_alpha( $frames ) ) {
+            self::cleanup( $temps );
+
+            return $skip( __( 'avifenc 无法为多帧图像保留透明通道，已跳过；可改用 WebP 或 JPEG XL 目标', 'libre-compress' ) );
+        }
+
+        // 拆帧丢透明同样不能继续：ffmpeg 拆 GIF 时按播放语义把透明区域合成填充成
+        // 旧帧像素，帧拿不到真实 alpha，重组的产物透明信息已经静默丢失。
+        if ( $plan['alpha'] && ! self::frames_have_real_alpha( $frames ) ) {
+            self::cleanup( $temps );
+
+            return $skip( __( '拆帧未能保留原图的透明通道，已跳过以保护内容', 'libre-compress' ) );
         }
 
         $commands = self::build_encode_commands( $extension, $frames, $plan['delays'], $plan['loop'], $temp_out );
@@ -788,6 +816,29 @@ class Libre_Compress_Animation {
             self::cleanup( $temps );
 
             $result['message'] = __( '动图拆帧失败', 'libre-compress' );
+            return $result;
+        }
+
+        // 透明通道保护：avifenc 的多帧序列模式不写 alpha 平面（实测 libavif 1.4.2：
+        // 日志显示 alpha quality 但产物 Alpha total size: 0 bytes，ffmpeg 的
+        // libaom-av1 / SVT-AV1 包装同样丢失），带真实透明像素的帧转出的 AVIF 必然丢透明。
+        if ( 'avif' === $target && self::frames_have_real_alpha( $frames ) ) {
+            self::cleanup( $temps );
+
+            $result['status']  = 'skipped';
+            $result['message'] = __( 'avifenc 无法为多帧图像保留透明通道，已跳过；可改用 WebP 或 JPEG XL 目标', 'libre-compress' );
+
+            return $result;
+        }
+
+        // 拆帧丢透明同样不能继续：ffmpeg 拆 GIF 时按播放语义把透明区域合成填充成
+        // 旧帧像素，帧拿不到真实 alpha，重组的产物透明信息已经静默丢失。
+        if ( $plan['alpha'] && ! self::frames_have_real_alpha( $frames ) ) {
+            self::cleanup( $temps );
+
+            $result['status']  = 'skipped';
+            $result['message'] = __( '拆帧未能保留原图的透明通道，已跳过以保护内容', 'libre-compress' );
+
             return $result;
         }
 
@@ -1219,6 +1270,66 @@ class Libre_Compress_Animation {
         $ihdr = self::png_chunks( $path )['IHDR'];
 
         return 13 === strlen( $ihdr ) && 8 === ord( $ihdr[8] ) && in_array( ord( $ihdr[9] ), array( 0, 2, 3, 4, 6 ), true );
+    }
+
+    /**
+     * 拆出来的帧里是否真的有透明像素（逐像素采样，而非容器声明）
+     *
+     * 与 frames_have_alpha 的分工：那个看容器（color type / tRNS），回答"文件有没有
+     * alpha 平面"；这个看像素，回答"画面有没有真正透空的地方"。avifenc 的多帧序列
+     * 模式只在帧含真实透明像素时才丢 alpha 平面（容器声明齐全但全不透明的帧反而
+     * 写得出来），ffmpeg 拆 GIF 的合成填充也只有像素级才看得出来，所以透明保护
+     * 一律以本函数的结论为准。
+     *
+     * @param string[] $frames 帧路径
+     * @return bool
+     */
+    private static function frames_have_real_alpha( array $frames ): bool {
+        foreach ( $frames as $frame ) {
+            if ( self::png_has_transparent_pixels( $frame ) ) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * 采样判断 PNG 是否存在透明像素
+     *
+     * 读不出或不支持 GD 时按最坏情况返回 true：宁可多跳过一次，也不放过丢透明的图。
+     *
+     * @param string $path PNG 路径
+     * @return bool
+     */
+    private static function png_has_transparent_pixels( string $path ): bool {
+        if ( ! function_exists( 'imagecreatefrompng' ) ) {
+            return true;
+        }
+
+        // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
+        $image = @imagecreatefrompng( $path );
+
+        if ( false === $image ) {
+            return true;
+        }
+
+        $width  = imagesx( $image );
+        $height = imagesy( $image );
+
+        // 采样步长：总采样点控制在两万以内，大图也不必逐像素扫全图
+        $step = max( 1, (int) ceil( sqrt( $width * $height / 20000 ) ) );
+
+        // GD 的 alpha 约定与 PNG 文件相反：0 = 完全不透明，127 = 完全透明
+        for ( $y = 0; $y < $height; $y += $step ) {
+            for ( $x = 0; $x < $width; $x += $step ) {
+                if ( ( imagecolorat( $image, $x, $y ) >> 24 ) & 0x7F ) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     /**

@@ -374,7 +374,7 @@ class Libre_Compress_Settings {
                             <input type="checkbox" name="libre_compress_general[output_gif]" value="1" <?php checked( ! empty( $options['output_gif'] ) ); ?>>
                             <?php esc_html_e( 'GIF', 'libre-compress' ); ?>
                         </label>
-                        <p class="description"><?php esc_html_e( '勾选的源格式执行压缩时输出为目标格式；未勾选的格式只执行同格式压缩。所有成功结果都记为已压缩。只有 PNG、JPG、GIF 能转换格式，动图同样按这两个勾选走：APNG 看 PNG，动画 GIF 看 GIF；WebP、AVIF、JPEG XL 无论静图动图都只做同格式压缩，不会再来一遍转换。动图逐帧拆开压缩再重组，每帧播放时长、循环次数和透明背景都保留，处理完还会核对帧数、时长与透明通道，对不上就放弃这次压缩、保留原文件。', 'libre-compress' ); ?></p>
+                        <p class="description"><?php esc_html_e( '勾选的源格式执行压缩时输出为目标格式；未勾选的格式只执行同格式压缩。所有成功结果都记为已压缩。只有 PNG、JPG、GIF 能转换格式，动图同样按这两个勾选走：APNG 看 PNG，动画 GIF 看 GIF；WebP、AVIF、JPEG XL 无论静图动图都只做同格式压缩，不会再来一遍转换。动图逐帧拆开压缩再重组，每帧播放时长、循环次数和透明背景都保留，处理完还会核对帧数、时长与透明通道，对不上就放弃这次压缩、保留原文件。带真实透明像素的动图压 AVIF 或转 AVIF 会跳过：avifenc 的多帧序列模式不写 alpha 平面，压出来必然丢透明，可改用 WebP 或 JPEG XL 目标。', 'libre-compress' ); ?></p>
                     </td>
                 </tr>
                 <tr>
