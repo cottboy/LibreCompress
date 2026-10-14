@@ -5,7 +5,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: LibreCompress 1.4.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-14 09:43+0000\n"
+"POT-Creation-Date: 2026-10-14 10:33+0000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -154,7 +154,7 @@ msgid "JPG"
 msgstr ""
 
 #: includes/class-animation.php:599, includes/class-animation.php:600
-#: includes/class-animation.php:749, includes/class-animation.php:750
+#: includes/class-animation.php:752, includes/class-animation.php:753
 msgid "JXL 压缩工具 cjxl 不可用"
 msgstr ""
 
@@ -230,7 +230,7 @@ msgstr ""
 msgid "cjxl 压缩失败"
 msgstr ""
 
-#: includes/class-animation.php:756, includes/class-animation.php:757
+#: includes/class-animation.php:759, includes/class-animation.php:760
 msgid "cjxl 转换失败"
 msgstr ""
 
@@ -415,18 +415,18 @@ msgstr ""
 msgid "删除未勾选尺寸的缩略图"
 msgstr ""
 
-#: includes/class-animation.php:1089, includes/class-animation.php:1090
+#: includes/class-animation.php:1115, includes/class-animation.php:1116
 msgid "动图处理命令执行失败"
 msgstr ""
 
 #. translators: %s: 工具名称
 #, php-format
-#: includes/class-animation.php:1260, includes/class-animation.php:1261
+#: includes/class-animation.php:1286, includes/class-animation.php:1287
 msgid "动图处理需要 %s 工具，当前环境未配齐，已跳过"
 msgstr ""
 
-#: includes/class-animation.php:656, includes/class-animation.php:657
-#: includes/class-animation.php:781, includes/class-animation.php:782
+#: includes/class-animation.php:659, includes/class-animation.php:660
+#: includes/class-animation.php:789, includes/class-animation.php:790
 msgid "动图拆帧失败"
 msgstr ""
 
@@ -513,7 +513,7 @@ msgid "压缩工具"
 msgstr ""
 
 #: includes/class-animation.php:630, includes/class-animation.php:631
-#: includes/class-animation.php:701, includes/class-animation.php:702
+#: includes/class-animation.php:704, includes/class-animation.php:705
 #: includes/class-compressor.php:778, includes/class-compressor.php:779
 #: includes/class-converter.php:449, includes/class-converter.php:450
 #: includes/class-converter.php:489, includes/class-converter.php:490
@@ -540,11 +540,11 @@ msgstr ""
 msgid "压缩精度"
 msgstr ""
 
-#: includes/class-animation.php:684, includes/class-animation.php:685
+#: includes/class-animation.php:687, includes/class-animation.php:688
 msgid "压缩结果与原动图的帧数、时长或透明通道不一致，已放弃"
 msgstr ""
 
-#: includes/class-animation.php:678, includes/class-animation.php:679
+#: includes/class-animation.php:681, includes/class-animation.php:682
 #: compression/class-tool-base.php:513, compression/class-tool-base.php:514
 msgid "压缩结果为空文件，已保留原文件"
 msgstr ""
@@ -562,7 +562,7 @@ msgid "压缩结果无效且回滚失败，请保留回滚副本并检查磁盘�
 msgstr ""
 
 #: includes/class-animation.php:623, includes/class-animation.php:624
-#: includes/class-animation.php:690, includes/class-animation.php:691
+#: includes/class-animation.php:693, includes/class-animation.php:694
 #: compression/class-tool-base.php:500, compression/class-tool-base.php:501
 msgid "压缩结果替换失败，已保留原文件"
 msgstr ""
@@ -947,6 +947,11 @@ msgstr ""
 msgid "无法为源文件分配新文件名，已保留原文件"
 msgstr ""
 
+#: includes/class-animation.php:651, includes/class-animation.php:652
+#: includes/class-animation.php:780, includes/class-animation.php:781
+msgid "无法创建动图临时目录，已保留原文件"
+msgstr ""
+
 #: includes/class-processor.php:502, includes/class-processor.php:503
 msgid "无法创建原图备份，已停止压缩"
 msgstr ""
@@ -987,7 +992,7 @@ msgstr ""
 msgid "无法读取动图信息，已停止压缩以保护内容"
 msgstr ""
 
-#: includes/class-animation.php:735, includes/class-animation.php:736
+#: includes/class-animation.php:738, includes/class-animation.php:739
 msgid "无法读取动图信息，已停止转换以保护内容"
 msgstr ""
 
@@ -1007,7 +1012,7 @@ msgstr ""
 msgid "暂无官方包，建议从 GitHub Releases 下载或自行编译"
 msgstr ""
 
-#: includes/class-animation.php:1238, includes/class-animation.php:1239
+#: includes/class-animation.php:1264, includes/class-animation.php:1265
 msgid "有损 PNG 压缩会逐帧各自调色让 APNG 闪烁，已跳过；要压 APNG 请开启\"APNG 自动无损压缩\"或把 PNG 设为无损"
 msgstr ""
 
@@ -1301,12 +1306,12 @@ msgstr ""
 msgid "跳转"
 msgstr ""
 
-#: includes/class-animation.php:763, includes/class-animation.php:764
-#: includes/class-animation.php:813, includes/class-animation.php:814
+#: includes/class-animation.php:766, includes/class-animation.php:767
+#: includes/class-animation.php:821, includes/class-animation.php:822
 msgid "转换结果与原动图的帧数、时长或透明通道不一致，已放弃"
 msgstr ""
 
-#: includes/class-animation.php:806, includes/class-animation.php:807
+#: includes/class-animation.php:814, includes/class-animation.php:815
 msgid "转换结果为空文件"
 msgstr ""
 

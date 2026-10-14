@@ -644,10 +644,13 @@ class Libre_Compress_Animation {
             return $fail( self::skip_reason( $extension ) );
         }
 
-        $token    = wp_generate_password( 6, false, false );
-        $dir      = self::frame_dir( $token );
-        $temp_out = $file_path . '.lc-anim-' . $token . '.' . $extension;
+        $dir      = self::create_frame_dir();
+        $temp_out = $file_path . '.lc-anim-' . wp_generate_password( 8, false, false ) . '.' . $extension;
         $temps    = array( $temp_out );
+
+        if ( '' === $dir ) {
+            return $fail( __( '无法创建动图临时目录，已保留原文件', 'libre-compress' ) );
+        }
 
         $frames = self::decode_frames( $file_path, $dir, $plan, $temps );
 
@@ -771,9 +774,14 @@ class Libre_Compress_Animation {
             return $result;
         }
 
-        $token  = wp_generate_password( 6, false, false );
-        $dir    = self::frame_dir( $token );
+        $dir    = self::create_frame_dir();
         $temps  = array( $output );
+
+        if ( '' === $dir ) {
+            $result['message'] = __( '无法创建动图临时目录，已保留原文件', 'libre-compress' );
+            return $result;
+        }
+
         $frames = self::decode_frames( $source, $dir, $plan, $temps );
 
         if ( null === $frames ) {
@@ -833,20 +841,30 @@ class Libre_Compress_Animation {
      *
      * 放在系统临时目录里，一是帧文件不该出现在公开的 uploads 里，二是配合"以该目录为
      * 工作目录执行编码器"，让命令里每个帧只占一个裸文件名（约 8 字符），把 Windows
-     * 命令行长度的天花板从实测 350 帧抬到 1000 帧以上。
+     * 命令行长度的天花板抬到上千帧。
      *
-     * @param string $token 本次调度的随机标识
-     * @return string
+     * @return string 目录路径，创建失败返回空字符串
      */
-    private static function frame_dir( string $token ): string {
-        return rtrim( sys_get_temp_dir(), '/\\' ) . '/lc-' . $token;
+    private static function create_frame_dir(): string {
+        $base = rtrim( sys_get_temp_dir(), '/\\' );
+
+        // 必须"创建成功"才算拿到目录：撞上同名目录时复用，会读到上一轮或另一个请求留下的帧文件
+        for ( $attempt = 0; $attempt < 5; $attempt++ ) {
+            $dir = $base . '/lc-' . wp_generate_password( 8, false, false );
+
+            if ( @mkdir( $dir, 0777, false ) ) {
+                return $dir;
+            }
+        }
+
+        return '';
     }
 
     /**
      * 把动图拆成逐帧 PNG
      *
      * 帧文件名固定为 0.png、1.png……；所有临时件（含目录本身）追加进 $temps 引用参数，
-     * 由调用方统一清理。
+     * 由调用方统一清理。$dir 必须已由 create_frame_dir() 建好。
      *
      * @param string $source 动图源路径
      * @param string $dir    帧目录
@@ -855,10 +873,6 @@ class Libre_Compress_Animation {
      * @return string[]|null 帧路径数组
      */
     private static function decode_frames( string $source, string $dir, array $plan, array &$temps ): ?array {
-        if ( ! is_dir( $dir ) && ! wp_mkdir_p( $dir ) ) {
-            return null;
-        }
-
         $format = $plan['format'];
         $frames = array();
 
@@ -1013,11 +1027,23 @@ class Libre_Compress_Animation {
                 }
             }
 
-            // --duration 作用于其后的帧，必须逐帧成对给出
-            foreach ( $frames as $index => $frame ) {
+            // 命令行长度是帧数的真实天花板（Windows 约 32767 字符）：
+            // 各帧时长一样时只给一条 --duration，每帧省下 14 字符，实测上限从约 1100 帧抬到约 3100 帧。
+            // 实测这是 --duration 的常规行为（非 :u 选项对其后的所有帧持续生效），产物逐帧时长与逐帧给参数完全一致。
+            if ( count( array_unique( $delays ) ) === 1 ) {
                 $commands[0][] = '--duration';
-                $commands[0][] = (string) max( 1, (int) $delays[ $index ] );
-                $commands[0][] = basename( $frame );
+                $commands[0][] = (string) max( 1, (int) $delays[0] );
+
+                foreach ( $frames as $frame ) {
+                    $commands[0][] = basename( $frame );
+                }
+            } else {
+                // 时长不一致时必须逐帧成对给出，--duration 只作用于紧跟它的那一帧
+                foreach ( $frames as $index => $frame ) {
+                    $commands[0][] = '--duration';
+                    $commands[0][] = (string) max( 1, (int) $delays[ $index ] );
+                    $commands[0][] = basename( $frame );
+                }
             }
 
             $commands[0][] = '--repetition-count';
