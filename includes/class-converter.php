@@ -203,6 +203,12 @@ class Libre_Compress_Output {
         $animation_plan = in_array( $format, array( 'png', 'gif' ), true ) ? Libre_Compress_Animation::analyze( $file_path ) : null;
         $is_animation   = null !== $animation_plan && $animation_plan['frames'] > 1;
 
+        if ( 'png' === $format && Libre_Compress_Compressor::is_apng( $file_path ) && null === $animation_plan ) {
+            $result_template['status']  = 'skipped';
+            $result_template['message'] = __( '无法读取 APNG 动画信息，已跳过以保护动画内容', 'libre-compress' );
+            return $result_template;
+        }
+
         if ( ! in_array( $format, $settings['formats'], true ) ) {
             $result_template['status']  = 'skipped';
             $result_template['message'] = __( '该格式未配置格式转换', 'libre-compress' );
@@ -272,6 +278,7 @@ class Libre_Compress_Output {
         $encode_ok      = false;
         $error_msg      = '';
         $temp_source    = '';
+        $cmyk_source    = '';
         $command        = false;
         $animation_done = false;
 
@@ -310,15 +317,16 @@ class Libre_Compress_Output {
             $command = $this->build_encode_command( $temp_source, $temp_output, $target );
         } else {
             // CMYK JPEG 会让 cwebp/avifenc/cjxl 产出废图，先转成 RGB 再编码
-            $cmyk = Libre_Compress_Compressor::normalize_cmyk( $file_path );
+            $prepared = Libre_Compress_Compressor::prepare_cmyk_rgb( $file_path );
 
-            if ( '' !== $cmyk ) {
+            if ( ! empty( $prepared['needed'] ) && '' !== $prepared['message'] ) {
                 $result_template['status']  = 'skipped';
-                $result_template['message'] = $cmyk;
+                $result_template['message'] = $prepared['message'];
                 return $result_template;
             }
 
-            $command = $this->build_encode_command( $file_path, $temp_output, $target );
+            $cmyk_source = ! empty( $prepared['path'] ) ? $prepared['path'] : '';
+            $command     = $this->build_encode_command( '' !== $cmyk_source ? $cmyk_source : $file_path, $temp_output, $target );
         }
 
         if ( $animation_done ) {
@@ -361,6 +369,11 @@ class Libre_Compress_Output {
         if ( '' !== $temp_source && file_exists( $temp_source ) ) {
             // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
             unlink( $temp_source );
+        }
+
+        if ( '' !== $cmyk_source && file_exists( $cmyk_source ) ) {
+            // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
+            unlink( $cmyk_source );
         }
 
         // 动画层与命令链都可能在本次请求内刚写出目标文件，必须绕过 stat 缓存取真实大小
@@ -2043,7 +2056,17 @@ class Libre_Compress_Output {
             $quality = isset( $settings['webp_quality'] ) ? absint( $settings['webp_quality'] ) : 80;
             $quality = max( 0, min( 100, $quality ) );
 
-            return array( array( $binary, '-quiet', '-mt', '-q', (string) $quality, '-m', (string) Libre_Compress_Settings::tool_speed( 'webp_method' ), $source, '-o', $output ) );
+            $encode = array( $binary, '-quiet', '-mt', '-q', (string) $quality, '-m', (string) Libre_Compress_Settings::tool_speed( 'webp_method' ) );
+
+            if ( Libre_Compress_Animation::prefer_420() ) {
+                $encode[] = '-sharp_yuv';
+            }
+
+            $encode[] = $source;
+            $encode[] = '-o';
+            $encode[] = $output;
+
+            return array( $encode );
         }
 
         if ( 'jxl' === $target ) {

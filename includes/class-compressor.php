@@ -311,18 +311,44 @@ class Libre_Compress_Compressor {
      * @return string 空字符串表示可以继续处理，否则为跳过原因
      */
     public static function normalize_cmyk( string $file_path ): string {
-        if ( ! self::cmyk_to_rgb_enabled() || ! self::is_cmyk_jpeg( $file_path ) ) {
+        $prepared = self::prepare_cmyk_rgb( $file_path );
+
+        if ( ! $prepared['needed'] ) {
             return '';
+        }
+
+        if ( '' !== $prepared['message'] ) {
+            return $prepared['message'];
+        }
+
+        if ( ! rename( $prepared['path'], $file_path ) ) {
+            self::cleanup_cmyk_temp( $prepared['path'] );
+            return __( 'CMYK 转换结果替换失败，已保留原文件', 'libre-compress' );
+        }
+
+        clearstatcache( true, $file_path );
+        return '';
+    }
+
+    /**
+     * 把 CMYK JPEG 转成临时 RGB JPEG，不改动原图。
+     *
+     * @param string $file_path 文件绝对路径
+     * @return array{needed:bool,path:string,message:string}
+     */
+    public static function prepare_cmyk_rgb( string $file_path ): array {
+        if ( ! self::cmyk_to_rgb_enabled() || ! self::is_cmyk_jpeg( $file_path ) ) {
+            return array( 'needed' => false, 'path' => '', 'message' => '' );
         }
 
         $ffmpeg = Libre_Compress_Output::find_local_tool( 'ffmpeg' );
 
         if ( false === $ffmpeg ) {
-            return __( 'CMYK 转 RGB 需要 ffmpeg，当前环境未安装，已跳过', 'libre-compress' );
+            return array( 'needed' => true, 'path' => '', 'message' => __( 'CMYK 转 RGB 需要 ffmpeg，当前环境未安装，已跳过', 'libre-compress' ) );
         }
 
         if ( ! function_exists( 'imagecreatefrompng' ) || ! function_exists( 'imagejpeg' ) ) {
-            return __( 'CMYK 转 RGB 需要 GD 的 PNG/JPEG 支持，当前环境不具备，已跳过', 'libre-compress' );
+            return array( 'needed' => true, 'path' => '', 'message' => __( 'CMYK 转 RGB 需要 GD 的 PNG/JPEG 支持，当前环境不具备，已跳过', 'libre-compress' ) );
         }
 
         $token    = wp_generate_password( 12, false, false );
@@ -339,7 +365,7 @@ class Libre_Compress_Compressor {
         if ( false === $image ) {
             self::cleanup_cmyk_temp( $temp_png );
 
-            return __( 'CMYK 解码失败，已保留原文件', 'libre-compress' );
+            return array( 'needed' => true, 'path' => '', 'message' => __( 'CMYK 解码失败，已保留原文件', 'libre-compress' ) );
         }
 
         // 只为换色彩空间，用高质量写回，避免再叠加一层可见损失
@@ -349,18 +375,10 @@ class Libre_Compress_Compressor {
         if ( ! $saved || ! file_exists( $temp_jpg ) || 0 === (int) filesize( $temp_jpg ) || self::is_cmyk_jpeg( $temp_jpg ) ) {
             self::cleanup_cmyk_temp( $temp_jpg );
 
-            return __( 'CMYK 转换结果不可用，已保留原文件', 'libre-compress' );
+            return array( 'needed' => true, 'path' => '', 'message' => __( 'CMYK 转换结果不可用，已保留原文件', 'libre-compress' ) );
         }
 
-        if ( ! rename( $temp_jpg, $file_path ) ) {
-            self::cleanup_cmyk_temp( $temp_jpg );
-
-            return __( 'CMYK 转换结果替换失败，已保留原文件', 'libre-compress' );
-        }
-
-        clearstatcache( true, $file_path );
-
-        return '';
+        return array( 'needed' => true, 'path' => $temp_jpg, 'message' => '' );
     }
 
     /**
@@ -570,6 +588,13 @@ class Libre_Compress_Compressor {
             : null;
         $tool   = null;
 
+        // 已确认是 APNG 但读不出完整帧信息时，宁可跳过，也不能把它当普通 PNG 交给有损工具。
+        if ( 'png' === $extension && Libre_Compress_Compressor::is_apng( $file_path ) && null === $plan ) {
+            $message = __( '无法读取 APNG 动画信息，已跳过以保护动画内容', 'libre-compress' );
+            $this->record_skipped_file( $attachment_id, $file_path, $size_type, $message );
+            return array( 'success' => false, 'message' => $message, 'status' => 'skipped' );
+        }
+
         if ( null !== $plan && $plan['frames'] > 1 ) {
             $message = '';
             $native  = Libre_Compress_Animation::native_tool_for( $extension );
@@ -593,19 +618,6 @@ class Libre_Compress_Compressor {
                 );
             }
         } else {
-            // CMYK JPEG 会先把色彩转成 RGB：jpegoptim 之后还要跑，转换失败就别压
-            $cmyk = self::normalize_cmyk( $file_path );
-
-            if ( '' !== $cmyk ) {
-                $this->record_skipped_file( $attachment_id, $file_path, $size_type, $cmyk );
-
-                return array(
-                    'success' => false,
-                    'message' => $cmyk,
-                    'status'  => 'skipped',
-                );
-            }
-
             $tool = $this->get_tool_for_format( $extension );
         }
 
@@ -651,6 +663,22 @@ class Libre_Compress_Compressor {
                 'message' => $message,
                 'status'  => 'failed',
             );
+        }
+
+        // 先建立回滚副本，再改写 CMYK JPEG；工具不可用或后续失败时一定能恢复原图。
+        if ( 'jpg' === $extension || 'jpeg' === $extension ) {
+            $cmyk = self::normalize_cmyk( $file_path );
+
+            if ( '' !== $cmyk ) {
+                $this->rollback_file( $rollback_path, $file_path );
+                $this->record_skipped_file( $attachment_id, $file_path, $size_type, $cmyk );
+
+                return array(
+                    'success' => false,
+                    'message' => $cmyk,
+                    'status'  => 'skipped',
+                );
+            }
         }
 
         $original_size = filesize( $file_path );

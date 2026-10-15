@@ -1402,3 +1402,15 @@ msgstr ""
 #: includes/class-task.php:1150, includes/class-task.php:1151
 msgid "（共 %d 个，仅显示前 10 个）"
 msgstr ""
+
+msgid "动图透明帧整理失败，已保留原文件"
+msgstr ""
+
+msgid "无法读取 APNG 动画信息，已跳过以保护动画内容"
+msgstr ""
+
+msgid "JXL 工具无法保留这张动图的有限播放次数，已跳过以保护动画内容"
+msgstr ""
+
+msgid "目标格式工具无法保留只播放一次的动画，已跳过以保护动画内容"
+msgstr ""

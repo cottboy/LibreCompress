@@ -118,7 +118,14 @@ class Libre_Compress_Processor {
      * @return array
      */
     public function get_supported_mimes(): array {
-        return array( 'image/jpeg', 'image/png', 'image/webp', 'image/avif', 'image/jxl', 'image/gif', 'image/svg+xml' );
+        $mimes = array( 'image/jpeg', 'image/png', 'image/webp', 'image/avif', 'image/gif', 'image/svg+xml' );
+
+        // WordPress 原生接管 JXL 后，插件停止自动处理，避免两个处理流程互相覆盖。
+        if ( ! function_exists( 'libre_compress_jxl_is_native_supported' ) || ! libre_compress_jxl_is_native_supported() ) {
+            $mimes[] = 'image/jxl';
+        }
+
+        return $mimes;
     }
 
     /**

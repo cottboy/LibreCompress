@@ -92,6 +92,10 @@ class Libre_Compress_Cwebp extends Libre_Compress_Tool_Base {
             $command_parts[] = (string) $quality;
             $command_parts[] = '-m';
             $command_parts[] = (string) Libre_Compress_Settings::tool_speed( 'webp_method' );
+
+            if ( Libre_Compress_Animation::prefer_420() ) {
+                $command_parts[] = '-sharp_yuv';
+            }
         }
 
         // 输入和输出文件

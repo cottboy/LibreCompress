@@ -317,7 +317,7 @@ class Libre_Compress_Database {
 
         $after_id = absint( $after_id );
         $limit    = max( 1, min( 200, absint( $limit ) ) );
-        $mimes    = array( 'image/jpeg', 'image/png', 'image/webp', 'image/avif', 'image/jxl', 'image/gif', 'image/svg+xml' );
+        $mimes    = $this->get_compressible_image_mimes();
         $mimes_sql = "'" . implode( "','", array_map( 'esc_sql', $mimes ) ) . "'";
 
         // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
@@ -348,7 +348,7 @@ class Libre_Compress_Database {
     public function count_image_attachments(): int {
         global $wpdb;
 
-        $mimes     = array( 'image/jpeg', 'image/png', 'image/webp', 'image/avif', 'image/jxl', 'image/gif', 'image/svg+xml' );
+        $mimes     = $this->get_compressible_image_mimes();
         $mimes_sql = "'" . implode( "','", array_map( 'esc_sql', $mimes ) ) . "'";
 
         // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
@@ -358,6 +358,23 @@ class Libre_Compress_Database {
             AND post_status != 'trash'
             AND post_mime_type IN ({$mimes_sql})"
         );
+    }
+
+    /**
+     * 获取插件当前负责的图片 MIME 类型。
+     *
+     * WordPress 原生接管 JXL 后，批量任务也要把 JXL 排除在插件范围外。
+     *
+     * @return string[]
+     */
+    private function get_compressible_image_mimes(): array {
+        $mimes = array( 'image/jpeg', 'image/png', 'image/webp', 'image/avif', 'image/gif', 'image/svg+xml' );
+
+        if ( ! function_exists( 'libre_compress_jxl_is_native_supported' ) || ! libre_compress_jxl_is_native_supported() ) {
+            $mimes[] = 'image/jxl';
+        }
+
+        return $mimes;
     }
 
     /**

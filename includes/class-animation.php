@@ -167,31 +167,39 @@ class Libre_Compress_Animation {
             return null;
         }
 
-        preg_match_all( '/delay\s+([0-9.]+)\s*s/i', $info, $delays );
+        preg_match_all( '/\+\s*image\s+#\d+.*?(?=\+\s*image\s+#|\z)/is', $info, $image_blocks );
 
-        if ( empty( $delays[1] ) || count( $delays[1] ) < (int) $count[1] ) {
+        if ( count( $image_blocks[0] ) !== (int) $count[1] ) {
             return null;
         }
 
         $frames = (int) $count[1];
-        $loop   = 0;
+        $delays = array();
 
-        if ( preg_match( '/loop\s+(\d+)\s+times/i', $info, $finite ) ) {
+        foreach ( $image_blocks[0] as $block ) {
+            // gifsicle 对合法的 0 延时帧不输出 delay 行；缺少这一行就是 0 毫秒。
+            $delays[] = preg_match( '/delay\s+([0-9.]+)\s*s/i', $block, $delay )
+                ? self::milliseconds( (float) $delay[1], 0 )
+                : 0;
+        }
+
+        $loop          = 0;
+        $loop_infinite = false;
+
+        if ( preg_match( '/loop\s+(?:count\s+)?(\d+)(?:\s+times)?/i', $info, $finite ) ) {
             // gifsicle 打印的是"额外循环次数"，APNG 语义是"总播放次数"，这里统一存额外次数
             $loop = (int) $finite[1];
+        } elseif ( false !== stripos( $info, 'loop forever' ) ) {
+            $loop_infinite = true;
         }
 
         $size = preg_match( '/logical screen\s+(\d+)x(\d+)/i', $info, $screen ) ? array( (int) $screen[1], (int) $screen[2] ) : array( 0, 0 );
 
         return array(
             'frames'  => $frames,
-            'delays'  => array_map(
-                static function ( $seconds ) {
-                    return self::milliseconds( (float) $seconds, 1 );
-                },
-                array_slice( $delays[1], 0, $frames )
-            ),
+            'delays'  => $delays,
             'loop'    => $loop,
+            'loop_infinite' => $loop_infinite,
             'alpha'   => false !== stripos( $info, 'transparent' ),
             'width'   => $size[0],
             'height'  => $size[1],
@@ -220,11 +228,13 @@ class Libre_Compress_Animation {
             // 注意：unpack 里 d1 会被解析成"double 类型取 1 个"，所以末尾两个字节必须用 C
             $delay = unpack( 'Nseq/Nwidth/Nheight/Nx/Ny/nnum/nden/Cdispose/Cblend', $fctl );
 
-            if ( false === $delay || empty( $delay['den'] ) ) {
+            if ( false === $delay ) {
                 return null;
             }
 
-            $delays[] = self::milliseconds( $delay['num'] / $delay['den'], 1 );
+            // APNG 规范规定分母为 0 时按 100 处理，而不是把文件判为损坏。
+            $denominator = empty( $delay['den'] ) ? 100 : (int) $delay['den'];
+            $delays[]    = self::milliseconds( $delay['num'] / $denominator, 0 );
         }
 
         if ( $frames < 1 || count( $delays ) !== $frames ) {
@@ -239,6 +249,7 @@ class Libre_Compress_Animation {
             'delays'   => $delays,
             // APNG 的 num_plays 是总播放次数，0 为无限；转成与 GIF 一致的"额外次数"
             'loop'     => 0 === (int) $control['plays'] ? 0 : max( 0, (int) $control['plays'] - 1 ),
+            'loop_infinite' => 0 === (int) $control['plays'],
             'alpha'    => in_array( $color, array( 4, 6 ), true ) || ! empty( $chunks['tRNS'] ),
             'width'    => (int) $header['width'],
             'height'   => (int) $header['height'],
@@ -292,13 +303,15 @@ class Libre_Compress_Animation {
             }
         }
 
-        $loop   = preg_match( '/Loop Count\s*:\s*(\d+)/i', $info, $lc ) ? (int) $lc[1] : 0;
+        $loop_infinite = false !== stripos( $info, 'Loop Count : 0' );
+        $loop           = preg_match( '/Loop Count\s*:\s*(\d+)/i', $info, $lc ) ? (int) $lc[1] : 0;
         $canvas = preg_match( '/Canvas size:\s*(\d+)\s*x\s*(\d+)/i', $info, $cs ) ? array( (int) $cs[1], (int) $cs[2] ) : array( (int) $rows[0][1], (int) $rows[0][2] );
 
         return array(
             'frames'  => $frames,
             'delays'  => $delays,
             'loop'    => $loop,
+            'loop_infinite' => $loop_infinite,
             'alpha'   => $alpha,
             'width'   => $canvas[0],
             'height'  => $canvas[1],
@@ -357,7 +370,8 @@ class Libre_Compress_Animation {
         return array(
             'frames'    => $frames,
             'delays'    => $delays,
-            'loop'      => preg_match( '/Repetition Count\s*:\s*(\d+)/i', $info, $rep ) ? (int) $rep[1] : 0,
+            'loop'      => preg_match( '/(?:Repetition|Repeat) Count\s*:\s*(\d+)/i', $info, $rep ) ? (int) $rep[1] : 0,
+            'loop_infinite' => (bool) ( preg_match( '/(?:Repetition|Repeat) Count\s*:\s*0\b/i', $info ) || false !== stripos( $info, 'Repeat Count   : Infinite' ) ),
             'alpha'     => '' !== $alpha_line && false === stripos( $alpha_line, 'absent' ),
             'width'     => $resolution[0],
             'height'    => $resolution[1],
@@ -394,6 +408,14 @@ class Libre_Compress_Animation {
         $frames = count( $delays[1] );
         $res    = preg_match( '/(\d+)\s*x\s*(\d+)/', $info, $size ) ? array( (int) $size[1], (int) $size[2] ) : array( 0, 0 );
 
+        $loop_infinite = false;
+        $loop          = 0;
+
+        if ( preg_match( '/Num loops:\s*(\d+)/i', $info, $loops ) ) {
+            $loop = (int) $loops[1];
+            $loop_infinite = 0 === $loop && false !== stripos( $info, '(looping)' );
+        }
+
         return array(
             'frames'  => $frames,
             'delays'  => array_map(
@@ -402,7 +424,8 @@ class Libre_Compress_Animation {
                 },
                 $delays[1]
             ),
-            'loop'    => false !== stripos( $info, '(looping)' ) ? 0 : 1,
+            'loop'    => $loop,
+            'loop_infinite' => $loop_infinite,
             'alpha'   => false !== stripos( $info, '+Alpha' ) || false !== stripos( $info, 'Alpha: ' ),
             'width'   => $res[0],
             'height'  => $res[1],
@@ -663,6 +686,11 @@ class Libre_Compress_Animation {
             return $fail( __( '动图拆帧失败', 'libre-compress' ) );
         }
 
+        if ( self::frames_have_alpha( $frames ) && ! self::normalize_frame_alpha( $frames ) ) {
+            self::cleanup( $temps );
+            return $fail( __( '动图透明帧整理失败，已保留原文件', 'libre-compress' ) );
+        }
+
         // 兜底：源容器表明确实带透明（GIF 的透明索引、APNG 的色彩类型、WebP 的 ALPH 块，
         // 都由 gifsicle / 自读容器 / webpmux 给出，与拆帧工具无关），拆出来的帧却没有透明通道，
         // 说明这台机器的拆帧工具把透明丢了，重组必然产出丢透明的图——直接放弃，原文件不动。
@@ -674,7 +702,7 @@ class Libre_Compress_Animation {
             return $fail( __( '这台机器的动图拆帧工具会丢失透明通道，已放弃这次压缩并保留原文件', 'libre-compress' ) );
         }
 
-        $commands = self::build_encode_commands( $extension, $frames, $plan['delays'], $plan['loop'], $temp_out );
+        $commands = self::build_encode_commands( $extension, $frames, $plan['delays'], $plan['loop'], $temp_out, ! empty( $plan['loop_infinite'] ) );
 
         if ( false === $commands ) {
             self::cleanup( $temps );
@@ -761,6 +789,12 @@ class Libre_Compress_Animation {
 
         // 动图转 JXL 直接把源交给 cjxl：实测它读 GIF 与 APNG 都能逐帧保留时长与透明
         if ( 'jxl' === $target ) {
+            // 当前 cjxl 不能从 GIF/APNG 继承有限播放次数；无法保证播放语义时直接跳过。
+            if ( empty( $plan['loop_infinite'] ) ) {
+                $result['message'] = __( 'JXL 工具无法保留这张动图的有限播放次数，已跳过以保护动画内容', 'libre-compress' );
+                return $result;
+            }
+
             $command = Libre_Compress_Cjxl::build_command( $source, $output );
 
             if ( false === $command ) {
@@ -788,6 +822,11 @@ class Libre_Compress_Animation {
             return $result;
         }
 
+        if ( ! $plan['loop_infinite'] && 0 === (int) $plan['loop'] && in_array( $target, array( 'webp', 'avif' ), true ) ) {
+            $result['message'] = __( '目标格式工具无法保留只播放一次的动画，已跳过以保护动画内容', 'libre-compress' );
+            return $result;
+        }
+
         $dir    = self::create_frame_dir();
         $temps  = array( $output );
 
@@ -805,6 +844,12 @@ class Libre_Compress_Animation {
             return $result;
         }
 
+        if ( self::frames_have_alpha( $frames ) && ! self::normalize_frame_alpha( $frames ) ) {
+            self::cleanup( $temps );
+            $result['message'] = __( '动图透明帧整理失败，已保留原文件', 'libre-compress' );
+            return $result;
+        }
+
         // 兜底：拆帧工具把源图的透明通道丢了就不能继续，理由与"同格式压缩"那一处相同。
         // 这里的源只会是 GIF 与 APNG（convert_supported() 已限定），两者的透明声明都来自
         // gifsicle 与自读的 PNG 块，与拆帧工具无关，可以放心拿来对照。
@@ -816,7 +861,7 @@ class Libre_Compress_Animation {
             return $result;
         }
 
-        $commands = self::build_encode_commands( $target, $frames, $plan['delays'], $plan['loop'], $output );
+        $commands = self::build_encode_commands( $target, $frames, $plan['delays'], $plan['loop'], $output, ! empty( $plan['loop_infinite'] ) );
 
         if ( false === $commands ) {
             self::cleanup( $temps );
@@ -1009,10 +1054,15 @@ class Libre_Compress_Animation {
      * @param string   $output  输出路径
      * @return array[]|false 命令链，缺工具返回 false
      */
-    private static function build_encode_commands( string $target, array $frames, array $delays, int $loop, string $output ) {
+    private static function build_encode_commands( string $target, array $frames, array $delays, int $loop, string $output, bool $loop_infinite = true ) {
         $settings = get_option( 'libre_compress_tools', array() );
 
         if ( 'avif' === $target ) {
+            // AVIF 编码器用 0 表示无限循环，无法表达“只播放一次”。
+            if ( ! $loop_infinite && 0 === $loop ) {
+                return false;
+            }
+
             $avifenc = self::tool( 'avifenc' );
 
             if ( false === $avifenc ) {
@@ -1072,7 +1122,7 @@ class Libre_Compress_Animation {
             }
 
             $commands[0][] = '--repetition-count';
-            $commands[0][] = 0 === $loop ? 'infinite' : (string) $loop;
+            $commands[0][] = $loop_infinite ? 'infinite' : (string) $loop;
             $commands[0][] = $output;
 
             return array( $commands[0] );
@@ -1111,8 +1161,13 @@ class Libre_Compress_Animation {
                 $command[] = basename( $frame );
             }
 
+            // WebP 的 0 表示无限循环，无法表达“只播放一次”；这种情况由上层拒绝转换。
+            if ( ! $loop_infinite && 0 === $loop ) {
+                return false;
+            }
+
             $command[] = '-loop';
-            $command[] = (string) $loop;
+            $command[] = $loop_infinite ? '0' : (string) $loop;
             $command[] = '-o';
             $command[] = $output;
 
@@ -1173,6 +1228,21 @@ class Libre_Compress_Animation {
             return false;
         }
 
+        if ( $expected['width'] > 0 && $actual['width'] > 0
+            && ( $expected['width'] !== $actual['width'] || $expected['height'] !== $actual['height'] ) ) {
+            return false;
+        }
+
+        if ( isset( $expected['loop_infinite'], $actual['loop_infinite'] )
+            && $expected['loop_infinite'] !== $actual['loop_infinite'] ) {
+            return false;
+        }
+
+        if ( empty( $expected['loop_infinite'] ) && isset( $expected['loop'], $actual['loop'] )
+            && $expected['loop'] !== $actual['loop'] ) {
+            return false;
+        }
+
         if ( $expected['alpha'] && ! $actual['alpha'] && ( null === $frames || self::frames_have_alpha( $frames ) ) ) {
             return false;
         }
@@ -1183,6 +1253,17 @@ class Libre_Compress_Animation {
         // 各格式的时长刻度不同（AVIF 受 timescale 量化），允许 5% 误差
         if ( $source_total > 0 && abs( $output_total - $source_total ) > $source_total * 0.05 ) {
             return false;
+        }
+
+        if ( count( $expected['delays'] ) !== count( $actual['delays'] ) ) {
+            return false;
+        }
+
+        foreach ( $expected['delays'] as $index => $delay ) {
+            $tolerance = max( 5, (int) round( $delay * 0.05 ) );
+            if ( abs( $actual['delays'][ $index ] - $delay ) > $tolerance ) {
+                return false;
+            }
         }
 
         return true;
@@ -1271,6 +1352,34 @@ class Libre_Compress_Animation {
         }
 
         return false;
+    }
+
+    /**
+     * 把所有帧统一写成带透明通道的 PNG，避免首帧 RGB 导致后续透明帧丢失。
+     *
+     * @param string[] $frames 帧路径
+     * @return bool
+     */
+    private static function normalize_frame_alpha( array $frames ): bool {
+        if ( ! function_exists( 'imagecreatefrompng' ) || ! function_exists( 'imagepng' ) ) {
+            return false;
+        }
+
+        foreach ( $frames as $frame ) {
+            $image = @imagecreatefrompng( $frame );
+            if ( false === $image ) {
+                return false;
+            }
+
+            imagealphablending( $image, false );
+            imagesavealpha( $image, true );
+            $saved = @imagepng( $image, $frame, 6 );
+            if ( ! $saved || ! file_exists( $frame ) || 0 === (int) filesize( $frame ) ) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
 

@@ -78,6 +78,17 @@ class Libre_Compress_Cjxl extends Libre_Compress_Tool_Base {
 
         // JPEG 输入时 cjxl 默认走"JPEG 无损重构"，与 -q/-d 冲突会直接失败，统一关掉
         $command[] = '--lossless_jpeg=0';
+
+        // 隐私清理必须明确告诉 cjxl 删除容器里的 Exif、XMP 与 JUMBF。
+        if ( Libre_Compress_Settings::strips_metadata() ) {
+            $command[] = '-x';
+            $command[] = 'strip=exif';
+            $command[] = '-x';
+            $command[] = 'strip=xmp';
+            $command[] = '-x';
+            $command[] = 'strip=jumbf';
+        }
+
         $command[] = $source;
         $command[] = $output;
 
