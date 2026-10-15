@@ -203,6 +203,12 @@ class Libre_Compress_Output {
         $animation_plan = in_array( $format, array( 'png', 'gif' ), true ) ? Libre_Compress_Animation::analyze( $file_path ) : null;
         $is_animation   = null !== $animation_plan && $animation_plan['frames'] > 1;
 
+        if ( 'gif' === $format && Libre_Compress_Compressor::is_animated_gif( $file_path ) && null === $animation_plan ) {
+            $result_template['status'] = 'skipped';
+            $result_template['message'] = __( '无法读取 GIF 动画信息，已跳过以保护动画内容', 'libre-compress' );
+            return $result_template;
+        }
+
         if ( 'png' === $format && Libre_Compress_Compressor::is_apng( $file_path ) && null === $animation_plan ) {
             $result_template['status']  = 'skipped';
             $result_template['message'] = __( '无法读取 APNG 动画信息，已跳过以保护动画内容', 'libre-compress' );
@@ -283,21 +289,11 @@ class Libre_Compress_Output {
         $animation_done = false;
 
         if ( $is_animation ) {
-            $gif2webp = 'gif' === $format && 'webp' === $target ? $this->build_gif2webp_command( $file_path, $temp_output ) : false;
-
-            if ( false !== $gif2webp ) {
-                // GIF → 动画 WebP 有专用的一步式工具，不必拆帧落盘
-                $command   = array( $gif2webp );
-                $tool_name = 'gif2webp';
-            } else {
-                // 缺 gif2webp 时同样能拆帧重组，走动画层的通用链路
-                $animation = Libre_Compress_Animation::convert( $file_path, $target, $temp_output );
-
-                $animation_done = true;
-                $encode_ok      = $animation['success'];
-                $error_msg      = $animation['message'];
-                $tool_name      = $animation['tool'];
-            }
+            $animation = Libre_Compress_Animation::convert( $file_path, $target, $temp_output );
+            $animation_done = true;
+            $encode_ok = $animation['success'];
+            $error_msg = $animation['message'];
+            $tool_name = $animation['tool'];
         } elseif ( 'gif' === $format ) {
             // 静态 GIF 先由 GD 解码为 PNG
             $temp_source = $file_path . '.lc-source-' . $temp_token . '.png';
@@ -2132,37 +2128,6 @@ class Libre_Compress_Output {
     }
 
     /**
-     * 构建动画 GIF → 动画 WebP 命令
-     *
-     * gif2webp 一步就能保留帧序、每帧时长与透明，比拆帧再组装省掉大量临时文件。
-     *
-     * @param string $gif_path GIF 源路径
-     * @param string $output   输出文件路径
-     * @return array|false 单条命令，缺工具返回 false
-     */
-    private function build_gif2webp_command( string $gif_path, string $output ) {
-        $binary = self::find_local_tool( 'gif2webp' );
-
-        if ( false === $binary ) {
-            return false;
-        }
-
-        $settings = get_option( 'libre_compress_tools', array() );
-        $mode     = isset( $settings['webp_mode'] ) ? $settings['webp_mode'] : 'lossy';
-        $method   = (string) Libre_Compress_Settings::tool_speed( 'gif2webp_method' );
-
-        // gif2webp 默认即无损编码，有损模式需显式开启并指定质量
-        if ( 'lossy' !== $mode ) {
-            return array( $binary, '-m', $method, $gif_path, '-o', $output );
-        }
-
-        $quality = isset( $settings['webp_quality'] ) ? absint( $settings['webp_quality'] ) : 80;
-        $quality = max( 0, min( 100, $quality ) );
-
-        return array( $binary, '-m', $method, '-lossy', '-q', (string) $quality, $gif_path, '-o', $output );
-    }
-
-    /**
      * 查找本地辅助工具（gif2webp、ffmpeg 等）
      *
      * 优先 wp-content/LibreCompress-bin 目录，其次系统 PATH。
@@ -2185,15 +2150,21 @@ class Libre_Compress_Output {
         }
 
         $is_windows = 'WIN' === strtoupper( substr( PHP_OS, 0, 3 ) );
-        $bin_path   = LIBRE_COMPRESS_BIN_PATH . $name;
+        $candidates = array( LIBRE_COMPRESS_BIN_PATH . $name );
 
-        if ( $is_windows ) {
-            $bin_path .= '.exe';
+        // ImageMagick 的便携版需要保留附带文件，单独放在子目录。
+        if ( 'magick' === $name ) {
+            array_unshift( $candidates, LIBRE_COMPRESS_BIN_PATH . 'ImageMagick/magick' );
         }
 
-        if ( file_exists( $bin_path ) ) {
-            $cache[ $name ] = $bin_path;
-            return $bin_path;
+        foreach ( $candidates as $bin_path ) {
+            if ( $is_windows ) {
+                $bin_path .= '.exe';
+            }
+            if ( is_file( $bin_path ) ) {
+                $cache[ $name ] = $bin_path;
+                return $bin_path;
+            }
         }
 
         $found = Libre_Compress_Tool_Base::run_command(

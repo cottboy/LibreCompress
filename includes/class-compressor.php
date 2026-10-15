@@ -582,11 +582,18 @@ class Libre_Compress_Compressor {
         $extension      = strtolower( pathinfo( $file_path, PATHINFO_EXTENSION ) );
 
         // 动图不能交给只认第一帧的单文件工具：pngquant、cwebp、avifenc 都会把动图压成静图。
-        // APNG 由 oxipng 整只无损优化（见 APNG 自动无损压缩开关），其余动图由动画层拆帧重组并校验。
-        $plan   = in_array( $extension, array( 'png', 'webp', 'avif', 'jxl' ), true )
+        // APNG 由 oxipng 整只无损优化（见 APNG 自动无损压缩开关），其余动图也直接交给支持完整动画的工具并校验。
+        $plan   = in_array( $extension, array( 'gif', 'png', 'webp', 'avif', 'jxl' ), true )
             ? Libre_Compress_Animation::analyze( $file_path )
             : null;
         $tool   = null;
+
+        if ( null === $plan && ( ( 'gif' === $extension && self::is_animated_gif( $file_path ) )
+            || ( 'webp' === $extension && self::is_animated_webp( $file_path ) ) ) ) {
+            $message = __( '无法读取动图信息，已停止压缩以保护内容', 'libre-compress' );
+            $this->record_skipped_file( $attachment_id, $file_path, $size_type, $message );
+            return array( 'success' => false, 'message' => $message, 'status' => 'skipped' );
+        }
 
         // 已确认是 APNG 但读不出完整帧信息时，宁可跳过，也不能把它当普通 PNG 交给有损工具。
         if ( 'png' === $extension && Libre_Compress_Compressor::is_apng( $file_path ) && null === $plan ) {
@@ -683,6 +690,13 @@ class Libre_Compress_Compressor {
 
         $original_size = filesize( $file_path );
         $result        = $tool->compress( $file_path, $options );
+
+        // gifsicle 与 oxipng 的原生处理同样要校验，不能仅凭工具退出成功就覆盖原图。
+        if ( $result['success'] && null !== $plan && $plan['frames'] > 1
+            && ! Libre_Compress_Animation::matches_plan( $plan, Libre_Compress_Animation::analyze( $file_path ) ) ) {
+            $result['success'] = false;
+            $result['message'] = __( '处理结果的动画、尺寸、播放次数、透明背景或颜色配置与原图不一致，已保留原文件', 'libre-compress' );
+        }
 
         if ( ! $result['success'] ) {
             // 工具执行失败后必须成功还原，才能清理回滚副本。

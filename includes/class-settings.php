@@ -374,7 +374,7 @@ class Libre_Compress_Settings {
                             <input type="checkbox" name="libre_compress_general[output_gif]" value="1" <?php checked( ! empty( $options['output_gif'] ) ); ?>>
                             <?php esc_html_e( 'GIF', 'libre-compress' ); ?>
                         </label>
-                        <p class="description"><?php esc_html_e( '勾选的源格式执行压缩时输出为目标格式；未勾选的格式只执行同格式压缩。所有成功结果都记为已压缩。只有 PNG、JPG、GIF 能转换格式，动图同样按这两个勾选走：APNG 看 PNG，动画 GIF 看 GIF；WebP、AVIF、JPEG XL 无论静图动图都只做同格式压缩，不会再来一遍转换。动图逐帧拆开压缩再重组，每帧播放时长、循环次数和透明背景都保留，处理完还会核对帧数、时长与透明通道，对不上就放弃这次压缩、保留原文件。', 'libre-compress' ); ?></p>
+                        <p class="description"><?php esc_html_e( '勾选的源格式执行压缩时输出为目标格式；未勾选的格式只执行同格式压缩。所有成功结果都记为已压缩。只有 PNG、JPG、GIF 能转换格式，动图同样按这两个勾选走：APNG 看 PNG，动画 GIF 看 GIF；WebP、AVIF、JPEG XL 无论静图动图都只做同格式压缩，不会再来一遍转换。动图整张交给支持动画和透明背景的工具处理，插件不拆帧、不修改透明像素；处理完核对帧数、尺寸、每帧时长、循环次数和透明背景，对不上就保留原文件。', 'libre-compress' ); ?></p>
                     </td>
                 </tr>
                 <tr>
@@ -601,9 +601,9 @@ class Libre_Compress_Settings {
             array( 'name' => 'oxipng', 'tool' => $tools['oxipng'] ),
             array( 'name' => 'gifsicle', 'tool' => $tools['gifsicle'] ),
             array( 'name' => 'gif2webp', 'tool' => null, 'path' => $output_processor->find_local_tool( 'gif2webp' ), 'url' => 'https://developers.google.com/speed/webp/download' ),
-            array( 'name' => 'img2webp', 'tool' => null, 'path' => $output_processor->find_local_tool( 'img2webp' ), 'url' => 'https://developers.google.com/speed/webp/download' ),
-            array( 'name' => 'anim_dump', 'tool' => null, 'path' => $output_processor->find_local_tool( 'anim_dump' ), 'url' => 'https://developers.google.com/speed/webp/download' ),
             array( 'name' => 'webpmux', 'tool' => null, 'path' => $output_processor->find_local_tool( 'webpmux' ), 'url' => 'https://developers.google.com/speed/webp/download' ),
+            array( 'name' => 'magick', 'tool' => null, 'path' => $output_processor->find_local_tool( 'magick' ), 'url' => 'https://imagemagick.org/script/download.php' ),
+            array( 'name' => 'ffprobe', 'tool' => null, 'path' => $output_processor->find_local_tool( 'ffprobe' ), 'url' => 'https://ffmpeg.org/download.html' ),
             array( 'name' => 'ffmpeg', 'tool' => null, 'path' => $output_processor->find_local_tool( 'ffmpeg' ), 'url' => 'https://ffmpeg.org/download.html' ),
             array( 'name' => 'cwebp', 'tool' => $tools['cwebp'] ),
             array( 'name' => 'avifenc', 'tool' => null, 'path' => $output_processor->find_local_tool( 'avifenc' ), 'url' => 'https://github.com/AOMediaCodec/libavif' ),
@@ -944,7 +944,7 @@ class Libre_Compress_Settings {
      * 构建压缩路径支持状态行
      *
      * groups 为"或"关系：任一组内依赖全部可用即视为支持该路径，
-     * 组内为"与"关系（如动画 GIF 压缩为 AVIF 需 ffmpeg 与 avifenc 同时可用）
+     * 组内为"与"关系，包含实际处理工具和结果检查工具
      *
      * @return array[] 每行包含 label、deps_display、supported、missing
      */
@@ -965,7 +965,7 @@ class Libre_Compress_Settings {
         $available['gd']       = function_exists( 'imagecreatefromgif' ) && function_exists( 'imagepng' );
 
         // 动图处理用到的 libwebp 与 libjxl 附带工具按可执行文件独立判定
-        foreach ( array( 'img2webp', 'anim_dump', 'webpmux', 'jxlinfo' ) as $helper ) {
+        foreach ( array( 'magick', 'ffprobe', 'webpmux', 'jxlinfo' ) as $helper ) {
             $available[ $helper ] = false !== $output_processor->find_local_tool( $helper );
         }
 
@@ -981,8 +981,8 @@ class Libre_Compress_Settings {
             'gifsicle'  => 'gifsicle',
             'svgo'      => 'svgo',
             'gif2webp'  => 'gif2webp',
-            'img2webp'  => 'img2webp',
-            'anim_dump' => 'anim_dump',
+            'magick'   => 'ImageMagick',
+            'ffprobe'  => 'ffprobe',
             'webpmux'   => 'webpmux',
             'ffmpeg'    => 'ffmpeg',
             'gd'        => __( 'GD 扩展', 'libre-compress' ),
@@ -1002,16 +1002,16 @@ class Libre_Compress_Settings {
             array( 'label' => __( '静态 GIF 压缩为 WebP', 'libre-compress' ),          'groups' => array( array( 'gd', 'cwebp' ) ) ),
             array( 'label' => __( '静态 GIF 压缩为 AVIF', 'libre-compress' ),          'groups' => array( array( 'gd', 'avifenc' ) ) ),
             array( 'label' => __( '静态 GIF 压缩为 JPEG XL', 'libre-compress' ),       'groups' => array( array( 'gd', 'cjxl' ) ) ),
-            array( 'label' => __( '动画 GIF 压缩为 WebP', 'libre-compress' ),          'groups' => array( array( 'gif2webp' ), array( 'ffmpeg', 'img2webp' ) ) ),
-            array( 'label' => __( '动画 GIF 压缩为 AVIF', 'libre-compress' ),          'groups' => array( array( 'ffmpeg', 'avifenc' ) ) ),
-            array( 'label' => __( '动画 GIF 压缩为 JPEG XL', 'libre-compress' ),       'groups' => array( array( 'cjxl' ) ) ),
+            array( 'label' => __( '动画 GIF 压缩为 WebP', 'libre-compress' ),          'groups' => Libre_Compress_Animation::required_tool_groups( 'gif', 'webp' ) ),
+            array( 'label' => __( '动画 GIF 压缩为 AVIF', 'libre-compress' ),          'groups' => Libre_Compress_Animation::required_tool_groups( 'gif', 'avif' ) ),
+            array( 'label' => __( '动画 GIF 压缩为 JPEG XL', 'libre-compress' ),       'groups' => Libre_Compress_Animation::required_tool_groups( 'gif', 'jxl' ) ),
             array( 'label' => __( 'APNG 同格式压缩（需 PNG 无损或开启 APNG 自动无损）', 'libre-compress' ), 'groups' => array( array( 'oxipng' ) ) ),
-            array( 'label' => __( 'APNG 压缩为 WebP', 'libre-compress' ),              'groups' => array( array( 'ffmpeg', 'img2webp' ) ) ),
-            array( 'label' => __( 'APNG 压缩为 AVIF', 'libre-compress' ),              'groups' => array( array( 'ffmpeg', 'avifenc' ) ) ),
-            array( 'label' => __( 'APNG 压缩为 JPEG XL', 'libre-compress' ),            'groups' => array( array( 'cjxl' ) ) ),
-            array( 'label' => __( '动画 WebP 同格式压缩', 'libre-compress' ),          'groups' => array( array( 'webpmux', 'anim_dump', 'img2webp' ) ) ),
-            array( 'label' => __( '动画 AVIF 同格式压缩', 'libre-compress' ),          'groups' => array( array( 'avifdec', 'avifenc' ) ) ),
-            array( 'label' => __( '动画 JPEG XL 同格式压缩', 'libre-compress' ),       'groups' => array( array( 'cjxl', 'jxlinfo' ) ) ),
+            array( 'label' => __( 'APNG 压缩为 WebP', 'libre-compress' ),              'groups' => Libre_Compress_Animation::required_tool_groups( 'png', 'webp' ) ),
+            array( 'label' => __( 'APNG 压缩为 AVIF', 'libre-compress' ),              'groups' => Libre_Compress_Animation::required_tool_groups( 'png', 'avif' ) ),
+            array( 'label' => __( 'APNG 压缩为 JPEG XL', 'libre-compress' ),            'groups' => Libre_Compress_Animation::required_tool_groups( 'png', 'jxl' ) ),
+            array( 'label' => __( '动画 WebP 同格式压缩', 'libre-compress' ),          'groups' => Libre_Compress_Animation::required_tool_groups( 'webp', '' ) ),
+            array( 'label' => __( '动画 AVIF 同格式压缩', 'libre-compress' ),          'groups' => Libre_Compress_Animation::required_tool_groups( 'avif', '' ) ),
+            array( 'label' => __( '动画 JPEG XL 同格式压缩', 'libre-compress' ),       'groups' => Libre_Compress_Animation::required_tool_groups( 'jxl', '' ) ),
             array( 'label' => __( 'CMYK 转 RGB', 'libre-compress' ),                   'groups' => array( array( 'ffmpeg' ) ) ),
         );
 
