@@ -87,7 +87,9 @@
 | ffprobe | 为 FFmpeg 挑选动画 AVIF 的颜色与透明轨道 |
 | djpeg | CMYK JPEG 解码为 RGB（同时抽出 ICC 颜色配置） |
 | cjpeg | 把解码结果写成标准 RGB JPEG（并写回 ICC 颜色配置） |
-| svgo | SVG 同格式压缩 |
+| oxvg | SVG 同格式压缩（Rust 单文件程序，不需要 Node.js） |
+
+SVG 压缩改用 oxvg（Rust 单文件程序，不再需要 Node.js）：从发布页取 `oxvg.exe` 放进工具目录即可，**Windows x64 请用 v0.0.6 版本**（v0.0.9 的 `oxvg.exe` 是 ARM64，x64 只能自己编译），其他平台可用 `cargo install oxvg`。
 
 Windows 下把 `gif2webp.exe`、`webpmux.exe`、`cjxl.exe`、`jxlinfo.exe` 及对应包内依赖的 `.dll` 放进 `LibreCompress-bin`。`djpeg.exe` 与 `cjpeg.exe` 来自 libjpeg-turbo（**需 3.1.0 及以上**，CMYK 转 RGB 从该版本才有），一并放进同一目录即可。
 
@@ -103,7 +105,7 @@ APNG 转 WebP 需要支持 `libwebp_anim` 的 FFmpeg；动画 AVIF 需要支持 
 | WebP | cwebp |
 | AVIF | avifenc + avifdec |
 | GIF | gifsicle |
-| SVG | svgo |
+| SVG | oxvg |
 | JPEG XL | cjxl |
 
 PNG 严格按当前有损/无损设置选择工具，不会静默切换压缩模式。
@@ -185,7 +187,7 @@ WebP / AVIF / JPEG XL 无论静图动图都只做同格式压缩；APNG 与动�
 
 动画 AVIF 使用 FFmpeg 对应的速度档位，最大取 8；动画 WebP 使用 WebP 方法档位。
 
-SVGO 另提供默认开启的“多轮优化”开关：开启时更慢、通常文件更小，关闭后仅优化一轮。jpegoptim 没有独立的速度档位。速度设置只作用于后续处理，不会自动重新压缩已完成的图片。
+oxvg 与 jpegoptim 都没有独立的速度档位。速度设置只作用于后续处理，不会自动重新压缩已完成的图片。
 
 ### 压缩结果规则
 
@@ -214,7 +216,7 @@ SVGO 另提供默认开启的“多轮优化”开关：开启时更慢、通常
 | 动画 WebP | 逐帧重压后由 webpmux 原样复制 ICC（EXIF / XMP 由"清除隐私信息"开关决定）；GIF 转 WebP 只复制 ICC；APNG 转 WebP 不带入隐私信息 | GIF 转换及 WebP 重压尽量保留工具支持的输入配置；APNG 转换不复制隐私信息 |
 | 动画 AVIF | FFmpeg 不复制隐私信息，保留其支持的 ICC；ICC 丢失时拒绝替换 | 尝试复制工具支持的元数据，不能保证保留 EXIF/XMP；ICC 丢失时拒绝替换 |
 | GIF | `gifsicle --no-comments` 清除注释扩展块 | 保留注释 |
-| SVG | svgo 默认预设即删除 `<metadata>` 与注释 | 同样删除，svgo 没有保留开关 |
+| SVG | oxvg 默认预设即删除 `<metadata>` 与注释 | 同样删除，oxvg 没有保留开关 |
 
 智能备份只保存主图像（未缩放原图优先）这一份压缩前的逐字节副本，不再逐张备份缩略图，以此节省磁盘；备份只服务于“恢复原图”，恢复时会按当前设置重新生成缩略图，正文链接仍指向原来的尺寸（原来用缩略图还是缩略图，原来用原图还是原图）。目录已禁止直接访问，前台回退用的是媒体库里同样压缩过的旧格式文件，两者都不依赖备份目录对外提供图片。已经压缩过的图片改设置后不会自动重做，需要先清除对应的压缩记录。
 

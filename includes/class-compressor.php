@@ -41,7 +41,7 @@ class Libre_Compress_Compressor {
         $this->register_tool( new Libre_Compress_Avif() );
         $this->register_tool( new Libre_Compress_Cjxl() );
         $this->register_tool( new Libre_Compress_Gifsicle() );
-        $this->register_tool( new Libre_Compress_Svgo() );
+        $this->register_tool( new Libre_Compress_Oxvg() );
 
         do_action( 'libre_compress_register_tools', $this );
     }

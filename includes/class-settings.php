@@ -240,16 +240,12 @@ class Libre_Compress_Settings {
         $sanitized['gif_mode']    = isset( $input['gif_mode'] ) && in_array( $input['gif_mode'], array( 'lossy', 'lossless' ), true ) ? $input['gif_mode'] : 'lossy';
         $sanitized['gif_quality'] = isset( $input['gif_quality'] ) ? absint( $input['gif_quality'] ) : 60;
 
-        $sanitized['svg_precision'] = isset( $input['svg_precision'] ) ? absint( $input['svg_precision'] ) : 3;
-        $sanitized['svg_multipass'] = isset( $input['svg_multipass'] ) && in_array( $input['svg_multipass'], array( true, 1, '1' ), true );
-
         $sanitized['jpeg_quality']       = max( 0, min( 100, $sanitized['jpeg_quality'] ) );
         $sanitized['png_lossy_quality']  = max( 0, min( 100, $sanitized['png_lossy_quality'] ) );
         $sanitized['webp_quality']       = max( 0, min( 100, $sanitized['webp_quality'] ) );
         $sanitized['avif_quality']       = max( 0, min( 100, $sanitized['avif_quality'] ) );
         $sanitized['jxl_quality']        = max( 0, min( 100, $sanitized['jxl_quality'] ) );
         $sanitized['gif_quality']        = max( 0, min( 100, $sanitized['gif_quality'] ) );
-        $sanitized['svg_precision']      = max( 0, min( 8, $sanitized['svg_precision'] ) );
 
         return $sanitized;
     }
@@ -611,7 +607,7 @@ class Libre_Compress_Settings {
             array( 'name' => 'avifdec', 'tool' => null, 'path' => $output_processor->find_local_tool( 'avifdec' ), 'url' => 'https://github.com/AOMediaCodec/libavif' ),
             array( 'name' => 'cjxl', 'tool' => isset( $tools['cjxl'] ) ? $tools['cjxl'] : null, 'path' => $output_processor->find_local_tool( 'cjxl' ), 'url' => 'https://github.com/libjxl/libjxl/releases' ),
             array( 'name' => 'jxlinfo', 'tool' => null, 'path' => $output_processor->find_local_tool( 'jxlinfo' ), 'url' => 'https://github.com/libjxl/libjxl/releases' ),
-            array( 'name' => 'svgo', 'tool' => $tools['svgo'] ),
+            array( 'name' => 'oxvg', 'tool' => $tools['oxvg'] ),
         );
 
         // 统一为渲染字段：available(bool)、path、url
@@ -893,28 +889,6 @@ class Libre_Compress_Settings {
                 <?php $this->render_speed_field( 'gifsicle_level', __( 'gifsicle GIF 优化级别', 'libre-compress' ), $options ); ?>
             </table>
 
-            <h3><?php esc_html_e( 'SVG 压缩', 'libre-compress' ); ?></h3>
-            <table class="form-table">
-                <tr>
-                    <th scope="row"><?php esc_html_e( '压缩精度', 'libre-compress' ); ?></th>
-                    <td>
-                        <input type="range" name="libre_compress_tools[svg_precision]" value="<?php echo esc_attr( $options['svg_precision'] ?? 3 ); ?>" min="0" max="8" oninput="this.nextElementSibling.value = this.value">
-                        <output><?php echo esc_html( $options['svg_precision'] ?? 3 ); ?></output>
-                        <p class="description"><?php esc_html_e( '坐标小数有效位数 0-8，数值越高越保真，文件越大', 'libre-compress' ); ?></p>
-                    </td>
-                </tr>
-                <tr>
-                    <th scope="row"><?php esc_html_e( 'SVGO 多轮优化', 'libre-compress' ); ?></th>
-                    <td>
-                        <label>
-                            <input type="checkbox" name="libre_compress_tools[svg_multipass]" value="1" <?php checked( in_array( $options['svg_multipass'] ?? true, array( true, 1, '1' ), true ) ); ?>>
-                            <?php esc_html_e( '启用多轮优化', 'libre-compress' ); ?>
-                        </label>
-                        <p class="description"><?php esc_html_e( '多轮优化压缩更慢，通常文件更小；关闭后只优化一轮，速度更快。', 'libre-compress' ); ?></p>
-                    </td>
-                </tr>
-            </table>
-
             <?php submit_button(); ?>
         </form>
         <?php
@@ -980,7 +954,7 @@ class Libre_Compress_Settings {
             'cjxl'      => 'cjxl',
             'jxlinfo'   => 'jxlinfo',
             'gifsicle'  => 'gifsicle',
-            'svgo'      => 'svgo',
+            'oxvg'      => 'oxvg',
             'gif2webp'  => 'gif2webp',
             'ffprobe'  => 'ffprobe',
             'djpeg'    => 'djpeg',
@@ -997,7 +971,7 @@ class Libre_Compress_Settings {
             array( 'label' => __( 'AVIF 压缩', 'libre-compress' ), 'groups' => array( array( 'avifenc', 'avifdec' ) ) ),
             array( 'label' => __( 'JPEG XL 压缩', 'libre-compress' ), 'groups' => array( array( 'cjxl' ) ) ),
             array( 'label' => __( 'GIF 压缩', 'libre-compress' ), 'groups' => array( array( 'gifsicle' ) ) ),
-            array( 'label' => __( 'SVG 压缩', 'libre-compress' ), 'groups' => array( array( 'svgo' ) ) ),
+            array( 'label' => __( 'SVG 压缩', 'libre-compress' ), 'groups' => array( array( 'oxvg' ) ) ),
             array( 'label' => __( 'PNG/JPG 压缩为 WebP', 'libre-compress' ),          'groups' => array( array( 'cwebp' ) ) ),
             array( 'label' => __( 'PNG/JPG 压缩为 AVIF', 'libre-compress' ),          'groups' => array( array( 'avifenc' ) ) ),
             array( 'label' => __( 'PNG/JPG 压缩为 JPEG XL', 'libre-compress' ),       'groups' => array( array( 'cjxl' ) ) ),

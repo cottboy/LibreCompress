@@ -341,7 +341,7 @@ function libre_compress_load_dependencies() {
     require_once LIBRE_COMPRESS_PATH . 'compression/class-avif.php';
     require_once LIBRE_COMPRESS_PATH . 'compression/class-cjxl.php';
     require_once LIBRE_COMPRESS_PATH . 'compression/class-gifsicle.php';
-    require_once LIBRE_COMPRESS_PATH . 'compression/class-svgo.php';
+    require_once LIBRE_COMPRESS_PATH . 'compression/class-oxvg.php';
 
     // 加载核心类
     require_once LIBRE_COMPRESS_PATH . 'includes/class-database.php';
@@ -410,8 +410,6 @@ function libre_compress_activate() {
         'jxl_quality'        => 80,
         'gif_mode'           => 'lossy',
         'gif_quality'        => 60,
-        'svg_precision'      => 3,
-        'svg_multipass'      => true,
     );
 
     foreach ( Libre_Compress_Settings::SPEED_SETTINGS as $key => $range ) {
