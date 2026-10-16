@@ -76,19 +76,20 @@
 | pngquant | PNG 有损压缩 |
 | oxipng | PNG 无损压缩，APNG 整只无损优化 |
 | gifsicle | GIF 同格式压缩，动图帧数与每帧时长读取 |
-| cwebp | WebP 同格式压缩，以及 PNG/JPG/GIF 输出为 WebP |
+| cwebp | WebP 同格式压缩、动画 WebP 逐帧重压，以及 PNG/JPG/GIF 输出为 WebP |
 | gif2webp | 动画 GIF 输出为 WebP |
-| magick（ImageMagick） | 完整动画 WebP 同格式压缩 |
-| webpmux | 动画 WebP 信息检查、末帧时长修正与颜色配置复制 |
+| webpmux | 动画 WebP 抽帧与重组、信息检查、末帧时长修正与颜色配置复制 |
 | avifenc | 静态 AVIF 编码 |
 | avifdec | 静态 AVIF 解码、动画 AVIF 信息读取及结果检查 |
 | cjxl | JPEG XL 编码（同格式压缩、目标格式输出，并直接读 GIF / APNG 的逐帧时长产出动画 JXL） |
 | jxlinfo | 动画 JXL 帧数与每帧时长读取 |
-| ffmpeg | APNG 转动画 WebP、完整动画 AVIF 输出、CMYK 转 RGB |
-| ffprobe | 识别动画 AVIF 的颜色和透明轨道 |
+| ffmpeg | APNG 转动画 WebP、完整动画 AVIF 输出 |
+| ffprobe | 为 FFmpeg 挑选动画 AVIF 的颜色与透明轨道 |
+| djpeg | CMYK JPEG 解码为 RGB（同时抽出 ICC 颜色配置） |
+| cjpeg | 把解码结果写成标准 RGB JPEG（并写回 ICC 颜色配置） |
 | svgo | SVG 同格式压缩 |
 
-Windows 下把 `gif2webp.exe`、`webpmux.exe`、`cjxl.exe`、`jxlinfo.exe` 及对应包内依赖的 `.dll` 放进 `LibreCompress-bin`。ImageMagick 便携版完整解压到 `LibreCompress-bin/ImageMagick/`，保留随附文件，入口为 `magick.exe`；也可将 ImageMagick 安装到系统 PATH。
+Windows 下把 `gif2webp.exe`、`webpmux.exe`、`cjxl.exe`、`jxlinfo.exe` 及对应包内依赖的 `.dll` 放进 `LibreCompress-bin`。`djpeg.exe` 与 `cjpeg.exe` 来自 libjpeg-turbo（**需 3.1.0 及以上**，CMYK 转 RGB 从该版本才有），一并放进同一目录即可。
 
 APNG 转 WebP 需要支持 `libwebp_anim` 的 FFmpeg；动画 AVIF 需要支持 `libaom-av1`、透明动画 AVIF 输出的新版 FFmpeg，两者均需支持 `-enc_time_base 1:1000` 和 `-fps_mode passthrough`，`ffmpeg.exe` 和 `ffprobe.exe` 放进同一工具目录。仅找到文件不代表该构建具备所有能力；实际处理或检查失败时会保留原图。
 
@@ -126,7 +127,7 @@ WebP、AVIF、JPEG XL 不作为转换源：它们只做同格式压缩。
 | --- | --- | --- | --- | --- |
 | 动画 GIF | gifsicle | gifsicle + gif2webp + webpmux | gifsicle + ffmpeg + avifdec | gifsicle + cjxl + jxlinfo |
 | APNG | oxipng（PNG 无损或开启 APNG 自动无损） | ffmpeg + webpmux | ffmpeg + avifdec | cjxl + jxlinfo |
-| 动画 WebP | ImageMagick + webpmux | 不转换 | 不转换 | 不转换 |
+| 动画 WebP | webpmux + cwebp | 不转换 | 不转换 | 不转换 |
 | 动画 AVIF | ffmpeg + ffprobe + avifdec | 不转换 | 不转换 | 不转换 |
 | 动画 JXL | cjxl + jxlinfo | 不转换 | 不转换 | 不转换 |
 
@@ -148,7 +149,7 @@ WebP / AVIF / JPEG XL 无论静图动图都只做同格式压缩；APNG 与动�
 ### 色彩处理
 
 - **4:2:0 色度抽样**：默认开启。色度抽样是"有损 YUV 格式"才有的东西，逐个格式说清楚：AVIF 能设，avifenc 对 PNG 输入默认写 4:4:4，勾选后静态 AVIF 的有损路径加 `-y 420 --sharpyuv`，动画 AVIF 使用 FFmpeg 的 `yuv420p`，实测同一质量下照片类小 1%～2%（3456×4608 手机照片 765.3→757.5 KB，壁纸 83.1→82.2 KB），4:2:0 本身一定不比 4:4:4 大（去掉 `--sharpyuv` 更小：755.3 / 81.3 KB），变大的那一点是 `--sharpyuv`：它把色彩转得更准，纯色块类插画可能反比 4:2:0 多几百字节。WebP 有损格式**固定就是 4:2:0**，这一项对它只切换 `-sharp_yuv` 色彩转换算法。JPEG 理论上有 4:2:0/4:2:2/4:4:4 可选，但插件用的 jpegoptim 只能优化与无损重编码，**改不了抽样**，所以 JPG 保持原图的抽样方式；要强制 4:2:0 得整张重压（再多一层损失），插件不做这种事。PNG / APNG / GIF / SVG 是 RGB 或索引色，压根没有色度平面可抽。JPEG XL 的 cjxl 没开放这个参数，由它自己内部决定。产物不比原图小时，由"必须变小"的规则自动保留原图。
-- **CMYK 转 RGB**：默认开启。真正会带 CMYK 的只有 JPEG（印刷排版导出常见）：读取 JPEG 的 SOF 段分量数，等于 4 即判定为 CMYK，先用 ffmpeg 转成 RGB 再交给编码器。这一步是必要的：实测 CMYK 输入会让 avifenc 与 cjxl 直接产出 0 字节文件、让 cwebp 产出几十字节的废图、让 GD 读出反色。其他格式不需要这一步——WebP/AVIF/JXL 的编码链路只接受 RGB/YUV，PNG 规范里那个 CMYK 色彩空间浏览器和工具都不支持，GIF/SVG 更是只有索引色与 RGB。转换需要 ffmpeg，缺它时该图会安全跳过。
+- **CMYK 转 RGB**：默认开启。真正会带 CMYK 的只有 JPEG（印刷排版导出常见）：读取 JPEG 的 SOF 段分量数，等于 4 即判定为 CMYK，先用 djpeg 解成 RGB、再由 cjpeg 写回 JPEG（ICC 颜色配置原样带过去）再交给编码器。这一步是必要的：实测 CMYK 输入会让 avifenc 与 cjxl 直接产出 0 字节文件、让 cwebp 产出几十字节的废图、让 GD 读出反色。其他格式不需要这一步——WebP/AVIF/JXL 的编码链路只接受 RGB/YUV，PNG 规范里那个 CMYK 色彩空间浏览器和工具都不支持，GIF/SVG 更是只有索引色与 RGB。转换需要 djpeg 与 cjpeg（libjpeg-turbo 3.1.0 以上），缺它们时该图会安全跳过。
 - 选 JPEG XL 作为目标格式时建议同时开启"兼容格式回退"：浏览器对动画 JXL 的支持远不如 AVIF/WebP，保留旧格式回退才能让前台正常显示。
 
 ## 使用说明
@@ -182,7 +183,7 @@ WebP / AVIF / JPEG XL 无论静图动图都只做同格式压缩；APNG 与动�
 | avifenc AVIF 速度 | 0–10 | 越大越快 | 6 |
 | gifsicle GIF 优化级别 | 1–3 | 越大越慢 | 2 |
 
-动画 AVIF 使用 FFmpeg 对应的速度档位，最大取 8；ImageMagick 动画 WebP 使用 WebP 方法档位。
+动画 AVIF 使用 FFmpeg 对应的速度档位，最大取 8；动画 WebP 使用 WebP 方法档位。
 
 SVGO 另提供默认开启的“多轮优化”开关：开启时更慢、通常文件更小，关闭后仅优化一轮。jpegoptim 没有独立的速度档位。速度设置只作用于后续处理，不会自动重新压缩已完成的图片。
 
@@ -210,7 +211,7 @@ SVGO 另提供默认开启的“多轮优化”开关：开启时更慢、通常
 | PNG | `oxipng --strip=safe` 清除 eXIf 与文本块；oxipng 会把标准 sRGB 配置换成等效的 `sRGB` 块，色彩声明不丢 | `--strip=none` 保留 eXIf；pngquant 有损路径仍会自行丢弃文本块 |
 | WebP | cwebp 不写入任何元数据 | 同样不写入：该构建没有 `-metadata` 选项，保留不了 |
 | AVIF | `avifenc --ignore-exif --ignore-xmp`，ICC 保留 | avifenc 默认会把输入图的 EXIF/XMP 原样带进 AVIF |
-| 动画 WebP | ImageMagick 清除隐私配置和注释，webpmux 原样复制 ICC；GIF 转 WebP 只复制 ICC；APNG 转 WebP 不带入隐私信息 | GIF 转换及 WebP 重压尽量保留工具支持的输入配置；APNG 转换不复制隐私信息 |
+| 动画 WebP | 逐帧重压后由 webpmux 原样复制 ICC（EXIF / XMP 由"清除隐私信息"开关决定）；GIF 转 WebP 只复制 ICC；APNG 转 WebP 不带入隐私信息 | GIF 转换及 WebP 重压尽量保留工具支持的输入配置；APNG 转换不复制隐私信息 |
 | 动画 AVIF | FFmpeg 不复制隐私信息，保留其支持的 ICC；ICC 丢失时拒绝替换 | 尝试复制工具支持的元数据，不能保证保留 EXIF/XMP；ICC 丢失时拒绝替换 |
 | GIF | `gifsicle --no-comments` 清除注释扩展块 | 保留注释 |
 | SVG | svgo 默认预设即删除 `<metadata>` 与注释 | 同样删除，svgo 没有保留开关 |

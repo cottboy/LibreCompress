@@ -413,7 +413,7 @@ class Libre_Compress_Settings {
                             <input type="checkbox" name="libre_compress_general[cmyk_to_rgb]" value="1" <?php checked( $options['cmyk_to_rgb'] ?? true ); ?>>
                             <?php esc_html_e( '把 CMYK 的 JPEG 转成 RGB', 'libre-compress' ); ?>
                         </label>
-                        <p class="description"><?php esc_html_e( '色度抽样只存在于有损的 YUV 格式：AVIF 编码器默认输出 4:4:4，改成 4:2:0 后照片类实测小 1%～2%，同时启用的锐利色彩转换让边缘颜色更准，但纯色块的小图可能反而大几百字节；WebP 有损格式本来就是 4:2:0，这一项对它只切换色彩转换算法；JPEG 理论上也能选 4:2:0，但插件用的 jpegoptim 改不了抽样，只能保持原图的方式；PNG、APNG、GIF、SVG 是 RGB 或索引色，没有色度可设；JPEG XL 的命令行工具也没开放这个参数。CMYK 方面：真正会碰到 CMYK 的只有 JPEG（印刷排版导出），浏览器常显示成反色，各编码器也会读错，转成 RGB 后才能正常显示和压缩——转换需要 ffmpeg；其他格式里不存在可用的 CMYK。', 'libre-compress' ); ?></p>
+                        <p class="description"><?php esc_html_e( '色度抽样只存在于有损的 YUV 格式：AVIF 编码器默认输出 4:4:4，改成 4:2:0 后照片类实测小 1%～2%，同时启用的锐利色彩转换让边缘颜色更准，但纯色块的小图可能反而大几百字节；WebP 有损格式本来就是 4:2:0，这一项对它只切换色彩转换算法；JPEG 理论上也能选 4:2:0，但插件用的 jpegoptim 改不了抽样，只能保持原图的方式；PNG、APNG、GIF、SVG 是 RGB 或索引色，没有色度可设；JPEG XL 的命令行工具也没开放这个参数。带透明的图不受这一项影响：alpha 通道始终是无损的全分辨率，色度抽一半反而会让半透明边缘出现描边，所以带透明的图自动按 4:4:4 编码。CMYK 方面：真正会碰到 CMYK 的只有 JPEG（印刷排版导出），浏览器常显示成反色，各编码器也会读错，转成 RGB 后才能正常显示和压缩——转换需要 djpeg 与 cjpeg；其他格式里不存在可用的 CMYK。', 'libre-compress' ); ?></p>
                     </td>
                 </tr>
                 <tr>
@@ -602,8 +602,9 @@ class Libre_Compress_Settings {
             array( 'name' => 'gifsicle', 'tool' => $tools['gifsicle'] ),
             array( 'name' => 'gif2webp', 'tool' => null, 'path' => $output_processor->find_local_tool( 'gif2webp' ), 'url' => 'https://developers.google.com/speed/webp/download' ),
             array( 'name' => 'webpmux', 'tool' => null, 'path' => $output_processor->find_local_tool( 'webpmux' ), 'url' => 'https://developers.google.com/speed/webp/download' ),
-            array( 'name' => 'magick', 'tool' => null, 'path' => $output_processor->find_local_tool( 'magick' ), 'url' => 'https://imagemagick.org/script/download.php' ),
             array( 'name' => 'ffprobe', 'tool' => null, 'path' => $output_processor->find_local_tool( 'ffprobe' ), 'url' => 'https://ffmpeg.org/download.html' ),
+            array( 'name' => 'djpeg', 'tool' => null, 'path' => $output_processor->find_local_tool( 'djpeg' ), 'url' => 'https://github.com/libjpeg-turbo/libjpeg-turbo' ),
+            array( 'name' => 'cjpeg', 'tool' => null, 'path' => $output_processor->find_local_tool( 'cjpeg' ), 'url' => 'https://github.com/libjpeg-turbo/libjpeg-turbo' ),
             array( 'name' => 'ffmpeg', 'tool' => null, 'path' => $output_processor->find_local_tool( 'ffmpeg' ), 'url' => 'https://ffmpeg.org/download.html' ),
             array( 'name' => 'cwebp', 'tool' => $tools['cwebp'] ),
             array( 'name' => 'avifenc', 'tool' => null, 'path' => $output_processor->find_local_tool( 'avifenc' ), 'url' => 'https://github.com/AOMediaCodec/libavif' ),
@@ -965,7 +966,7 @@ class Libre_Compress_Settings {
         $available['gd']       = function_exists( 'imagecreatefromgif' ) && function_exists( 'imagepng' );
 
         // 动图处理用到的 libwebp 与 libjxl 附带工具按可执行文件独立判定
-        foreach ( array( 'magick', 'ffprobe', 'webpmux', 'jxlinfo' ) as $helper ) {
+        foreach ( array( 'ffprobe', 'webpmux', 'jxlinfo', 'djpeg', 'cjpeg' ) as $helper ) {
             $available[ $helper ] = false !== $output_processor->find_local_tool( $helper );
         }
 
@@ -981,8 +982,9 @@ class Libre_Compress_Settings {
             'gifsicle'  => 'gifsicle',
             'svgo'      => 'svgo',
             'gif2webp'  => 'gif2webp',
-            'magick'   => 'ImageMagick',
             'ffprobe'  => 'ffprobe',
+            'djpeg'    => 'djpeg',
+            'cjpeg'    => 'cjpeg',
             'webpmux'   => 'webpmux',
             'ffmpeg'    => 'ffmpeg',
             'gd'        => __( 'GD 扩展', 'libre-compress' ),
@@ -1012,7 +1014,7 @@ class Libre_Compress_Settings {
             array( 'label' => __( '动画 WebP 同格式压缩', 'libre-compress' ),          'groups' => Libre_Compress_Animation::required_tool_groups( 'webp', '' ) ),
             array( 'label' => __( '动画 AVIF 同格式压缩', 'libre-compress' ),          'groups' => Libre_Compress_Animation::required_tool_groups( 'avif', '' ) ),
             array( 'label' => __( '动画 JPEG XL 同格式压缩', 'libre-compress' ),       'groups' => Libre_Compress_Animation::required_tool_groups( 'jxl', '' ) ),
-            array( 'label' => __( 'CMYK 转 RGB', 'libre-compress' ),                   'groups' => array( array( 'ffmpeg' ) ) ),
+            array( 'label' => __( 'CMYK 转 RGB', 'libre-compress' ),                   'groups' => array( array( 'djpeg', 'cjpeg' ) ) ),
         );
 
         $rows = array();

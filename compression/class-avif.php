@@ -225,8 +225,10 @@ class Libre_Compress_Avif extends Libre_Compress_Tool_Base {
             $encode[] = '-q';
             $encode[] = (string) $quality;
 
-            // 4:2:0 色度抽样：体积更小的主因，--sharpyuv 用来减轻彩边的锯齿
-            if ( Libre_Compress_Animation::prefer_420() ) {
+            // 4:2:0 色度抽样：体积更小的主因，--sharpyuv 用来减轻彩边的锯齿。
+            // 带透明的图例外：alpha 是全分辨率无损的，色度抽一半会让两者在斜边上
+            // 错位，把半透明边缘压出描边，这种图宁可大一点也不抽。
+            if ( Libre_Compress_Animation::prefer_420() && ! Libre_Compress_Compressor::has_alpha( $file_path ) ) {
                 $encode[] = '-y';
                 $encode[] = '420';
                 $encode[] = '--sharpyuv';

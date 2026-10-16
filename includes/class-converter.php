@@ -2152,11 +2152,6 @@ class Libre_Compress_Output {
         $is_windows = 'WIN' === strtoupper( substr( PHP_OS, 0, 3 ) );
         $candidates = array( LIBRE_COMPRESS_BIN_PATH . $name );
 
-        // ImageMagick 的便携版需要保留附带文件，单独放在子目录。
-        if ( 'magick' === $name ) {
-            array_unshift( $candidates, LIBRE_COMPRESS_BIN_PATH . 'ImageMagick/magick' );
-        }
-
         foreach ( $candidates as $bin_path ) {
             if ( $is_windows ) {
                 $bin_path .= '.exe';

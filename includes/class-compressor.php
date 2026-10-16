@@ -230,6 +230,57 @@ class Libre_Compress_Compressor {
     }
 
     /**
+     * 判断图片是否带透明通道
+     *
+     * 只读容器头部的声明，不解码像素。JPEG 与 GIF 不在这里判断：JPEG 没有透明通道，
+     * GIF 只在静态转换链路里先解码成 PNG 再到这里，那时已经能按 PNG 判断。
+     *
+     * @param string $file_path 文件绝对路径
+     * @return bool 是否带透明
+     */
+    public static function has_alpha( string $file_path ): bool {
+        if ( ! is_file( $file_path ) ) {
+            return false;
+        }
+
+        $extension = strtolower( pathinfo( $file_path, PATHINFO_EXTENSION ) );
+        $handle    = fopen( $file_path, 'rb' );
+
+        if ( false === $handle ) {
+            return false;
+        }
+
+        // 颜色配置、透明声明这类头信息都在文件前部，读一段就够，不解码图像数据。
+        $head = (string) fread( $handle, 65536 );
+        fclose( $handle );
+
+        if ( 'png' === $extension ) {
+            if ( "\x89PNG\r\n\x1a\n" !== substr( $head, 0, 8 ) ) {
+                return false;
+            }
+
+            // IHDR 颜色类型 4 = 灰度+透明，6 = RGBA；调色板图靠 tRNS 声明透明。
+            return ( isset( $head[25] ) && in_array( ord( $head[25] ), array( 4, 6 ), true ) )
+                || false !== strpos( $head, 'tRNS' );
+        }
+
+        if ( 'webp' === $extension ) {
+            // VP8X 扩展块 flags 的 0x10 位表示带透明。
+            return 'RIFF' === substr( $head, 0, 4 )
+                && false !== strpos( $head, 'VP8X' )
+                && isset( $head[20] )
+                && 0 !== ( ord( $head[20] ) & 0x10 );
+        }
+
+        if ( 'avif' === $extension ) {
+            // AVIF 的透明是一张独立的辅助图，靠 iref 里的 auxl 关联声明。
+            return false !== strpos( $head, 'auxl' );
+        }
+
+        return false;
+    }
+
+    /**
      * 是否开启 CMYK 转 RGB
      *
      * 选项缺失时按开启处理：CMYK JPEG 交给 avifenc、cwebp、cjxl 会直接失败或产出
@@ -302,10 +353,10 @@ class Libre_Compress_Compressor {
     /**
      * 把 CMYK JPEG 原地转成 RGB
      *
-     * 先用 ffmpeg 解码成 PNG（实测它能正确套用 Adobe 的色彩变换，而 GD 直接读 CMYK
-     * 会得到反色），再用 GD 写成标准 RGB JPEG。不能让 ffmpeg 直接写 JPEG：实测它产出的
-     * JPEG 会被 cjxl 拒绝（Getting pixel data failed），而 GD 写出来的三种编码器都能吃。
-     * 转换只落到临时文件，全部确认成功后才改名替换原文件。
+     * 用 libjpeg-turbo 自带的 djpeg 解出 RGB，再用 cjpeg 写回 JPEG。djpeg 对 CMYK
+     * 输入默认就输出 RGB，不要加 -rgb（那会要求库自己做色彩空间转换而直接报错）；
+     * 顺手用 -icc 把原图的 ICC 抽出来，转完再塞回去，换色彩空间不会丢颜色配置。
+     * 转换只落到临时文件，全部确认成功后才改名替换原文件。需 libjpeg-turbo 3.1.0 以上。
      *
      * @param string $file_path 文件绝对路径
      * @return string 空字符串表示可以继续处理，否则为跳过原因
@@ -341,38 +392,51 @@ class Libre_Compress_Compressor {
             return array( 'needed' => false, 'path' => '', 'message' => '' );
         }
 
-        $ffmpeg = Libre_Compress_Output::find_local_tool( 'ffmpeg' );
+        $djpeg = Libre_Compress_Output::find_local_tool( 'djpeg' );
+        $cjpeg = Libre_Compress_Output::find_local_tool( 'cjpeg' );
 
-        if ( false === $ffmpeg ) {
-            return array( 'needed' => true, 'path' => '', 'message' => __( 'CMYK 转 RGB 需要 ffmpeg，当前环境未安装，已跳过', 'libre-compress' ) );
-        }
-
-        if ( ! function_exists( 'imagecreatefrompng' ) || ! function_exists( 'imagejpeg' ) ) {
-            return array( 'needed' => true, 'path' => '', 'message' => __( 'CMYK 转 RGB 需要 GD 的 PNG/JPEG 支持，当前环境不具备，已跳过', 'libre-compress' ) );
+        if ( false === $djpeg || false === $cjpeg ) {
+            return array( 'needed' => true, 'path' => '', 'message' => __( 'CMYK 转 RGB 需要 djpeg 与 cjpeg，当前环境未配齐，已跳过', 'libre-compress' ) );
         }
 
         $token    = wp_generate_password( 12, false, false );
-        $temp_png = $file_path . '.lc-cmyk-' . $token . '.png';
+        $temp_ppm = $file_path . '.lc-cmyk-' . $token . '.ppm';
+        $temp_icc = $file_path . '.lc-cmyk-' . $token . '.icc';
         $temp_jpg = $file_path . '.lc-cmyk-' . $token . '.jpg';
 
         $decoded = Libre_Compress_Tool_Base::run_command(
-            array( $ffmpeg, '-y', '-loglevel', 'error', '-i', $file_path, $temp_png ),
+            array( $djpeg, '-pnm', '-icc', $temp_icc, '-outfile', $temp_ppm, $file_path ),
             300
         );
 
-        $image = empty( $decoded['success'] ) ? false : @imagecreatefrompng( $temp_png );
-
-        if ( false === $image ) {
-            self::cleanup_cmyk_temp( $temp_png );
+        if ( empty( $decoded['success'] ) || ! is_file( $temp_ppm ) || 0 === (int) filesize( $temp_ppm ) ) {
+            self::cleanup_cmyk_temp( $temp_ppm );
+            self::cleanup_cmyk_temp( $temp_icc );
 
             return array( 'needed' => true, 'path' => '', 'message' => __( 'CMYK 解码失败，已保留原文件', 'libre-compress' ) );
         }
 
         // 只为换色彩空间，用高质量写回，避免再叠加一层可见损失
-        $saved = imagejpeg( $image, $temp_jpg, 90 );
-        self::cleanup_cmyk_temp( $temp_png );
+        $encode = array( $cjpeg, '-quality', '90', '-optimize', '-progressive' );
 
-        if ( ! $saved || ! file_exists( $temp_jpg ) || 0 === (int) filesize( $temp_jpg ) || self::is_cmyk_jpeg( $temp_jpg ) ) {
+        // 原图带 ICC 时一并写回，颜色配置不会因为换色彩空间而丢掉
+        if ( is_file( $temp_icc ) && (int) filesize( $temp_icc ) > 0 ) {
+            $encode = array_merge( $encode, array( '-icc', $temp_icc ) );
+        }
+
+        if ( ! Libre_Compress_Animation::prefer_420() ) {
+            // 关掉色度抽样时按 4:4:4 输出，文字与 logo 的边缘不会被压烂
+            $encode = array_merge( $encode, array( '-sample', '1x1,1x1,1x1' ) );
+        }
+
+        $encode = array_merge( $encode, array( '-outfile', $temp_jpg, $temp_ppm ) );
+
+        $encoded = Libre_Compress_Tool_Base::run_command( $encode, 300 );
+
+        self::cleanup_cmyk_temp( $temp_ppm );
+        self::cleanup_cmyk_temp( $temp_icc );
+
+        if ( empty( $encoded['success'] ) || ! is_file( $temp_jpg ) || 0 === (int) filesize( $temp_jpg ) || self::is_cmyk_jpeg( $temp_jpg ) ) {
             self::cleanup_cmyk_temp( $temp_jpg );
 
             return array( 'needed' => true, 'path' => '', 'message' => __( 'CMYK 转换结果不可用，已保留原文件', 'libre-compress' ) );
