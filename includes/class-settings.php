@@ -409,7 +409,7 @@ class Libre_Compress_Settings {
                             <input type="checkbox" name="libre_compress_general[cmyk_to_rgb]" value="1" <?php checked( $options['cmyk_to_rgb'] ?? true ); ?>>
                             <?php esc_html_e( '把 CMYK 的 JPEG 转成 RGB', 'libre-compress' ); ?>
                         </label>
-                        <p class="description"><?php esc_html_e( '色度抽样只存在于有损的 YUV 格式：AVIF 编码器默认输出 4:4:4，改成 4:2:0 后照片类实测小 1%～2%，同时启用的锐利色彩转换让边缘颜色更准，但纯色块的小图可能反而大几百字节；WebP 有损格式本来就是 4:2:0，这一项对它只切换色彩转换算法；JPEG 理论上也能选 4:2:0，但插件用的 jpegoptim 改不了抽样，只能保持原图的方式；PNG、APNG、GIF、SVG 是 RGB 或索引色，没有色度可设；JPEG XL 的命令行工具也没开放这个参数。带透明的图不受这一项影响：alpha 通道始终是无损的全分辨率，色度抽一半反而会让半透明边缘出现描边，所以带透明的图自动按 4:4:4 编码。CMYK 方面：真正会碰到 CMYK 的只有 JPEG（印刷排版导出），浏览器常显示成反色，各编码器也会读错，转成 RGB 后才能正常显示和压缩——转换需要 djpeg 与 cjpeg；其他格式里不存在可用的 CMYK。', 'libre-compress' ); ?></p>
+                        <p class="description"><?php esc_html_e( '色度抽样只存在于有损的 YUV 格式：AVIF 编码器默认输出 4:4:4，改成 4:2:0 后照片类实测小 1%～2%，同时启用的锐利色彩转换让边缘颜色更准，但纯色块的小图可能反而大几百字节；WebP 有损格式本来就是 4:2:0，这一项对它只切换色彩转换算法；JPEG 理论上也能选 4:2:0，但插件用的 jpegoptim 改不了抽样，只能保持原图的方式；PNG、APNG、GIF、SVG 是 RGB 或索引色，没有色度可设；JPEG XL 的命令行工具也没开放这个参数。CMYK 方面：真正会碰到 CMYK 的只有 JPEG（印刷排版导出），浏览器常显示成反色，各编码器也会读错，转成 RGB 后才能正常显示和压缩——转换需要 djpeg 与 cjpeg；其他格式里不存在可用的 CMYK。', 'libre-compress' ); ?></p>
                     </td>
                 </tr>
                 <tr>

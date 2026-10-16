@@ -1104,8 +1104,7 @@ class Libre_Compress_Animation {
             }
         }
 
-        // 带透明的动画同理：alpha 是全分辨率无损的，色度抽一半会让半透明边缘出现描边。
-        $pixel_format = $lossless ? 'gbrp' : ( ( self::prefer_420() && ! $plan['alpha'] ) ? 'yuv420p' : 'yuv444p' );
+        $pixel_format = $lossless ? 'gbrp' : ( self::prefer_420() ? 'yuv420p' : 'yuv444p' );
         if ( 'avif' === $plan['format'] && $lossless ) {
             // 无损重压直接使用原颜色与透明轨道，避免颜色换算；颜色配置仍由输出校验把关。
             $command = array_merge( $command, array( '-map', '0:' . $colors[0] ) );

@@ -87,7 +87,7 @@ msgstr ""
 msgid "AVIF 压缩"
 msgstr ""
 
-#: includes/class-compressor.php:416
+#: includes/class-compressor.php:365
 msgid "CMYK 解码失败，已保留原文件"
 msgstr ""
 
@@ -95,15 +95,15 @@ msgstr ""
 msgid "CMYK 转 RGB"
 msgstr ""
 
-#: includes/class-compressor.php:399
+#: includes/class-compressor.php:348
 msgid "CMYK 转 RGB 需要 djpeg 与 cjpeg，当前环境未配齐，已跳过"
 msgstr ""
 
-#: includes/class-compressor.php:442
+#: includes/class-compressor.php:391
 msgid "CMYK 转换结果不可用，已保留原文件"
 msgstr ""
 
-#: includes/class-compressor.php:377
+#: includes/class-compressor.php:326
 msgid "CMYK 转换结果替换失败，已保留原文件"
 msgstr ""
 
@@ -271,7 +271,7 @@ msgstr ""
 msgid "从 eternallybored.org 下载预编译的 gifsicle.exe"
 msgstr ""
 
-#: compression/class-avif.php:287
+#: compression/class-avif.php:285
 msgid "从 libavif GitHub Releases 下载静态编译的 avifenc.exe 和 avifdec.exe"
 msgstr ""
 
@@ -371,7 +371,7 @@ msgstr ""
 
 #. translators: %s: 工具名称
 #, php-format
-#: includes/class-animation.php:1267
+#: includes/class-animation.php:1266
 msgid "动图处理需要 %s 工具，当前环境未配齐，已跳过"
 msgstr ""
 
@@ -433,7 +433,7 @@ msgstr ""
 msgid "压缩参数设置"
 msgstr ""
 
-#: includes/class-compressor.php:822
+#: includes/class-compressor.php:771
 msgid "压缩后体积没有变小，已保留原图"
 msgstr ""
 
@@ -441,7 +441,7 @@ msgstr ""
 msgid "压缩失败"
 msgstr ""
 
-#: includes/class-compressor.php:770
+#: includes/class-compressor.php:719
 msgid "压缩失败且回滚失败，请保留回滚副本并检查磁盘状态"
 msgstr ""
 
@@ -449,7 +449,7 @@ msgstr ""
 msgid "压缩工具"
 msgstr ""
 
-#: compression/class-pngquant.php:90 compression/class-pngquant.php:104 compression/class-tool-base.php:522 includes/class-animation.php:652 includes/class-compressor.php:885 includes/class-converter.php:459 includes/class-converter.php:499
+#: compression/class-pngquant.php:90 compression/class-pngquant.php:104 compression/class-tool-base.php:522 includes/class-animation.php:652 includes/class-compressor.php:834 includes/class-converter.php:459 includes/class-converter.php:499
 msgid "压缩成功"
 msgstr ""
 
@@ -473,7 +473,7 @@ msgstr ""
 msgid "压缩结果文件写入失败"
 msgstr ""
 
-#: includes/class-compressor.php:800
+#: includes/class-compressor.php:749
 msgid "压缩结果无效且回滚失败，请保留回滚副本并检查磁盘状态"
 msgstr ""
 
@@ -481,7 +481,7 @@ msgstr ""
 msgid "压缩结果替换失败，已保留原文件"
 msgstr ""
 
-#: includes/class-compressor.php:870
+#: includes/class-compressor.php:819
 msgid "压缩记录保存失败且回滚失败，请保留回滚副本并检查数据库状态"
 msgstr ""
 
@@ -489,11 +489,11 @@ msgstr ""
 msgid "压缩记录保存失败，已保留原文件"
 msgstr ""
 
-#: includes/class-compressor.php:869
+#: includes/class-compressor.php:818
 msgid "压缩记录保存失败，已恢复原文件"
 msgstr ""
 
-#: includes/class-compressor.php:835 includes/class-converter.php:391
+#: includes/class-compressor.php:784 includes/class-converter.php:391
 msgid "压缩记录保存失败，请重新压缩"
 msgstr ""
 
@@ -773,16 +773,16 @@ msgstr ""
 msgid "数值越大速度越快，通常文件越大；数值越小压缩越慢，通常文件越小。"
 msgstr ""
 
-#: compression/class-tool-base.php:452 includes/class-compressor.php:633 includes/class-converter.php:189 includes/class-processor.php:348 includes/class-processor.php:374
+#: compression/class-tool-base.php:452 includes/class-compressor.php:582 includes/class-converter.php:189 includes/class-processor.php:348 includes/class-processor.php:374
 msgid "文件不存在"
 msgstr ""
 
 #, php-format
-#: includes/class-compressor.php:712
+#: includes/class-compressor.php:661
 msgid "文件大小超过限制（最大 %d MB）"
 msgstr ""
 
-#: includes/class-compressor.php:641 includes/class-converter.php:194
+#: includes/class-compressor.php:590 includes/class-converter.php:194
 msgid "文件路径不安全"
 msgstr ""
 
@@ -822,7 +822,7 @@ msgstr ""
 msgid "无法创建命令输出缓冲区"
 msgstr ""
 
-#: includes/class-compressor.php:729
+#: includes/class-compressor.php:678
 msgid "无法创建回滚副本，已跳过压缩"
 msgstr ""
 
@@ -850,7 +850,7 @@ msgstr ""
 msgid "无法读取上传的 SVG 文件"
 msgstr ""
 
-#: includes/class-compressor.php:657
+#: includes/class-compressor.php:606
 msgid "无法读取动图信息，已停止压缩以保护内容"
 msgstr ""
 
@@ -878,11 +878,11 @@ msgstr ""
 msgid "暂无官方包，建议从 GitHub Releases 下载"
 msgstr ""
 
-#: compression/class-avif.php:284
+#: compression/class-avif.php:282
 msgid "暂无官方包，建议从 GitHub Releases 下载或自行编译"
 msgstr ""
 
-#: includes/class-animation.php:1245
+#: includes/class-animation.php:1244
 msgid "有损 PNG 压缩会逐帧各自调色让 APNG 闪烁，已跳过；要压 APNG 请开启\"APNG 自动无损压缩\"或把 PNG 设为无损"
 msgstr ""
 
@@ -956,7 +956,7 @@ msgstr ""
 msgid "没有可显示的文件"
 msgstr ""
 
-#: includes/class-compressor.php:696 includes/class-converter.php:335
+#: includes/class-compressor.php:645 includes/class-converter.php:335
 msgid "没有可用的压缩工具"
 msgstr ""
 
@@ -1080,10 +1080,6 @@ msgstr ""
 
 #: includes/class-settings.php:420
 msgid "自动缩放超尺寸的主图，阈值"
-msgstr ""
-
-#: includes/class-settings.php:412
-msgid "色度抽样只存在于有损的 YUV 格式：AVIF 编码器默认输出 4:4:4，改成 4:2:0 后照片类实测小 1%～2%，同时启用的锐利色彩转换让边缘颜色更准，但纯色块的小图可能反而大几百字节；WebP 有损格式本来就是 4:2:0，这一项对它只切换色彩转换算法；JPEG 理论上也能选 4:2:0，但插件用的 jpegoptim 改不了抽样，只能保持原图的方式；PNG、APNG、GIF、SVG 是 RGB 或索引色，没有色度可设；JPEG XL 的命令行工具也没开放这个参数。带透明的图不受这一项影响：alpha 通道始终是无损的全分辨率，色度抽一半反而会让半透明边缘出现描边，所以带透明的图自动按 4:4:4 编码。CMYK 方面：真正会碰到 CMYK 的只有 JPEG（印刷排版导出），浏览器常显示成反色，各编码器也会读错，转成 RGB 后才能正常显示和压缩——转换需要 djpeg 与 cjpeg；其他格式里不存在可用的 CMYK。"
 msgstr ""
 
 #: includes/class-settings.php:402
@@ -1210,7 +1206,7 @@ msgstr ""
 msgid "（共 %d 个，仅显示前 10 个）"
 msgstr ""
 
-#: includes/class-compressor.php:664 includes/class-converter.php:214
+#: includes/class-compressor.php:613 includes/class-converter.php:214
 msgid "无法读取 APNG 动画信息，已跳过以保护动画内容"
 msgstr ""
 
@@ -1242,10 +1238,14 @@ msgstr ""
 msgid "当前动画工具无法完整保留这张图片的颜色精度或透明方式，已保留原文件"
 msgstr ""
 
-#: includes/class-animation.php:757 includes/class-compressor.php:762
+#: includes/class-animation.php:757 includes/class-compressor.php:711
 msgid "处理结果的动画、尺寸、播放次数、透明背景或颜色配置与原图不一致，已保留原文件"
 msgstr ""
 
 #: compression/class-oxvg.php:104
 msgid "从发布页下载 oxvg.exe 放进工具目录（x64 请用 v0.0.6，之后的版本只发了 ARM64）"
+msgstr ""
+
+#: includes/class-settings.php:412
+msgid "色度抽样只存在于有损的 YUV 格式：AVIF 编码器默认输出 4:4:4，改成 4:2:0 后照片类实测小 1%～2%，同时启用的锐利色彩转换让边缘颜色更准，但纯色块的小图可能反而大几百字节；WebP 有损格式本来就是 4:2:0，这一项对它只切换色彩转换算法；JPEG 理论上也能选 4:2:0，但插件用的 jpegoptim 改不了抽样，只能保持原图的方式；PNG、APNG、GIF、SVG 是 RGB 或索引色，没有色度可设；JPEG XL 的命令行工具也没开放这个参数。CMYK 方面：真正会碰到 CMYK 的只有 JPEG（印刷排版导出），浏览器常显示成反色，各编码器也会读错，转成 RGB 后才能正常显示和压缩——转换需要 djpeg 与 cjpeg；其他格式里不存在可用的 CMYK。"
 msgstr ""

@@ -230,57 +230,6 @@ class Libre_Compress_Compressor {
     }
 
     /**
-     * 判断图片是否带透明通道
-     *
-     * 只读容器头部的声明，不解码像素。JPEG 与 GIF 不在这里判断：JPEG 没有透明通道，
-     * GIF 只在静态转换链路里先解码成 PNG 再到这里，那时已经能按 PNG 判断。
-     *
-     * @param string $file_path 文件绝对路径
-     * @return bool 是否带透明
-     */
-    public static function has_alpha( string $file_path ): bool {
-        if ( ! is_file( $file_path ) ) {
-            return false;
-        }
-
-        $extension = strtolower( pathinfo( $file_path, PATHINFO_EXTENSION ) );
-        $handle    = fopen( $file_path, 'rb' );
-
-        if ( false === $handle ) {
-            return false;
-        }
-
-        // 颜色配置、透明声明这类头信息都在文件前部，读一段就够，不解码图像数据。
-        $head = (string) fread( $handle, 65536 );
-        fclose( $handle );
-
-        if ( 'png' === $extension ) {
-            if ( "\x89PNG\r\n\x1a\n" !== substr( $head, 0, 8 ) ) {
-                return false;
-            }
-
-            // IHDR 颜色类型 4 = 灰度+透明，6 = RGBA；调色板图靠 tRNS 声明透明。
-            return ( isset( $head[25] ) && in_array( ord( $head[25] ), array( 4, 6 ), true ) )
-                || false !== strpos( $head, 'tRNS' );
-        }
-
-        if ( 'webp' === $extension ) {
-            // VP8X 扩展块 flags 的 0x10 位表示带透明。
-            return 'RIFF' === substr( $head, 0, 4 )
-                && false !== strpos( $head, 'VP8X' )
-                && isset( $head[20] )
-                && 0 !== ( ord( $head[20] ) & 0x10 );
-        }
-
-        if ( 'avif' === $extension ) {
-            // AVIF 的透明是一张独立的辅助图，靠 iref 里的 auxl 关联声明。
-            return false !== strpos( $head, 'auxl' );
-        }
-
-        return false;
-    }
-
-    /**
      * 是否开启 CMYK 转 RGB
      *
      * 选项缺失时按开启处理：CMYK JPEG 交给 avifenc、cwebp、cjxl 会直接失败或产出
