@@ -75,10 +75,6 @@ msgstr ""
 msgid "APNG 压缩为 WebP"
 msgstr ""
 
-#: includes/class-settings.php:984
-msgid "APNG 同格式压缩（需 PNG 无损或开启 APNG 自动无损）"
-msgstr ""
-
 #: includes/class-settings.php:393
 msgid "AVIF"
 msgstr ""
@@ -147,12 +143,8 @@ msgstr ""
 msgid "PNG"
 msgstr ""
 
-#: includes/class-settings.php:744
+#: includes/class-settings.php:744 includes/class-settings.php:969
 msgid "PNG 压缩"
-msgstr ""
-
-#: includes/class-settings.php:969
-msgid "PNG 压缩（按模式使用其中一种）"
 msgstr ""
 
 #: includes/class-settings.php:976
@@ -1248,4 +1240,8 @@ msgstr ""
 
 #: includes/class-converter.php:310
 msgid "GIF 转 AVIF 需要 GD 扩展"
+msgstr ""
+
+#: includes/class-settings.php:984
+msgid "APNG 同格式压缩"
 msgstr ""

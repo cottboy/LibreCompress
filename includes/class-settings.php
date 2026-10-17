@@ -966,7 +966,7 @@ class Libre_Compress_Settings {
 
         $rows_definition = array(
             array( 'label' => __( 'JPEG 压缩', 'libre-compress' ), 'groups' => array( array( 'jpegoptim' ) ) ),
-            array( 'label' => __( 'PNG 压缩（按模式使用其中一种）', 'libre-compress' ), 'groups' => array( array( 'pngquant' ), array( 'oxipng' ) ) ),
+            array( 'label' => __( 'PNG 压缩', 'libre-compress' ), 'groups' => array( array( 'pngquant' ), array( 'oxipng' ) ) ),
             array( 'label' => __( 'WEBP 压缩', 'libre-compress' ), 'groups' => array( array( 'cwebp' ) ) ),
             array( 'label' => __( 'AVIF 压缩', 'libre-compress' ), 'groups' => array( array( 'avifenc', 'avifdec' ) ) ),
             array( 'label' => __( 'JPEG XL 压缩', 'libre-compress' ), 'groups' => array( array( 'cjxl' ) ) ),
@@ -981,7 +981,7 @@ class Libre_Compress_Settings {
             array( 'label' => __( '动画 GIF 压缩为 WebP', 'libre-compress' ),          'groups' => Libre_Compress_Animation::required_tool_groups( 'gif', 'webp' ) ),
             array( 'label' => __( '动画 GIF 压缩为 AVIF', 'libre-compress' ),          'groups' => Libre_Compress_Animation::required_tool_groups( 'gif', 'avif' ) ),
             array( 'label' => __( '动画 GIF 压缩为 JPEG XL', 'libre-compress' ),       'groups' => Libre_Compress_Animation::required_tool_groups( 'gif', 'jxl' ) ),
-            array( 'label' => __( 'APNG 同格式压缩（需 PNG 无损或开启 APNG 自动无损）', 'libre-compress' ), 'groups' => array( array( 'oxipng' ) ) ),
+            array( 'label' => __( 'APNG 同格式压缩', 'libre-compress' ), 'groups' => array( array( 'oxipng' ) ) ),
             array( 'label' => __( 'APNG 压缩为 WebP', 'libre-compress' ),              'groups' => Libre_Compress_Animation::required_tool_groups( 'png', 'webp' ) ),
             array( 'label' => __( 'APNG 压缩为 AVIF', 'libre-compress' ),              'groups' => Libre_Compress_Animation::required_tool_groups( 'png', 'avif' ) ),
             array( 'label' => __( 'APNG 压缩为 JPEG XL', 'libre-compress' ),            'groups' => Libre_Compress_Animation::required_tool_groups( 'png', 'jxl' ) ),

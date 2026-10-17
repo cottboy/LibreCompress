@@ -130,14 +130,14 @@ WebP、AVIF、JPEG XL 不作为转换源：它们只做同格式压缩。
 | 源格式 | 同格式压缩 | 输出 WebP | 输出 AVIF | 输出 JXL |
 | --- | --- | --- | --- | --- |
 | 动画 GIF | gifsicle | gifsicle + gif2webp + webpmux | gifsicle + ffmpeg + avifdec | gifsicle + cjxl + jxlinfo |
-| APNG | oxipng（PNG 无损或开启 APNG 自动无损） | ffmpeg + webpmux | ffmpeg + avifdec | cjxl + jxlinfo |
+| APNG | oxipng | ffmpeg + webpmux | ffmpeg + avifdec | cjxl + jxlinfo |
 | 动画 WebP | webpmux + cwebp | 不转换 | 不转换 | 不转换 |
 | 动画 AVIF | ffmpeg + ffprobe + avifdec | 不转换 | 不转换 | 不转换 |
 | 动画 JXL | cjxl + jxlinfo | 不转换 | 不转换 | 不转换 |
 
-表格包含处理工具与结果检查工具。缺少对应工具时跳过，不再退回插件拆帧。旧的 `anim_dump`、`img2webp` 已不作为插件运行依赖。
+表格包含处理工具与结果检查工具。缺少对应工具时跳过，不自行拆帧。
 
-唯一按帧处理的是动画 WebP 同格式重压：libwebp 没有能整只重压动画 WebP 的官方工具（cwebp 只出静图、webpmux 只搬容器不重压像素、gif2webp 只认 GIF、img2webp 只吃一串单帧图片），所以只能由 webpmux 把每帧的原始压缩码流抽到临时文件、cwebp 逐帧重压（带 `-exact`，透明区的颜色原样保留）、再按原图的帧时长、帧偏移、处置方式、混合方式、循环次数与 ICC 装回去。抽出来的是压缩码流而不是像素：插件不解整张画布、不合成帧、不重算帧间差分。装好后还会逐项核对帧数、时长、循环、透明声明与颜色配置，对不上就丢弃结果、保留原图。
+唯一按帧处理的是动画 WebP 同格式重压：libwebp 没有能整只重压动画 WebP 的官方工具（cwebp 只出静图、webpmux 只搬容器不重压像素、gif2webp 只认 GIF），所以只能由 webpmux 把每帧的原始压缩码流抽到临时文件、cwebp 逐帧重压（带 `-exact`，透明区的颜色原样保留）、再按原图的帧时长、帧偏移、处置方式、混合方式、循环次数与 ICC 装回去。抽出来的是压缩码流而不是像素：插件不解整张画布、不合成帧、不重算帧间差分。装好后还会逐项核对帧数、时长、循环、透明声明与颜色配置，对不上就丢弃结果、保留原图。
 
 WebP / AVIF / JPEG XL 无论静图动图都只做同格式压缩；APNG 与动画 GIF 是否转换，分别跟随设置里的 PNG、GIF 勾选。JPEG XL 继续作为 WordPress 原生支持前的补充能力，未来 WordPress 原生接管后插件让出上传、尺寸与自动批量处理。
 
