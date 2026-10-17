@@ -784,28 +784,57 @@ class Libre_Compress_Animation {
             return self::build_avif_command( $source, $output, $plan );
         }
 
-        $lossless = 'lossless' === ( $settings['webp_mode'] ?? 'lossy' );
-        $quality = max( 0, min( 100, absint( $settings['webp_quality'] ?? 80 ) ) );
-        if ( 'png' === $plan['format'] ) {
-            return array(
-                self::tool( 'ffmpeg' ), '-nostdin', '-v', 'error', '-f', 'apng', '-ignore_loop', '1', '-i', $source,
-                '-c:v', 'libwebp_anim', '-lossless', $lossless ? '1' : '0', '-quality', (string) $quality,
-                '-compression_level', (string) Libre_Compress_Settings::tool_speed( 'webp_method' ),
-                '-enc_time_base', '1:1000', '-fps_mode', 'passthrough', '-map_metadata', '-1',
-                '-loop', $plan['loop_infinite'] ? '0' : (string) ( $plan['loop'] + 1 ), '-f', 'webp', $output,
-            );
-        }
         if ( 'gif' === $plan['format'] ) {
-            $command = array( self::tool( 'gif2webp' ), '-m', (string) Libre_Compress_Settings::tool_speed( 'gif2webp_method' ) );
-            if ( ! $lossless ) {
-                $command = array_merge( $command, array( '-lossy', '-q', (string) $quality ) );
-            }
-            $command = array_merge( $command, array( '-metadata', Libre_Compress_Settings::strips_metadata() ? 'icc' : 'all' ) );
-            return array_merge( $command, array( $source, '-o', $output ) );
+            return self::gif2webp_command( $source, $output );
         }
 
         // 剩下的只有动画 WebP 同格式压缩，它由 recompress_animated_webp() 用 libwebp 自带的 webpmux 与 cwebp 处理。
-        return false;
+        if ( 'png' !== $plan['format'] ) {
+            return false;
+        }
+
+        $lossless = 'lossless' === ( $settings['webp_mode'] ?? 'lossy' );
+        $quality = max( 0, min( 100, absint( $settings['webp_quality'] ?? 80 ) ) );
+
+        return array(
+            self::tool( 'ffmpeg' ), '-nostdin', '-v', 'error', '-f', 'apng', '-ignore_loop', '1', '-i', $source,
+            '-c:v', 'libwebp_anim', '-lossless', $lossless ? '1' : '0', '-quality', (string) $quality,
+            '-compression_level', (string) Libre_Compress_Settings::tool_speed( 'webp_method' ),
+            '-enc_time_base', '1:1000', '-fps_mode', 'passthrough', '-map_metadata', '-1',
+            '-loop', $plan['loop_infinite'] ? '0' : (string) ( $plan['loop'] + 1 ), '-f', 'webp', $output,
+        );
+    }
+
+    /**
+     * 构建 gif2webp 命令
+     *
+     * 动画 GIF 与静态 GIF 共用一个出口：gif2webp 自己读整只 GIF，多帧出来仍是动画，
+     * 单帧出来就是一张静图，两种都不需要拆帧，也不经过任何聚合引擎。
+     *
+     * @param string $source GIF 源路径
+     * @param string $output 输出路径
+     * @return array|false 参数数组，工具不可用时返回 false
+     */
+    public static function gif2webp_command( string $source, string $output ) {
+        $gif2webp = self::tool( 'gif2webp' );
+
+        if ( false === $gif2webp ) {
+            return false;
+        }
+
+        $settings = get_option( 'libre_compress_tools', array() );
+        $lossless = 'lossless' === ( $settings['webp_mode'] ?? 'lossy' );
+        $quality  = max( 0, min( 100, absint( $settings['webp_quality'] ?? 80 ) ) );
+
+        $command = array( $gif2webp, '-m', (string) Libre_Compress_Settings::tool_speed( 'gif2webp_method' ) );
+
+        if ( ! $lossless ) {
+            $command = array_merge( $command, array( '-lossy', '-q', (string) $quality ) );
+        }
+
+        $command = array_merge( $command, array( '-metadata', Libre_Compress_Settings::strips_metadata() ? 'icc' : 'all' ) );
+
+        return array_merge( $command, array( $source, '-o', $output ) );
     }
 
     /**

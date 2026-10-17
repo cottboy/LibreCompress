@@ -76,10 +76,10 @@
 | pngquant | PNG 有损压缩 |
 | oxipng | PNG 无损压缩，APNG 整只无损优化 |
 | gifsicle | GIF 同格式压缩，动图帧数与每帧时长读取 |
-| cwebp | WebP 同格式压缩、动画 WebP 逐帧重压，以及 PNG/JPG/GIF 输出为 WebP |
-| gif2webp | 动画 GIF 输出为 WebP |
+| cwebp | WebP 同格式压缩、动画 WebP 逐帧重压，以及 PNG/JPG 输出为 WebP |
+| gif2webp | 静态与动画 GIF 输出为 WebP（整只 GIF 直读，不拆帧；单帧 GIF 出来即为静图） |
 | webpmux | 动画 WebP 抽帧与重组、信息检查、末帧时长修正与颜色配置复制 |
-| avifenc | 静态 AVIF 编码 |
+| avifenc | 静态 AVIF 编码（不认 GIF，静态 GIF 转 AVIF 需先用 GD 解成 PNG） |
 | avifdec | 静态 AVIF 解码、动画 AVIF 信息读取及结果检查 |
 | cjxl | JPEG XL 编码（同格式压缩、目标格式输出，并直接读 GIF / APNG 的逐帧时长产出动画 JXL） |
 | jxlinfo | 动画 JXL 帧数与每帧时长读取 |
@@ -115,11 +115,13 @@ PNG 严格按当前有损/无损设置选择工具，不会静默切换压缩模
 | 源格式 | WebP | AVIF | JPEG XL |
 | --- | --- | --- | --- |
 | PNG / JPG | cwebp | avifenc | cjxl |
-| 静态 GIF | GD + cwebp | GD + avifenc | GD + cjxl |
+| 静态 GIF | gif2webp | GD + avifenc | cjxl |
 | 动画 GIF | gifsicle + gif2webp + webpmux | gifsicle + ffmpeg + avifdec | gifsicle + cjxl + jxlinfo |
 | APNG | ffmpeg + webpmux | ffmpeg + avifdec | cjxl + jxlinfo |
 
 WebP、AVIF、JPEG XL 不作为转换源：它们只做同格式压缩。
+
+静态 GIF 转 WebP、转 JPEG XL 都是把原文件直接交给 gif2webp / cjxl（两者都直读 GIF，透明背景不丢、产物也比先转 PNG 再编码小得多），只有转 AVIF 要先经 GD 解成 PNG（avifenc 不认 GIF）。这里不要改用 cwebp 读 GIF：实测 cwebp 会丢掉 GIF 的透明背景。
 
 ### 动图处理
 

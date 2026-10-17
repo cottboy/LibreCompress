@@ -119,7 +119,7 @@ msgstr ""
 msgid "GIF 压缩"
 msgstr ""
 
-#: includes/class-converter.php:310
+#: includes/class-converter.php:318
 msgid "GIF 压缩预处理失败"
 msgstr ""
 
@@ -365,17 +365,17 @@ msgstr ""
 msgid "删除未勾选尺寸的缩略图"
 msgstr ""
 
-#: includes/class-animation.php:724 includes/class-animation.php:743 includes/class-animation.php:870 includes/class-animation.php:900 includes/class-animation.php:933
+#: includes/class-animation.php:724 includes/class-animation.php:743 includes/class-animation.php:899 includes/class-animation.php:929 includes/class-animation.php:962
 msgid "动图处理命令执行失败"
 msgstr ""
 
 #. translators: %s: 工具名称
 #, php-format
-#: includes/class-animation.php:1266
+#: includes/class-animation.php:1295
 msgid "动图处理需要 %s 工具，当前环境未配齐，已跳过"
 msgstr ""
 
-#: includes/class-converter.php:331
+#: includes/class-converter.php:340
 msgid "动图转换失败"
 msgstr ""
 
@@ -437,7 +437,7 @@ msgstr ""
 msgid "压缩后体积没有变小，已保留原图"
 msgstr ""
 
-#: includes/class-converter.php:352 includes/class-media-library.php:249 includes/class-processor.php:382
+#: includes/class-converter.php:361 includes/class-media-library.php:249 includes/class-processor.php:382
 msgid "压缩失败"
 msgstr ""
 
@@ -449,7 +449,7 @@ msgstr ""
 msgid "压缩工具"
 msgstr ""
 
-#: compression/class-pngquant.php:90 compression/class-pngquant.php:104 compression/class-tool-base.php:522 includes/class-animation.php:652 includes/class-compressor.php:834 includes/class-converter.php:459 includes/class-converter.php:499
+#: compression/class-pngquant.php:90 compression/class-pngquant.php:104 compression/class-tool-base.php:522 includes/class-animation.php:652 includes/class-compressor.php:834 includes/class-converter.php:468 includes/class-converter.php:508
 msgid "压缩成功"
 msgstr ""
 
@@ -469,7 +469,7 @@ msgstr ""
 msgid "压缩结果已生成，但附件引用或文章链接更新失败，图片仍指向原文件，可重新压缩继续提交"
 msgstr ""
 
-#: includes/class-converter.php:420
+#: includes/class-converter.php:429
 msgid "压缩结果文件写入失败"
 msgstr ""
 
@@ -485,7 +485,7 @@ msgstr ""
 msgid "压缩记录保存失败且回滚失败，请保留回滚副本并检查数据库状态"
 msgstr ""
 
-#: includes/class-converter.php:429 includes/class-converter.php:486
+#: includes/class-converter.php:438 includes/class-converter.php:495
 msgid "压缩记录保存失败，已保留原文件"
 msgstr ""
 
@@ -493,7 +493,7 @@ msgstr ""
 msgid "压缩记录保存失败，已恢复原文件"
 msgstr ""
 
-#: includes/class-compressor.php:784 includes/class-converter.php:391
+#: includes/class-compressor.php:784 includes/class-converter.php:400
 msgid "压缩记录保存失败，请重新压缩"
 msgstr ""
 
@@ -715,7 +715,7 @@ msgstr ""
 msgid "恢复所有原图备份"
 msgstr ""
 
-#: includes/class-converter.php:436 includes/class-converter.php:439
+#: includes/class-converter.php:445 includes/class-converter.php:448
 msgid "恢复映射保存失败，已保留原文件"
 msgstr ""
 
@@ -790,7 +790,7 @@ msgstr ""
 msgid "文件项目"
 msgstr ""
 
-#: includes/class-converter.php:537
+#: includes/class-converter.php:546
 msgid "文章图片链接替换失败，已保留原文件"
 msgstr ""
 
@@ -854,15 +854,15 @@ msgstr ""
 msgid "无法读取动图信息，已停止压缩以保护内容"
 msgstr ""
 
-#: includes/class-animation.php:833 includes/class-animation.php:839
+#: includes/class-animation.php:862 includes/class-animation.php:868
 msgid "无法读取这张动图的帧信息，已保留原文件"
 msgstr ""
 
-#: includes/class-animation.php:854
+#: includes/class-animation.php:883
 msgid "无法创建动图处理的临时目录，已保留原文件"
 msgstr ""
 
-#: includes/class-animation.php:845
+#: includes/class-animation.php:874
 msgid "这张动图有透明留白区域，重组会改变画布尺寸，已保留原文件"
 msgstr ""
 
@@ -882,7 +882,7 @@ msgstr ""
 msgid "暂无官方包，建议从 GitHub Releases 下载或自行编译"
 msgstr ""
 
-#: includes/class-animation.php:1244
+#: includes/class-animation.php:1273
 msgid "有损 PNG 压缩会逐帧各自调色让 APNG 闪烁，已跳过；要压 APNG 请开启\"APNG 自动无损压缩\"或把 PNG 设为无损"
 msgstr ""
 
@@ -956,7 +956,7 @@ msgstr ""
 msgid "没有可显示的文件"
 msgstr ""
 
-#: includes/class-compressor.php:645 includes/class-converter.php:335
+#: includes/class-compressor.php:645 includes/class-converter.php:344
 msgid "没有可用的压缩工具"
 msgstr ""
 
@@ -1132,7 +1132,7 @@ msgstr ""
 msgid "跳转"
 msgstr ""
 
-#: includes/class-converter.php:405
+#: includes/class-converter.php:414
 msgid "转换结果没有变小，已保留原图"
 msgstr ""
 
@@ -1172,7 +1172,7 @@ msgstr ""
 msgid "链接"
 msgstr ""
 
-#: includes/class-converter.php:533
+#: includes/class-converter.php:542
 msgid "附件 MIME 类型同步失败，已保留原文件"
 msgstr ""
 
@@ -1180,7 +1180,7 @@ msgstr ""
 msgid "附件引用更新失败，已退回原文件"
 msgstr ""
 
-#: includes/class-converter.php:529
+#: includes/class-converter.php:538
 msgid "附件路径同步失败，已保留原文件"
 msgstr ""
 
@@ -1194,10 +1194,6 @@ msgstr ""
 
 #: includes/class-settings.php:978
 msgid "静态 GIF 压缩为 WebP"
-msgstr ""
-
-#: includes/class-converter.php:302
-msgid "静态 GIF 压缩需要 GD 扩展"
 msgstr ""
 
 #. translators: %d: 失败附件总数
@@ -1248,4 +1244,8 @@ msgstr ""
 
 #: includes/class-settings.php:412
 msgid "色度抽样只存在于有损的 YUV 格式：AVIF 编码器默认输出 4:4:4，改成 4:2:0 后照片类实测小 1%～2%，同时启用的锐利色彩转换让边缘颜色更准，但纯色块的小图可能反而大几百字节；WebP 有损格式本来就是 4:2:0，这一项对它只切换色彩转换算法；JPEG 理论上也能选 4:2:0，但插件用的 jpegoptim 改不了抽样，只能保持原图的方式；PNG、APNG、GIF、SVG 是 RGB 或索引色，没有色度可设；JPEG XL 的命令行工具也没开放这个参数。CMYK 方面：真正会碰到 CMYK 的只有 JPEG（印刷排版导出），浏览器常显示成反色，各编码器也会读错，转成 RGB 后才能正常显示和压缩——转换需要 djpeg 与 cjpeg；其他格式里不存在可用的 CMYK。"
+msgstr ""
+
+#: includes/class-converter.php:310
+msgid "GIF 转 AVIF 需要 GD 扩展"
 msgstr ""

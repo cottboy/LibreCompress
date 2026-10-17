@@ -295,22 +295,31 @@ class Libre_Compress_Output {
             $error_msg = $animation['message'];
             $tool_name = $animation['tool'];
         } elseif ( 'gif' === $format ) {
-            // 静态 GIF 先由 GD 解码为 PNG
-            $temp_source = $file_path . '.lc-source-' . $temp_token . '.png';
-            if ( ! function_exists( 'imagecreatefromgif' ) || ! function_exists( 'imagepng' ) ) {
-                $result_template['status']  = 'skipped';
-                $result_template['message'] = __( '静态 GIF 压缩需要 GD 扩展', 'libre-compress' );
-                return $result_template;
-            }
-            if ( ! $this->decode_gif_to_png( $file_path, $temp_source ) ) {
-                if ( file_exists( $temp_source ) ) {
-                    // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
-                    unlink( $temp_source );
+            // 静态 GIF 只有一条帧，不用拆帧：WebP 交给 gif2webp、JPEG XL 交给 cjxl 直接读原文件
+            //（cwebp 读 GIF 会丢透明，实测过），只有 AVIF 必须先经 GD 解成 PNG —— avifenc 不认 GIF。
+            if ( 'webp' === $target ) {
+                $gif2webp = Libre_Compress_Animation::gif2webp_command( $file_path, $temp_output );
+                $command  = false === $gif2webp ? false : array( $gif2webp );
+            } elseif ( 'jxl' === $target ) {
+                $cjxl    = Libre_Compress_Cjxl::build_command( $file_path, $temp_output );
+                $command = false === $cjxl ? false : array( $cjxl );
+            } else {
+                $temp_source = $file_path . '.lc-source-' . $temp_token . '.png';
+                if ( ! function_exists( 'imagecreatefromgif' ) || ! function_exists( 'imagepng' ) ) {
+                    $result_template['status']  = 'skipped';
+                    $result_template['message'] = __( 'GIF 转 AVIF 需要 GD 扩展', 'libre-compress' );
+                    return $result_template;
                 }
-                $result_template['message'] = __( 'GIF 压缩预处理失败', 'libre-compress' );
-                return $result_template;
+                if ( ! $this->decode_gif_to_png( $file_path, $temp_source ) ) {
+                    if ( file_exists( $temp_source ) ) {
+                        // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
+                        unlink( $temp_source );
+                    }
+                    $result_template['message'] = __( 'GIF 压缩预处理失败', 'libre-compress' );
+                    return $result_template;
+                }
+                $command = $this->build_encode_command( $temp_source, $temp_output, $target );
             }
-            $command = $this->build_encode_command( $temp_source, $temp_output, $target );
         } else {
             // CMYK JPEG 会让 cwebp/avifenc/cjxl 产出废图，先转成 RGB 再编码
             $prepared = Libre_Compress_Compressor::prepare_cmyk_rgb( $file_path );
@@ -2103,7 +2112,10 @@ class Libre_Compress_Output {
     }
 
     /**
-     * 用 GD 将 GIF 解码为 PNG（仅用于静态 GIF，动画 GIF 走专用工具）
+     * 用 GD 将 GIF 解码为 PNG
+     *
+     * 只用于静态 GIF 转 AVIF：avifenc 不认 GIF，又没有别的现成工具能读 GIF 转 PNG
+     *（gifsicle 只能写 GIF）。静态 GIF 转 WebP / JPEG XL 都不需要这一步。
      *
      * @param string $gif_path GIF 源路径
      * @param string $png_path PNG 输出路径
