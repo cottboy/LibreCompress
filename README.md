@@ -36,7 +36,7 @@
 - **隐私保护**：压缩和格式转换时默认清除 EXIF、GPS 拍摄位置、设备与软件信息，对所有压缩路径生效，并尽量保留 ICC 色彩配置以免偏色。
 - **动图保护**：识别 APNG 的 `acTL` 块、WebP 的 `ANMF` 块，绝不让只认第一帧的工具把动图压成静图；APNG 只走 oxipng 的无损通道，由"APNG 自动无损压缩"控制，默认开启。
 - **逐路径参数**：JPEG、PNG、APNG、GIF、WebP 静态/动画、AVIF 静态/动画、JPEG XL、SVG，以及转换到 WebP/AVIF/JPEG XL 的每条路径，都可以单独设置压缩模式、质量和速度。
-- **JPEG 有损优先 jpegli**：装了 cjpegli 就有损压缩走 jpegli，没装自动回退 jpegoptim；无损压缩始终由 jpegoptim 负责。
+- **JPEG 有损优先 jpegli**：装了 [jpegli](https://github.com/google/jpegli) 的 cjpegli 就有损压缩走它，没装自动回退 jpegoptim；无损压缩始终由 jpegoptim 负责。
 - **附件级排他锁**：同一附件的压缩、恢复和缩略图操作不会并发互相覆盖。
 - **元数据同步**：格式转换后同步 `_wp_attached_file`、附件 metadata、文件大小和 MIME；原本没有完整 metadata 的图片按目标文件的真实尺寸建立，不伪造数据；主文件失败时不会把整个附件错误标记为新格式。
 - **内容 URL 持久替换**：转换时把文章正文里已固化的旧地址按实际映射改写为新文件，保留查询参数、锚点、`srcset` 与区块 JSON 的转义写法；恢复时反向替换。
@@ -90,7 +90,7 @@
 
 SVG 压缩改用 oxvg（Rust 单文件程序，不再需要 Node.js）：从发布页取 `oxvg.exe` 放进工具目录即可，**Windows x64 请用 v0.0.6 版本**（v0.0.9 的 `oxvg.exe` 是 ARM64，x64 只能自己编译），其他平台可用 `cargo install oxvg`。
 
-Windows 下把 `gif2webp.exe`、`webpmux.exe`、`cjxl.exe` 及对应包内依赖的 `.dll` 放进 `LibreCompress-bin`。`cjpegli.exe` 来自 libjxl 发布包（https://github.com/libjxl/libjxl），可选；放进去后 JPEG 有损压缩会自动优先用它。
+Windows 下把 `gif2webp.exe`、`webpmux.exe`、`cjxl.exe` 及对应包内依赖的 `.dll` 放进 `LibreCompress-bin`。`cjpegli.exe` 来自 jpegli 项目（https://github.com/google/jpegli），可选；放进去后 JPEG 有损压缩会自动优先用它。
 
 APNG 转 WebP 需要支持 `libwebp_anim` 的 FFmpeg；动画 AVIF 需要支持 `libaom-av1`、透明动画 AVIF 输出的新版 FFmpeg，两者均需支持 `-enc_time_base 1:1000` 和 `-fps_mode passthrough`，`ffmpeg.exe` 和 `ffprobe.exe` 放进同一工具目录。仅找到文件不代表该构建具备所有能力；实际处理失败时会保留原图。
 
@@ -139,7 +139,7 @@ WebP、AVIF、JPEG XL 不作为转换源：它们只做同格式压缩。
 
 唯一按帧处理的是动画 WebP 同格式重压：libwebp 没有能整只重压动画 WebP 的官方工具（cwebp 只出静图、webpmux 只搬容器不重压像素、gif2webp 只认 GIF），所以只能由 webpmux 把每帧的原始压缩码流抽到临时文件、cwebp 逐帧重压（带 `-exact`，透明区的颜色原样保留）、再按原图的帧时长、帧偏移、处置方式、混合方式、循环次数与背景色装回去。抽出来的是压缩码流而不是像素：插件不解整张画布、不合成帧、不重算帧间差分。插件不再在压缩前后逐项比对动画信息，工具执行成功且产物非空就保留结果。
 
-WebP / AVIF / JPEG XL 无论静图动图都只做同格式压缩；APNG 与动画 GIF 是否转换，分别跟随设置里的 PNG、GIF 勾选。JPEG XL 压缩路径保留；插件不再替 WordPress 添加 JXL 上传白名单或补尺寸元数据，上传与媒体元数据完全交给 WordPress 自己处理。
+WebP / AVIF / JPEG XL 无论静图动图都只做同格式压缩；APNG 与动画 GIF 是否转换，分别跟随设置里的 PNG、GIF 勾选。插件默认不往上传白名单里添加任何图片格式，也不补尺寸元数据；AVIF 从 WordPress 6.5 起原生支持上传，JXL 与其余格式的上传和媒体元数据完全交给 WordPress 自己处理。唯一的例外是设置里手动开启的 SVG 上传。
 
 - APNG 同格式只用 oxipng 无损优化，不交给 pngquant，以免破坏动画或产生调色板闪烁。
 - AVIF 的颜色和透明部分均由 FFmpeg 内部处理，透明部分始终无损编码，以保留半透明边缘。

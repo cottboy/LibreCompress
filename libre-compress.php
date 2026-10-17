@@ -70,24 +70,6 @@ function libre_compress_load_textdomain() {
 add_action( 'plugins_loaded', 'libre_compress_load_textdomain' );
 
 /**
- * 允许上传 AVIF 图片
- *
- * WordPress 6.5 起原生支持 AVIF，此过滤器保证旧版本也能上传。
- * JXL 的上传白名单与尺寸元数据一律交给 WordPress 自己处理，插件不接管。
- *
- * @param array $mimes 允许的 MIME 类型
- * @return array 修改后的 MIME 类型
- */
-function libre_compress_allow_extended_uploads( $mimes ) {
-    if ( ! isset( $mimes['avif'] ) ) {
-        $mimes['avif'] = 'image/avif';
-    }
-
-    return $mimes;
-}
-add_filter( 'upload_mimes', 'libre_compress_allow_extended_uploads' );
-
-/**
  * 检查设置中是否允许上传 SVG
  *
  * @return bool 是否允许

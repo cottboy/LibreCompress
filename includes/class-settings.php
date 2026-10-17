@@ -637,7 +637,7 @@ class Libre_Compress_Settings {
         // 全部压缩工具，按格式相邻排序
         $all_tools = array(
             array( 'name' => 'jpegoptim', 'tool' => null, 'path' => $output_processor->find_local_tool( 'jpegoptim' ), 'url' => 'https://github.com/tjko/jpegoptim' ),
-            array( 'name' => 'cjpegli', 'tool' => null, 'path' => $output_processor->find_local_tool( 'cjpegli' ), 'url' => 'https://github.com/libjxl/libjxl' ),
+            array( 'name' => 'cjpegli', 'tool' => null, 'path' => $output_processor->find_local_tool( 'cjpegli' ), 'url' => 'https://github.com/google/jpegli' ),
             array( 'name' => 'pngquant', 'tool' => $tools['pngquant'] ),
             array( 'name' => 'oxipng', 'tool' => $tools['oxipng'] ),
             array( 'name' => 'gifsicle', 'tool' => $tools['gifsicle'] ),
@@ -672,7 +672,7 @@ class Libre_Compress_Settings {
                     <?php if ( $proc_open_available ) : ?>
                         <span style="color: #00a32a;">✓ <?php esc_html_e( '可用', 'libre-compress' ); ?></span>
                     <?php else : ?>
-                        <span style="color: #d63638;">✗ <?php esc_html_e( '不可用', 'libre-compress' ); ?></span>
+                        <span><?php esc_html_e( '不可用', 'libre-compress' ); ?></span>
                         <p class="description"><?php esc_html_e( '插件的所有压缩都靠 proc_open() 直接启动命令行工具，请联系主机商启用', 'libre-compress' ); ?></p>
                     <?php endif; ?>
                 </td>
@@ -698,7 +698,7 @@ class Libre_Compress_Settings {
                             <?php if ( $row['available'] ) : ?>
                                 <span style="color: #00a32a;">✓ <?php esc_html_e( '已安装', 'libre-compress' ); ?></span>
                             <?php else : ?>
-                                <span style="color: #d63638;">✗ <?php esc_html_e( '未安装', 'libre-compress' ); ?></span>
+                                <span><?php esc_html_e( '未安装', 'libre-compress' ); ?></span>
                             <?php endif; ?>
                         </td>
                         <td>
@@ -740,7 +740,7 @@ class Libre_Compress_Settings {
                             <?php if ( $row['supported'] ) : ?>
                                 <span style="color: #00a32a;">✓ <?php esc_html_e( '支持', 'libre-compress' ); ?></span>
                             <?php else : ?>
-                                <span style="color: #d63638;">✗ <?php esc_html_e( '不支持', 'libre-compress' ); ?></span>
+                                <span><?php esc_html_e( '不支持', 'libre-compress' ); ?></span>
                                 <?php if ( ! empty( $row['missing'] ) ) : ?>
                                     <span class="description">— <?php echo esc_html( sprintf( __( '缺少：%s', 'libre-compress' ), implode( '、', $row['missing'] ) ) ); ?></span>
                                 <?php endif; ?>
