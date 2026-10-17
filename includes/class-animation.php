@@ -844,8 +844,8 @@ class Libre_Compress_Animation {
         }
 
         $settings = get_option( 'libre_compress_tools', array() );
-        $lossless = 'lossless' === ( $settings['webp_anim_mode'] ?? 'lossy' );
-        $quality  = max( 0, min( 100, absint( $settings['webp_anim_quality'] ?? 80 ) ) );
+        $lossless = 'lossless' === ( $settings['webp_mode'] ?? 'lossy' );
+        $quality  = max( 0, min( 100, absint( $settings['webp_quality'] ?? 80 ) ) );
         $work     = rtrim( sys_get_temp_dir(), '/\\' ) . '/lc-webp-' . wp_generate_password( 12, false, false );
 
         if ( ! wp_mkdir_p( $work ) ) {
@@ -874,14 +874,14 @@ class Libre_Compress_Animation {
                 $encode = array_merge( $encode, array(
                     '-lossless',
                     '-z',
-                    (string) Libre_Compress_Settings::tool_speed( 'webp_anim_lossless_level' ),
+                    (string) Libre_Compress_Settings::tool_speed( 'webp_lossless_level' ),
                 ) );
             } else {
                 $encode = array_merge( $encode, array(
                     '-q',
                     (string) $quality,
                     '-m',
-                    (string) Libre_Compress_Settings::tool_speed( 'webp_anim_method' ),
+                    (string) Libre_Compress_Settings::tool_speed( 'webp_method' ),
                 ) );
             }
 
@@ -1056,10 +1056,10 @@ class Libre_Compress_Animation {
     private static function build_avif_command( string $source, string $output, array $plan ) {
         $settings = get_option( 'libre_compress_tools', array() );
         $same     = 'avif' === $plan['format'];
-        $prefix   = $same ? 'avif_anim_' : 'convert_avif_';
+        $prefix   = $same ? 'avif_' : 'convert_avif_';
         $lossless = 'lossless' === ( $settings[ $prefix . 'mode' ] ?? 'lossy' );
         $quality  = max( 0, min( 100, absint( $settings[ $prefix . 'quality' ] ?? 80 ) ) );
-        $speed    = Libre_Compress_Settings::tool_speed( $same ? 'avif_anim_speed' : 'convert_avif_speed' );
+        $speed    = Libre_Compress_Settings::tool_speed( $same ? 'avif_speed' : 'convert_avif_speed' );
         $command  = array( self::tool( 'ffmpeg' ), '-nostdin', '-v', 'error' );
 
         if ( 'gif' === $plan['format'] ) {

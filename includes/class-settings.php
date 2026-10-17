@@ -25,13 +25,9 @@ class Libre_Compress_Settings {
     const SPEED_SETTINGS = array(
         'pngquant_speed'              => array( 1, 11, 3 ),
         'oxipng_level'                => array( 0, 6, 4 ),
-        'apng_oxipng_level'           => array( 0, 6, 4 ),
         'webp_method'                 => array( 0, 6, 4 ),
         'webp_lossless_level'         => array( 0, 9, 6 ),
-        'webp_anim_method'            => array( 0, 6, 4 ),
-        'webp_anim_lossless_level'    => array( 0, 9, 6 ),
         'avif_speed'                  => array( 0, 10, 6 ),
-        'avif_anim_speed'             => array( 0, 8, 6 ),
         'jxl_effort'                  => array( 1, 9, 7 ),
         'gifsicle_level'              => array( 1, 3, 2 ),
         'convert_webp_method'         => array( 0, 6, 4 ),
@@ -51,9 +47,7 @@ class Libre_Compress_Settings {
         'png',
         'gif',
         'webp',
-        'webp_anim',
         'avif',
-        'avif_anim',
         'jxl',
         'convert_webp',
         'convert_avif',
@@ -70,9 +64,7 @@ class Libre_Compress_Settings {
         'png_lossy_quality'    => 80,
         'gif_quality'          => 60,
         'webp_quality'         => 80,
-        'webp_anim_quality'    => 80,
         'avif_quality'         => 80,
-        'avif_anim_quality'    => 80,
         'jxl_quality'          => 80,
         'convert_webp_quality' => 80,
         'convert_avif_quality' => 80,
@@ -97,7 +89,7 @@ class Libre_Compress_Settings {
     /**
      * 读取压缩模式
      *
-     * @param string $prefix 路径前缀，例如 webp、webp_anim、convert_webp
+     * @param string $prefix 路径前缀，例如 jpeg、webp、convert_webp
      * @return string lossy|lossless
      */
     public static function tool_mode( string $prefix ): string {
@@ -763,18 +755,14 @@ class Libre_Compress_Settings {
                 <?php $this->render_quality_field( 'jpeg_quality', __( '有损质量', 'libre-compress' ), 80, __( '有损压缩优先用 jpegli，没装 jpegli 时自动用 jpegoptim；无损压缩始终用 jpegoptim。', 'libre-compress' ) ); ?>
             </table>
 
-            <h3><?php esc_html_e( 'PNG 同格式压缩', 'libre-compress' ); ?></h3>
+            <h3><?php esc_html_e( 'PNG / APNG 同格式压缩', 'libre-compress' ); ?></h3>
             <table class="form-table">
                 <?php $this->render_mode_field( 'png' ); ?>
                 <?php $this->render_quality_field( 'png_lossy_quality', __( '有损质量', 'libre-compress' ), 80, __( '仅 pngquant 有损压缩有效。', 'libre-compress' ) ); ?>
                 <?php $this->render_speed_field( 'pngquant_speed', __( 'pngquant 有损速度', 'libre-compress' ), $options ); ?>
                 <?php $this->render_speed_field( 'oxipng_level', __( 'oxipng 无损级别', 'libre-compress' ), $options ); ?>
-            </table>
-
-            <h3><?php esc_html_e( 'APNG 同格式压缩', 'libre-compress' ); ?></h3>
-            <table class="form-table">
                 <tr>
-                    <th scope="row"><?php esc_html_e( '无损压缩', 'libre-compress' ); ?></th>
+                    <th scope="row"><?php esc_html_e( 'APNG 无损压缩', 'libre-compress' ); ?></th>
                     <td>
                         <label style="display:block;">
                             <input type="checkbox" name="libre_compress_tools[apng_lossless]" value="1" <?php checked( $options['apng_lossless'] ?? true ); ?>>
@@ -783,7 +771,6 @@ class Libre_Compress_Settings {
                         <p class="description"><?php esc_html_e( '有损 PNG 靠 pngquant 逐帧各自挑 256 色调色板，APNG 这样处理会闪烁，所以 APNG 只走 oxipng 的无损通道。取消勾选后，PNG 为有损时 APNG 原样保留不压；PNG 为无损时本来就走 oxipng，与本项无关。', 'libre-compress' ); ?></p>
                     </td>
                 </tr>
-                <?php $this->render_speed_field( 'apng_oxipng_level', __( 'oxipng 无损级别', 'libre-compress' ), $options ); ?>
             </table>
 
             <h3><?php esc_html_e( 'GIF 同格式压缩', 'libre-compress' ); ?></h3>
@@ -793,7 +780,7 @@ class Libre_Compress_Settings {
                 <?php $this->render_speed_field( 'gifsicle_level', __( 'gifsicle 优化级别', 'libre-compress' ), $options ); ?>
             </table>
 
-            <h3><?php esc_html_e( 'WebP 同格式压缩（静态）', 'libre-compress' ); ?></h3>
+            <h3><?php esc_html_e( 'WebP 同格式压缩（静图与动图）', 'libre-compress' ); ?></h3>
             <table class="form-table">
                 <?php $this->render_mode_field( 'webp' ); ?>
                 <?php $this->render_quality_field( 'webp_quality', __( '有损质量', 'libre-compress' ), 80 ); ?>
@@ -801,26 +788,11 @@ class Libre_Compress_Settings {
                 <?php $this->render_speed_field( 'webp_lossless_level', __( 'cwebp 无损级别', 'libre-compress' ), $options ); ?>
             </table>
 
-            <h3><?php esc_html_e( 'WebP 同格式压缩（动画）', 'libre-compress' ); ?></h3>
-            <table class="form-table">
-                <?php $this->render_mode_field( 'webp_anim' ); ?>
-                <?php $this->render_quality_field( 'webp_anim_quality', __( '有损质量', 'libre-compress' ), 80 ); ?>
-                <?php $this->render_speed_field( 'webp_anim_method', __( '逐帧 cwebp 有损方法', 'libre-compress' ), $options ); ?>
-                <?php $this->render_speed_field( 'webp_anim_lossless_level', __( '逐帧 cwebp 无损级别', 'libre-compress' ), $options ); ?>
-            </table>
-
-            <h3><?php esc_html_e( 'AVIF 同格式压缩（静态）', 'libre-compress' ); ?></h3>
+            <h3><?php esc_html_e( 'AVIF 同格式压缩（静图与动图）', 'libre-compress' ); ?></h3>
             <table class="form-table">
                 <?php $this->render_mode_field( 'avif' ); ?>
                 <?php $this->render_quality_field( 'avif_quality', __( '有损质量', 'libre-compress' ), 80 ); ?>
-                <?php $this->render_speed_field( 'avif_speed', __( 'avifenc 速度', 'libre-compress' ), $options ); ?>
-            </table>
-
-            <h3><?php esc_html_e( 'AVIF 同格式压缩（动画）', 'libre-compress' ); ?></h3>
-            <table class="form-table">
-                <?php $this->render_mode_field( 'avif_anim' ); ?>
-                <?php $this->render_quality_field( 'avif_anim_quality', __( '有损质量', 'libre-compress' ), 80 ); ?>
-                <?php $this->render_speed_field( 'avif_anim_speed', __( 'FFmpeg 速度', 'libre-compress' ), $options ); ?>
+                <?php $this->render_speed_field( 'avif_speed', __( 'avifenc / FFmpeg 速度', 'libre-compress' ), $options ); ?>
             </table>
 
             <h3><?php esc_html_e( 'JPEG XL 同格式压缩（静图与动图）', 'libre-compress' ); ?></h3>
@@ -922,7 +894,7 @@ class Libre_Compress_Settings {
     private function render_speed_field( string $key, string $label, array $options ): void {
         list( $min, $max, $default ) = self::SPEED_SETTINGS[ $key ];
         $value = self::normalize_speed( $key, $options[ $key ] ?? null );
-        $description = in_array( $key, array( 'pngquant_speed', 'avif_speed', 'avif_anim_speed', 'convert_avif_speed' ), true )
+        $description = in_array( $key, array( 'pngquant_speed', 'avif_speed', 'convert_avif_speed' ), true )
             ? __( '数值越大速度越快，通常文件越大；数值越小压缩越慢，通常文件越小。', 'libre-compress' )
             : __( '数值越大压缩越慢，通常文件越小；数值越小速度越快，通常文件越大。', 'libre-compress' );
         ?>
@@ -991,8 +963,8 @@ class Libre_Compress_Settings {
         $rows_definition = array(
             array( 'label' => __( 'JPEG 有损压缩', 'libre-compress' ), 'groups' => array( array( 'jpegoptim' ), array( 'cjpegli' ) ) ),
             array( 'label' => __( 'JPEG 无损压缩', 'libre-compress' ), 'groups' => array( array( 'jpegoptim' ) ) ),
-            array( 'label' => __( 'PNG 压缩', 'libre-compress' ), 'groups' => array( array( 'pngquant' ), array( 'oxipng' ) ) ),
-            array( 'label' => __( 'APNG 同格式压缩', 'libre-compress' ), 'groups' => array( array( 'oxipng' ) ) ),
+            array( 'label' => __( 'PNG 有损压缩', 'libre-compress' ), 'groups' => array( array( 'pngquant' ) ) ),
+            array( 'label' => __( 'PNG / APNG 无损压缩', 'libre-compress' ), 'groups' => array( array( 'oxipng' ) ) ),
             array( 'label' => __( 'WEBP 压缩', 'libre-compress' ), 'groups' => array( array( 'cwebp' ) ) ),
             array( 'label' => __( '动画 WebP 同格式压缩', 'libre-compress' ), 'groups' => Libre_Compress_Animation::required_tool_groups( 'webp', '' ) ),
             array( 'label' => __( 'AVIF 压缩', 'libre-compress' ), 'groups' => array( array( 'avifenc', 'avifdec' ) ) ),

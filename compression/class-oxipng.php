@@ -54,9 +54,7 @@ class Libre_Compress_Oxipng extends Libre_Compress_Tool_Base {
     protected function build_command_chain( string $file_path, array $options ): array {
         $executable = $this->get_executable_path();
 
-        $level = Libre_Compress_Compressor::is_apng( $file_path )
-            ? Libre_Compress_Settings::tool_speed( 'apng_oxipng_level' )
-            : Libre_Compress_Settings::tool_speed( 'oxipng_level' );
+        $level = Libre_Compress_Settings::tool_speed( 'oxipng_level' );
 
         // 构建命令：-o 无损级别，--strip 元数据取舍，--quiet 静默
         return array( array(
