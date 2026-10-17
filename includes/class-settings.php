@@ -758,7 +758,7 @@ class Libre_Compress_Settings {
                     </td>
                 </tr>
                 <tr>
-                    <th scope="row"><?php esc_html_e( '有损压缩质量', 'libre-compress' ); ?></th>
+                    <th scope="row"><?php esc_html_e( '压缩质量', 'libre-compress' ); ?></th>
                     <td>
                         <input type="range" name="libre_compress_tools[png_lossy_quality]" value="<?php echo esc_attr( $options['png_lossy_quality'] ?? 80 ); ?>" min="0" max="100" oninput="this.nextElementSibling.value = this.value">
                         <output><?php echo esc_html( $options['png_lossy_quality'] ?? 80 ); ?></output>

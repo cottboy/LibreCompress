@@ -489,7 +489,7 @@ msgstr ""
 msgid "压缩记录保存失败，请重新压缩"
 msgstr ""
 
-#: includes/class-settings.php:735 includes/class-settings.php:799 includes/class-settings.php:828 includes/class-settings.php:855 includes/class-settings.php:882
+#: includes/class-settings.php:735 includes/class-settings.php:761 includes/class-settings.php:799 includes/class-settings.php:828 includes/class-settings.php:855 includes/class-settings.php:882
 msgid "压缩质量"
 msgstr ""
 
@@ -884,10 +884,6 @@ msgstr ""
 
 #: includes/class-settings.php:725 includes/class-settings.php:751 includes/class-settings.php:789 includes/class-settings.php:818 includes/class-settings.php:845 includes/class-settings.php:872
 msgid "有损压缩"
-msgstr ""
-
-#: includes/class-settings.php:761
-msgid "有损压缩质量"
 msgstr ""
 
 #: libre-compress.php:301
