@@ -92,11 +92,11 @@ class Libre_Compress_Cwebp extends Libre_Compress_Tool_Base {
             $command_parts[] = (string) $quality;
             $command_parts[] = '-m';
             $command_parts[] = (string) Libre_Compress_Settings::tool_speed( 'webp_method' );
-
-            if ( Libre_Compress_Animation::prefer_420() ) {
-                $command_parts[] = '-sharp_yuv';
-            }
         }
+
+        // cwebp 默认不复制任何元数据；删除元数据时只保留 ICC，避免广色域图偏色。
+        $command_parts[] = '-metadata';
+        $command_parts[] = Libre_Compress_Settings::strips_metadata() ? 'icc' : 'all';
 
         // 输入和输出文件
         $command_parts[] = $file_path;

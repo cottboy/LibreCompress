@@ -34,7 +34,7 @@ class Libre_Compress_Compressor {
      * 注册默认压缩工具
      */
     private function register_default_tools() {
-        $this->register_tool( new Libre_Compress_Jpegoptim() );
+        $this->register_tool( new Libre_Compress_Jpeg() );
         $this->register_tool( new Libre_Compress_Pngquant() );
         $this->register_tool( new Libre_Compress_Oxipng() );
         $this->register_tool( new Libre_Compress_Cwebp() );
@@ -230,183 +230,6 @@ class Libre_Compress_Compressor {
     }
 
     /**
-     * 是否开启 CMYK 转 RGB
-     *
-     * 选项缺失时按开启处理：CMYK JPEG 交给 avifenc、cwebp、cjxl 会直接失败或产出
-     * 只有几十字节的废图，GD 还会把颜色读反，默认不转等于默认出错。
-     *
-     * @return bool
-     */
-    public static function cmyk_to_rgb_enabled(): bool {
-        $general = get_option( 'libre_compress_general', array() );
-
-        return ! isset( $general['cmyk_to_rgb'] ) || ! empty( $general['cmyk_to_rgb'] );
-    }
-
-    /**
-     * 判断 JPEG 是否为 CMYK
-     *
-     * 只看 SOF 标记里的分量数：4 个分量就是 CMYK。 WordPress 上传时不校验图片真实内容，
-     * 后缀与 MIME 都可能是 jpg 而容器是 CMYK，所以必须读字节而不是信元数据。
-     *
-     * @param string $file_path 文件绝对路径
-     * @return bool
-     */
-    public static function is_cmyk_jpeg( string $file_path ): bool {
-        if ( ! in_array( strtolower( pathinfo( $file_path, PATHINFO_EXTENSION ) ), array( 'jpg', 'jpeg' ), true ) ) {
-            return false;
-        }
-
-        $data = file_get_contents( $file_path, false, null, 0, 512 * 1024 ); // phpcs:ignore WordPress.WP.AlternativeFunctions
-
-        if ( false === $data || strlen( $data ) < 4 || "\xFF\xD8" !== substr( $data, 0, 2 ) ) {
-            return false;
-        }
-
-        $length = strlen( $data );
-        $offset = 2;
-
-        while ( $offset + 4 < $length ) {
-            if ( "\xFF" !== $data[ $offset ] ) {
-                $offset++;
-                continue;
-            }
-
-            $marker = ord( $data[ $offset + 1 ] );
-
-            // 填充字节与独立标记（SOI/EOI/RSTn/SO）没有长度字段
-            if ( 0xFF === $marker || 0x01 === $marker || ( $marker >= 0xD0 && $marker <= 0xD9 ) ) {
-                $offset += 2;
-                continue;
-            }
-
-            $segment = unpack( 'n', substr( $data, $offset + 2, 2 ) );
-            $size    = (int) $segment[1];
-
-            // SOF0-SOF15，跳过 JPEG 扩展(D8C9)与算术/无损里的 D8CC/D8C8
-            if ( $marker >= 0xC0 && $marker <= 0xCF && ! in_array( $marker, array( 0xC4, 0xC8, 0xCC ), true ) ) {
-                // 分量数字节在段头之后：长度 2 + 精度 1 + 高 2 + 宽 2
-                return isset( $data[ $offset + 9 ] ) && 4 === ord( $data[ $offset + 9 ] );
-            }
-
-            if ( $size < 2 ) {
-                return false;
-            }
-
-            $offset += 2 + $size;
-        }
-
-        return false;
-    }
-
-    /**
-     * 把 CMYK JPEG 原地转成 RGB
-     *
-     * 用 libjpeg-turbo 自带的 djpeg 解出 RGB，再用 cjpeg 写回 JPEG。djpeg 对 CMYK
-     * 输入默认就输出 RGB，不要加 -rgb（那会要求库自己做色彩空间转换而直接报错）；
-     * 顺手用 -icc 把原图的 ICC 抽出来，转完再塞回去，换色彩空间不会丢颜色配置。
-     * 转换只落到临时文件，全部确认成功后才改名替换原文件。需 libjpeg-turbo 3.1.0 以上。
-     *
-     * @param string $file_path 文件绝对路径
-     * @return string 空字符串表示可以继续处理，否则为跳过原因
-     */
-    public static function normalize_cmyk( string $file_path ): string {
-        $prepared = self::prepare_cmyk_rgb( $file_path );
-
-        if ( ! $prepared['needed'] ) {
-            return '';
-        }
-
-        if ( '' !== $prepared['message'] ) {
-            return $prepared['message'];
-        }
-
-        if ( ! rename( $prepared['path'], $file_path ) ) {
-            self::cleanup_cmyk_temp( $prepared['path'] );
-            return __( 'CMYK 转换结果替换失败，已保留原文件', 'libre-compress' );
-        }
-
-        clearstatcache( true, $file_path );
-        return '';
-    }
-
-    /**
-     * 把 CMYK JPEG 转成临时 RGB JPEG，不改动原图。
-     *
-     * @param string $file_path 文件绝对路径
-     * @return array{needed:bool,path:string,message:string}
-     */
-    public static function prepare_cmyk_rgb( string $file_path ): array {
-        if ( ! self::cmyk_to_rgb_enabled() || ! self::is_cmyk_jpeg( $file_path ) ) {
-            return array( 'needed' => false, 'path' => '', 'message' => '' );
-        }
-
-        $djpeg = Libre_Compress_Output::find_local_tool( 'djpeg' );
-        $cjpeg = Libre_Compress_Output::find_local_tool( 'cjpeg' );
-
-        if ( false === $djpeg || false === $cjpeg ) {
-            return array( 'needed' => true, 'path' => '', 'message' => __( 'CMYK 转 RGB 需要 djpeg 与 cjpeg，当前环境未配齐，已跳过', 'libre-compress' ) );
-        }
-
-        $token    = wp_generate_password( 12, false, false );
-        $temp_ppm = $file_path . '.lc-cmyk-' . $token . '.ppm';
-        $temp_icc = $file_path . '.lc-cmyk-' . $token . '.icc';
-        $temp_jpg = $file_path . '.lc-cmyk-' . $token . '.jpg';
-
-        $decoded = Libre_Compress_Tool_Base::run_command(
-            array( $djpeg, '-pnm', '-icc', $temp_icc, '-outfile', $temp_ppm, $file_path ),
-            300
-        );
-
-        if ( empty( $decoded['success'] ) || ! is_file( $temp_ppm ) || 0 === (int) filesize( $temp_ppm ) ) {
-            self::cleanup_cmyk_temp( $temp_ppm );
-            self::cleanup_cmyk_temp( $temp_icc );
-
-            return array( 'needed' => true, 'path' => '', 'message' => __( 'CMYK 解码失败，已保留原文件', 'libre-compress' ) );
-        }
-
-        // 只为换色彩空间，用高质量写回，避免再叠加一层可见损失
-        $encode = array( $cjpeg, '-quality', '90', '-optimize', '-progressive' );
-
-        // 原图带 ICC 时一并写回，颜色配置不会因为换色彩空间而丢掉
-        if ( is_file( $temp_icc ) && (int) filesize( $temp_icc ) > 0 ) {
-            $encode = array_merge( $encode, array( '-icc', $temp_icc ) );
-        }
-
-        if ( ! Libre_Compress_Animation::prefer_420() ) {
-            // 关掉色度抽样时按 4:4:4 输出，文字与 logo 的边缘不会被压烂
-            $encode = array_merge( $encode, array( '-sample', '1x1,1x1,1x1' ) );
-        }
-
-        $encode = array_merge( $encode, array( '-outfile', $temp_jpg, $temp_ppm ) );
-
-        $encoded = Libre_Compress_Tool_Base::run_command( $encode, 300 );
-
-        self::cleanup_cmyk_temp( $temp_ppm );
-        self::cleanup_cmyk_temp( $temp_icc );
-
-        if ( empty( $encoded['success'] ) || ! is_file( $temp_jpg ) || 0 === (int) filesize( $temp_jpg ) || self::is_cmyk_jpeg( $temp_jpg ) ) {
-            self::cleanup_cmyk_temp( $temp_jpg );
-
-            return array( 'needed' => true, 'path' => '', 'message' => __( 'CMYK 转换结果不可用，已保留原文件', 'libre-compress' ) );
-        }
-
-        return array( 'needed' => true, 'path' => $temp_jpg, 'message' => '' );
-    }
-
-    /**
-     * 清理 CMYK 转换的临时文件
-     *
-     * @param string $path 临时文件路径
-     */
-    private static function cleanup_cmyk_temp( string $path ): void {
-        if ( file_exists( $path ) ) {
-            // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
-            unlink( $path );
-        }
-    }
-
-    /**
      * 检测 GIF 是否为动画（解析 GIF 块结构统计图像帧数）
      *
      * WordPress 的图片编辑器缩放 GIF 只会留下第一帧，动图被当静态图处理就毁掉了，
@@ -595,8 +418,8 @@ class Libre_Compress_Compressor {
         $extension      = strtolower( pathinfo( $file_path, PATHINFO_EXTENSION ) );
 
         // 动图不能交给只认第一帧的单文件工具：pngquant、cwebp、avifenc 都会把动图压成静图。
-        // APNG 由 oxipng 整只无损优化（见 APNG 自动无损压缩开关），其余动图也直接交给支持完整动画的工具并校验。
-        $plan   = in_array( $extension, array( 'gif', 'png', 'webp', 'avif', 'jxl' ), true )
+        // APNG 由 oxipng 整只无损优化（见 APNG 自动无损压缩开关），其余动图直接交给支持完整动画的工具。
+        $plan   = in_array( $extension, array( 'gif', 'png', 'webp', 'avif' ), true )
             ? Libre_Compress_Animation::analyze( $file_path )
             : null;
         $tool   = null;
@@ -685,31 +508,8 @@ class Libre_Compress_Compressor {
             );
         }
 
-        // 先建立回滚副本，再改写 CMYK JPEG；工具不可用或后续失败时一定能恢复原图。
-        if ( 'jpg' === $extension || 'jpeg' === $extension ) {
-            $cmyk = self::normalize_cmyk( $file_path );
-
-            if ( '' !== $cmyk ) {
-                $this->rollback_file( $rollback_path, $file_path );
-                $this->record_skipped_file( $attachment_id, $file_path, $size_type, $cmyk );
-
-                return array(
-                    'success' => false,
-                    'message' => $cmyk,
-                    'status'  => 'skipped',
-                );
-            }
-        }
-
         $original_size = filesize( $file_path );
         $result        = $tool->compress( $file_path, $options );
-
-        // gifsicle 与 oxipng 的原生处理同样要校验，不能仅凭工具退出成功就覆盖原图。
-        if ( $result['success'] && null !== $plan && $plan['frames'] > 1
-            && ! Libre_Compress_Animation::matches_plan( $plan, Libre_Compress_Animation::analyze( $file_path ) ) ) {
-            $result['success'] = false;
-            $result['message'] = __( '处理结果的动画、尺寸、播放次数、透明背景或颜色配置与原图不一致，已保留原文件', 'libre-compress' );
-        }
 
         if ( ! $result['success'] ) {
             // 工具执行失败后必须成功还原，才能清理回滚副本。
@@ -724,7 +524,7 @@ class Libre_Compress_Compressor {
                 $size_type,
                 $original_size,
                 $original_size,
-                $tool->get_name(),
+                $tool->get_used_tool_name(),
                 'failed',
                 $message
             );
@@ -753,7 +553,7 @@ class Libre_Compress_Compressor {
                     $size_type,
                     $original_size,
                     $original_size,
-                    $tool->get_name(),
+                    $tool->get_used_tool_name(),
                     'failed',
                     $message
                 );
@@ -776,7 +576,7 @@ class Libre_Compress_Compressor {
                 $size_type,
                 $original_size,
                 $original_size,
-                $tool->get_name(),
+                $tool->get_used_tool_name(),
                 'success'
             ) ) {
                 return array(
@@ -808,7 +608,7 @@ class Libre_Compress_Compressor {
             $size_type,
             $original_size,
             $compressed_size,
-            $tool->get_name(),
+            $tool->get_used_tool_name(),
             'success'
         );
 

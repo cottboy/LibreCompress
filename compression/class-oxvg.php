@@ -55,14 +55,16 @@ class Libre_Compress_Oxvg extends Libre_Compress_Tool_Base {
     protected function build_command_chain( string $file_path, array $options ): array {
         $executable  = $this->get_executable_path();
         $temp_output = $this->get_temp_output_path( $file_path );
+        $settings    = get_option( 'libre_compress_tools', array() );
+        $preset      = 'safe' === ( $settings['svg_preset'] ?? 'default' ) ? 'safe' : 'default';
 
-        // default 是 oxvg 的常规优化预设；另有 safe 预设更保守，几乎不改视觉。
+        // default 是常规优化预设；safe 更保守，几乎不改视觉。
         return array(
             array(
                 $executable,
                 'optimise',
                 '-e',
-                'default',
+                $preset,
                 '-o',
                 $temp_output,
                 $file_path,

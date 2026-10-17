@@ -284,7 +284,6 @@ class Libre_Compress_Output {
         $encode_ok      = false;
         $error_msg      = '';
         $temp_source    = '';
-        $cmyk_source    = '';
         $command        = false;
         $animation_done = false;
 
@@ -301,7 +300,7 @@ class Libre_Compress_Output {
                 $gif2webp = Libre_Compress_Animation::gif2webp_command( $file_path, $temp_output );
                 $command  = false === $gif2webp ? false : array( $gif2webp );
             } elseif ( 'jxl' === $target ) {
-                $cjxl    = Libre_Compress_Cjxl::build_command( $file_path, $temp_output );
+                $cjxl    = Libre_Compress_Cjxl::build_command( $file_path, $temp_output, 'convert_jxl_' );
                 $command = false === $cjxl ? false : array( $cjxl );
             } else {
                 $temp_source = $file_path . '.lc-source-' . $temp_token . '.png';
@@ -321,17 +320,7 @@ class Libre_Compress_Output {
                 $command = $this->build_encode_command( $temp_source, $temp_output, $target );
             }
         } else {
-            // CMYK JPEG 会让 cwebp/avifenc/cjxl 产出废图，先转成 RGB 再编码
-            $prepared = Libre_Compress_Compressor::prepare_cmyk_rgb( $file_path );
-
-            if ( ! empty( $prepared['needed'] ) && '' !== $prepared['message'] ) {
-                $result_template['status']  = 'skipped';
-                $result_template['message'] = $prepared['message'];
-                return $result_template;
-            }
-
-            $cmyk_source = ! empty( $prepared['path'] ) ? $prepared['path'] : '';
-            $command     = $this->build_encode_command( '' !== $cmyk_source ? $cmyk_source : $file_path, $temp_output, $target );
+            $command = $this->build_encode_command( $file_path, $temp_output, $target );
         }
 
         if ( $animation_done ) {
@@ -374,11 +363,6 @@ class Libre_Compress_Output {
         if ( '' !== $temp_source && file_exists( $temp_source ) ) {
             // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
             unlink( $temp_source );
-        }
-
-        if ( '' !== $cmyk_source && file_exists( $cmyk_source ) ) {
-            // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
-            unlink( $cmyk_source );
         }
 
         // 动画层与命令链都可能在本次请求内刚写出目标文件，必须绕过 stat 缓存取真实大小
@@ -2052,21 +2036,26 @@ class Libre_Compress_Output {
         $settings = get_option( 'libre_compress_tools', array() );
 
         if ( 'webp' === $target ) {
-            $mode = isset( $settings['webp_mode'] ) ? $settings['webp_mode'] : 'lossy';
+            $mode    = isset( $settings['convert_webp_mode'] ) ? $settings['convert_webp_mode'] : 'lossy';
+            $encode  = array( $binary, '-quiet', '-mt' );
 
             if ( 'lossless' === $mode ) {
-                return array( array( $binary, '-quiet', '-lossless', '-z', (string) Libre_Compress_Settings::tool_speed( 'webp_lossless_level' ), $source, '-o', $output ) );
+                $encode[] = '-lossless';
+                $encode[] = '-z';
+                $encode[] = (string) Libre_Compress_Settings::tool_speed( 'convert_webp_lossless_level' );
+            } else {
+                $quality = isset( $settings['convert_webp_quality'] ) ? absint( $settings['convert_webp_quality'] ) : 80;
+                $quality = max( 0, min( 100, $quality ) );
+
+                $encode[] = '-q';
+                $encode[] = (string) $quality;
+                $encode[] = '-m';
+                $encode[] = (string) Libre_Compress_Settings::tool_speed( 'convert_webp_method' );
             }
 
-            $quality = isset( $settings['webp_quality'] ) ? absint( $settings['webp_quality'] ) : 80;
-            $quality = max( 0, min( 100, $quality ) );
-
-            $encode = array( $binary, '-quiet', '-mt', '-q', (string) $quality, '-m', (string) Libre_Compress_Settings::tool_speed( 'webp_method' ) );
-
-            if ( Libre_Compress_Animation::prefer_420() ) {
-                $encode[] = '-sharp_yuv';
-            }
-
+            // cwebp 默认不复制任何元数据；删除元数据时只保留 ICC。
+            $encode[] = '-metadata';
+            $encode[] = Libre_Compress_Settings::strips_metadata() ? 'icc' : 'all';
             $encode[] = $source;
             $encode[] = '-o';
             $encode[] = $output;
@@ -2075,15 +2064,15 @@ class Libre_Compress_Output {
         }
 
         if ( 'jxl' === $target ) {
-            $command = Libre_Compress_Cjxl::build_command( $source, $output );
+            $command = Libre_Compress_Cjxl::build_command( $source, $output, 'convert_jxl_' );
 
             return false === $command ? false : array( $command );
         }
 
-        $mode = isset( $settings['avif_mode'] ) ? $settings['avif_mode'] : 'lossy';
+        $mode = isset( $settings['convert_avif_mode'] ) ? $settings['convert_avif_mode'] : 'lossy';
 
         // avifenc 默认会把输入图片里的 EXIF/XMP 原样搬进 AVIF，而转换结果正是对外访问的那张图
-        $encode = array( $binary, '-j', '4', '-s', (string) Libre_Compress_Settings::tool_speed( 'avif_speed' ) );
+        $encode = array( $binary, '-j', '4', '-s', (string) Libre_Compress_Settings::tool_speed( 'convert_avif_speed' ) );
 
         if ( Libre_Compress_Settings::strips_metadata() ) {
             $encode[] = '--ignore-exif';
@@ -2093,16 +2082,10 @@ class Libre_Compress_Output {
         if ( 'lossless' === $mode ) {
             $encode[] = '--lossless';
         } else {
-            $quality = isset( $settings['avif_quality'] ) ? absint( $settings['avif_quality'] ) : 80;
+            $quality = isset( $settings['convert_avif_quality'] ) ? absint( $settings['convert_avif_quality'] ) : 80;
             $quality = max( 0, min( 100, $quality ) );
             $encode[] = '-q';
             $encode[] = (string) $quality;
-
-            if ( Libre_Compress_Animation::prefer_420() ) {
-                $encode[] = '-y';
-                $encode[] = '420';
-                $encode[] = '--sharpyuv';
-            }
         }
 
         $encode[] = $source;

@@ -88,6 +88,18 @@ abstract class Libre_Compress_Tool_Base {
     }
 
     /**
+     * 获取写入压缩记录的工具名
+     *
+     * 同一渠道可能根据环境切换具体可执行文件（例如 jpegli / jpegoptim），
+     * 需要在压缩完成后给出实际使用的工具名。
+     *
+     * @return string 工具名
+     */
+    public function get_used_tool_name(): string {
+        return $this->get_name();
+    }
+
+    /**
      * 获取编码结果的临时文件路径
      *
      * 返回空字符串表示工具自己原地覆盖原文件（默认）。

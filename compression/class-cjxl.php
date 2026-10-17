@@ -48,9 +48,10 @@ class Libre_Compress_Cjxl extends Libre_Compress_Tool_Base {
      *
      * @param string $source 输入文件路径
      * @param string $output 输出文件路径
+     * @param string $prefix 设置前缀：同格式压缩用 jxl_，格式转换用 convert_jxl_
      * @return array|false 参数数组，工具不可用时返回 false
      */
-    public static function build_command( string $source, string $output ) {
+    public static function build_command( string $source, string $output, string $prefix = 'jxl_' ) {
         $cjxl     = Libre_Compress_Output::find_local_tool( 'cjxl' );
         $settings = get_option( 'libre_compress_tools', array() );
 
@@ -58,13 +59,13 @@ class Libre_Compress_Cjxl extends Libre_Compress_Tool_Base {
             return false;
         }
 
-        $mode    = isset( $settings['jxl_mode'] ) ? $settings['jxl_mode'] : 'lossy';
-        $quality = isset( $settings['jxl_quality'] ) ? absint( $settings['jxl_quality'] ) : 80;
+        $mode    = isset( $settings[ $prefix . 'mode' ] ) ? $settings[ $prefix . 'mode' ] : 'lossy';
+        $quality = isset( $settings[ $prefix . 'quality' ] ) ? absint( $settings[ $prefix . 'quality' ] ) : 80;
 
         $command = array(
             $cjxl,
             '-e',
-            (string) Libre_Compress_Settings::tool_speed( 'cjxl_effort' ),
+            (string) Libre_Compress_Settings::tool_speed( $prefix . 'effort' ),
         );
 
         if ( 'lossless' === $mode ) {
@@ -139,7 +140,7 @@ class Libre_Compress_Cjxl extends Libre_Compress_Tool_Base {
             'centos'  => __( '暂无官方包，建议从 GitHub Releases 下载', 'libre-compress' ),
             'fedora'  => 'sudo dnf install libjxl-tools',
             'macos'   => 'brew install libjxl',
-            'windows' => __( '从 libjxl GitHub Releases 下载 jxl-x64-windows.zip，把 bin 目录里的 cjxl.exe、jxlinfo.exe 与其依赖的 dll 一起放进 LibreCompress-bin', 'libre-compress' ),
+            'windows' => __( '从 libjxl GitHub Releases 下载 jxl-x64-windows.zip，把 bin 目录里的 cjxl.exe 与其依赖的 dll 一起放进 LibreCompress-bin', 'libre-compress' ),
         );
     }
 }

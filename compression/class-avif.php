@@ -110,71 +110,6 @@ class Libre_Compress_Avif extends Libre_Compress_Tool_Base {
     }
 
     /**
-     * 压缩 AVIF 前确认文件只有单帧
-     *
-     * 当前同格式处理链只支持单张 PNG 中间文件，动画或多帧文件必须跳过，
-     * 防止静默丢失动画帧。
-     *
-     * @param string $file_path 文件路径
-     * @param array  $options   压缩选项
-     * @return array
-     */
-    public function compress( string $file_path, array $options = array() ): array {
-        $decoder = $this->get_decoder_path();
-
-        if ( false === $decoder || ! self::is_command_execution_available() ) {
-            return parent::compress( $file_path, $options );
-        }
-
-        $result  = self::run_command( array( $decoder, '--info', $file_path ), 15 );
-        $info    = $result['output'];
-        $frames  = $this->parse_frame_count( $info );
-
-        if ( ! $result['success'] || 0 === $frames ) {
-            return array(
-                'success'         => false,
-                'message'         => __( '无法确认 AVIF 帧数，已停止压缩以保护动画内容', 'libre-compress' ),
-                'original_size'   => file_exists( $file_path ) ? (int) filesize( $file_path ) : 0,
-                'compressed_size' => file_exists( $file_path ) ? (int) filesize( $file_path ) : 0,
-            );
-        }
-
-        if ( $frames > 1 ) {
-            return array(
-                'success'         => false,
-                'message'         => __( '动画或多帧 AVIF 暂不支持同格式压缩，已保持原文件不变', 'libre-compress' ),
-                'original_size'   => (int) filesize( $file_path ),
-                'compressed_size' => (int) filesize( $file_path ),
-            );
-        }
-
-        return parent::compress( $file_path, $options );
-    }
-
-    /**
-     * 从 avifdec --info 输出中解析帧数
-     *
-     * libavif 1.x 已去掉 Image Count 字段，改成
-     * "… 1.00 seconds (1 timescales), 1 frame"；旧版本才是 "Image Count: N"。
-     * 两种输出都认，都读不到时返回 0，表示无法确认帧数。
-     *
-     * @param string $info avifdec --info 的输出
-     * @return int 帧数，无法确认时返回 0
-     */
-    private function parse_frame_count( string $info ): int {
-        if ( preg_match( '/Image\s+Count\s*:\s*(\d+)/i', $info, $matches ) ) {
-            return (int) $matches[1];
-        }
-
-        // 逗号锚定，避免把 "32 worker threads" 这类数字误当成帧数。
-        if ( preg_match( '/,\s*(\d+)\s+frames?\b/i', $info, $matches ) ) {
-            return (int) $matches[1];
-        }
-
-        return 0;
-    }
-
-    /**
      * 构建压缩命令链
      *
      * 同格式 AVIF 压缩分两步：先无损解码成 PNG 中间文件，再用 avifenc 压回 AVIF。
@@ -224,13 +159,6 @@ class Libre_Compress_Avif extends Libre_Compress_Tool_Base {
         } else {
             $encode[] = '-q';
             $encode[] = (string) $quality;
-
-            // 4:2:0 色度抽样：体积更小的主因，--sharpyuv 用来减轻彩边的锯齿
-            if ( Libre_Compress_Animation::prefer_420() ) {
-                $encode[] = '-y';
-                $encode[] = '420';
-                $encode[] = '--sharpyuv';
-            }
         }
 
         $encode[] = $temp_png;

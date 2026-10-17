@@ -70,27 +70,10 @@ function libre_compress_load_textdomain() {
 add_action( 'plugins_loaded', 'libre_compress_load_textdomain' );
 
 /**
- * 判断 WordPress 核心是否已经完整接管 JXL。
+ * 允许上传 AVIF 图片
  *
- * 只要核心还没有把 JXL 放进自己的 MIME 白名单，就仍由插件补充上传和尺寸信息。
- *
- * @return bool
- */
-function libre_compress_jxl_is_native_supported(): bool {
-    if ( ! function_exists( 'wp_image_editor_supports' ) || ! wp_image_editor_supports( array( 'mime_type' => 'image/jxl' ) ) ) {
-        return false;
-    }
-
-    $mimes = function_exists( 'wp_get_mime_types' ) ? wp_get_mime_types() : array();
-
-    return isset( $mimes['jxl'] ) && 'image/jxl' === $mimes['jxl'];
-}
-
-/**
- * 允许上传 AVIF 与 JPEG XL 图片
- *
- * WordPress 6.5 起原生支持 AVIF，此过滤器保证旧版本也能上传；
- * JPEG XL 至今不在 WordPress 的允许列表里，一律由插件补上。
+ * WordPress 6.5 起原生支持 AVIF，此过滤器保证旧版本也能上传。
+ * JXL 的上传白名单与尺寸元数据一律交给 WordPress 自己处理，插件不接管。
  *
  * @param array $mimes 允许的 MIME 类型
  * @return array 修改后的 MIME 类型
@@ -100,62 +83,9 @@ function libre_compress_allow_extended_uploads( $mimes ) {
         $mimes['avif'] = 'image/avif';
     }
 
-    if ( ! libre_compress_jxl_is_native_supported() && ! isset( $mimes['jxl'] ) ) {
-        $mimes['jxl'] = 'image/jxl';
-    }
-
     return $mimes;
 }
 add_filter( 'upload_mimes', 'libre_compress_allow_extended_uploads' );
-
-/**
- * 为当前 WordPress 没有图片编辑器支持的 JXL 补充尺寸信息。
- *
- * 一旦 WordPress 原生支持 JXL，保留核心自己的上传和元数据流程，插件不再接管。
- *
- * @param mixed $metadata      WordPress 生成的附件元数据
- * @param int   $attachment_id 附件 ID
- * @param string $context      WordPress 处理上下文
- * @return mixed
- */
-function libre_compress_fill_jxl_metadata( $metadata, $attachment_id, $context ) {
-    unset( $context );
-
-    $file = function_exists( 'get_attached_file' ) ? get_attached_file( $attachment_id ) : '';
-
-    if ( ! is_string( $file ) || 'jxl' !== strtolower( pathinfo( $file, PATHINFO_EXTENSION ) )
-        || libre_compress_jxl_is_native_supported() ) {
-        return $metadata;
-    }
-
-    if ( ! is_array( $metadata ) ) {
-        $metadata = array();
-    }
-
-    if ( ! empty( $metadata['width'] ) && ! empty( $metadata['height'] ) ) {
-        return $metadata;
-    }
-
-    $jxlinfo = class_exists( 'Libre_Compress_Output' ) ? Libre_Compress_Output::find_local_tool( 'jxlinfo' ) : false;
-    if ( false === $jxlinfo ) {
-        return $metadata;
-    }
-
-    $result = Libre_Compress_Tool_Base::run_command( array( $jxlinfo, '-v', $file ), 60 );
-    $info   = (string) $result['output'];
-
-    if ( ! preg_match( '/(?:Intrinsic dimensions:|JPEG XL(?: animation)?[,]?)\s*(\d+)x(\d+)/i', $info, $size ) ) {
-        return $metadata;
-    }
-
-    $metadata['width']  = (int) $size[1];
-    $metadata['height'] = (int) $size[2];
-    $metadata['filesize'] = file_exists( $file ) ? (int) filesize( $file ) : 0;
-    $metadata['mime-type'] = 'image/jxl';
-
-    return $metadata;
-}
-add_filter( 'wp_generate_attachment_metadata', 'libre_compress_fill_jxl_metadata', 5, 3 );
 
 /**
  * 检查设置中是否允许上传 SVG
@@ -334,7 +264,7 @@ add_filter( 'wp_handle_upload_prefilter', 'libre_compress_sanitize_svg_upload' )
 function libre_compress_load_dependencies() {
     // 加载压缩工具基类和实现
     require_once LIBRE_COMPRESS_PATH . 'compression/class-tool-base.php';
-    require_once LIBRE_COMPRESS_PATH . 'compression/class-jpegoptim.php';
+    require_once LIBRE_COMPRESS_PATH . 'compression/class-jpeg.php';
     require_once LIBRE_COMPRESS_PATH . 'compression/class-pngquant.php';
     require_once LIBRE_COMPRESS_PATH . 'compression/class-oxipng.php';
     require_once LIBRE_COMPRESS_PATH . 'compression/class-cwebp.php';
@@ -392,24 +322,33 @@ function libre_compress_activate() {
         'image_scale_enabled'   => true,
         'image_size_threshold'  => 2560,
         'output_format'         => 'avif',
-        'chroma_420'            => true,
-        'cmyk_to_rgb'           => true,
     );
 
     $default_tools = array(
-        'jpeg_mode'          => 'lossy',
-        'jpeg_quality'       => 80,
-        'png_mode'           => 'lossy',
-        'png_lossy_quality'  => 80,
-        'apng_lossless'      => true,
-        'webp_mode'          => 'lossy',
-        'webp_quality'       => 80,
-        'avif_mode'          => 'lossy',
-        'avif_quality'       => 80,
-        'jxl_mode'           => 'lossy',
-        'jxl_quality'        => 80,
-        'gif_mode'           => 'lossy',
-        'gif_quality'        => 60,
+        'jpeg_mode'             => 'lossy',
+        'jpeg_quality'          => 80,
+        'png_mode'              => 'lossy',
+        'png_lossy_quality'     => 80,
+        'apng_lossless'         => true,
+        'gif_mode'              => 'lossy',
+        'gif_quality'           => 60,
+        'webp_mode'             => 'lossy',
+        'webp_quality'          => 80,
+        'webp_anim_mode'        => 'lossy',
+        'webp_anim_quality'     => 80,
+        'avif_mode'             => 'lossy',
+        'avif_quality'          => 80,
+        'avif_anim_mode'        => 'lossy',
+        'avif_anim_quality'     => 80,
+        'jxl_mode'              => 'lossy',
+        'jxl_quality'           => 80,
+        'convert_webp_mode'     => 'lossy',
+        'convert_webp_quality'  => 80,
+        'convert_avif_mode'     => 'lossy',
+        'convert_avif_quality'  => 80,
+        'convert_jxl_mode'      => 'lossy',
+        'convert_jxl_quality'   => 80,
+        'svg_preset'            => 'default',
     );
 
     foreach ( Libre_Compress_Settings::SPEED_SETTINGS as $key => $range ) {

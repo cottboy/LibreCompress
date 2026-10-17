@@ -6,8 +6,8 @@
  * 动画 WebP 用 libwebp 自带的 webpmux + cwebp 原样重组：webpmux 按帧抽出压缩
  * 码流，cwebp 重压，再按原图的时间、偏移、处置、混合与背景色装回去，全程不
  * 经过任何聚合引擎，也不解码成整画布像素。
- * 插件只选择工具、读取动画信息和校验结果，不拆帧、不重写透明像素。
- * 工具执行失败或播放信息不一致时保留原文件。
+ * 插件只选择工具、读取播放参数，不拆帧、不重写透明像素。
+ * 工具执行失败时保留原文件。
  *
  * @package LibreCompress
  */
@@ -26,7 +26,7 @@ class Libre_Compress_Animation {
      *
      * @var array
      */
-    private static $same_format_targets = array( 'webp', 'avif', 'jxl' );
+    private static $same_format_targets = array( 'webp', 'avif' );
 
     /**
      * 允许参与格式转换的动图源扩展名
@@ -56,17 +56,6 @@ class Libre_Compress_Animation {
         return ! isset( $tools['apng_lossless'] ) || ! empty( $tools['apng_lossless'] );
     }
 
-    /**
-     * 是否优先使用 4:2:0 色度抽样
-     *
-     * @return bool
-     */
-    public static function prefer_420(): bool {
-        $general = get_option( 'libre_compress_general', array() );
-
-        return ! isset( $general['chroma_420'] ) || ! empty( $general['chroma_420'] );
-    }
-
     /* ---------------------------------------------------------------------
      * 元信息读取
      * ------------------------------------------------------------------- */
@@ -82,7 +71,7 @@ class Libre_Compress_Animation {
     public static function is_animated( string $file_path ): bool {
         $extension = strtolower( pathinfo( $file_path, PATHINFO_EXTENSION ) );
 
-        if ( ! in_array( $extension, array( 'gif', 'png', 'webp', 'avif', 'jxl' ), true ) ) {
+        if ( ! in_array( $extension, array( 'gif', 'png', 'webp', 'avif' ), true ) ) {
             return false;
         }
 
@@ -123,9 +112,6 @@ class Libre_Compress_Animation {
             case 'avif':
                 $plan = self::analyze_avif( $file_path );
                 break;
-            case 'jxl':
-                $plan = self::analyze_jxl( $file_path );
-                break;
             default:
                 $plan = null;
         }
@@ -140,70 +126,146 @@ class Libre_Compress_Animation {
     }
 
     /**
-     * 用 gifsicle -I 读取 GIF 动画信息
+     * 读取 GIF 动画信息
      *
-     * 不自己解析字节流：GIF 的延时藏在逐帧图形控制扩展里，
-     * 帧数据又可能包含同样特征的字节，手写解析容易数错帧。gifsicle 本来就是 GIF 依赖。
+     * 直接按 GIF 块结构解析：延时与透明标记在图形控制扩展里，
+     * 循环次数在 NETSCAPE2.0 应用扩展里。这样只做格式转换时不再需要 gifsicle。
      *
      * @param string $file_path GIF 路径
      * @return array|null
      */
     private static function analyze_gif( string $file_path ): ?array {
-        $gifsicle = Libre_Compress_Output::find_local_tool( 'gifsicle' );
+        // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
+        $data = file_get_contents( $file_path );
 
-        if ( false === $gifsicle ) {
+        if ( false === $data || strlen( $data ) < 14 || 'GIF' !== substr( $data, 0, 3 ) ) {
             return null;
         }
 
-        $result = Libre_Compress_Tool_Base::run_command( array( $gifsicle, '-I', $file_path ), 30 );
+        $width  = (int) unpack( 'v', substr( $data, 6, 2 ) )[1];
+        $height = (int) unpack( 'v', substr( $data, 8, 2 ) )[1];
+        $flags  = ord( $data[10] );
+        $pos    = 13;
+        $length = strlen( $data );
 
-        if ( empty( $result['success'] ) ) {
-            return null;
+        if ( $flags & 0x80 ) {
+            $pos += 3 * ( 2 << ( $flags & 0x07 ) );
         }
 
-        $info = (string) $result['output'];
-
-        if ( ! preg_match( '/\b(\d+)\s+images?\b/i', $info, $count ) ) {
-            return null;
-        }
-
-        preg_match_all( '/\+\s*image\s+#\d+.*?(?=\+\s*image\s+#|\z)/is', $info, $image_blocks );
-
-        if ( count( $image_blocks[0] ) !== (int) $count[1] ) {
-            return null;
-        }
-
-        $frames = (int) $count[1];
-        $delays = array();
-
-        foreach ( $image_blocks[0] as $block ) {
-            // gifsicle 对合法的 0 延时帧不输出 delay 行；缺少这一行就是 0 毫秒。
-            $delays[] = preg_match( '/delay\s+([0-9.]+)\s*s/i', $block, $delay )
-                ? self::milliseconds( (float) $delay[1] )
-                : 0;
-        }
-
+        $frames        = 0;
+        $delays        = array();
         $loop          = 0;
         $loop_infinite = false;
+        $alpha         = false;
+        $pending_delay = 0;
+        $pending_alpha = false;
 
-        if ( preg_match( '/loop\s+(?:count\s+)?(\d+)(?:\s+times)?/i', $info, $finite ) ) {
-            // gifsicle 打印的是"额外循环次数"，APNG 语义是"总播放次数"，这里统一存额外次数
-            $loop = (int) $finite[1];
-        } elseif ( false !== stripos( $info, 'loop forever' ) ) {
-            $loop_infinite = true;
+        while ( $pos < $length ) {
+            $block = ord( $data[ $pos ] );
+
+            if ( 0x3B === $block ) {
+                break;
+            }
+
+            if ( 0x21 === $block ) {
+                if ( $pos + 2 > $length ) {
+                    return null;
+                }
+
+                $label = ord( $data[ $pos + 1 ] );
+                $pos  += 2;
+
+                if ( 0xF9 === $label ) {
+                    // 图形控制扩展：块大小 4，打包字段、延时、透明色索引、结束符。
+                    if ( $pos + 6 > $length || 4 !== ord( $data[ $pos ] ) ) {
+                        return null;
+                    }
+
+                    $packed  = ord( $data[ $pos + 1 ] );
+                    $pending_delay = (int) unpack( 'v', substr( $data, $pos + 2, 2 ) )[1] * 10;
+                    $pending_alpha = (bool) ( $packed & 0x01 );
+                    $pos += 6;
+                    continue;
+                }
+
+                if ( 0xFF === $label && $pos + 12 <= $length && 11 === ord( $data[ $pos ] ) ) {
+                    $identifier = substr( $data, $pos + 1, 11 );
+
+                    if ( 'NETSCAPE2.0' === $identifier || 'ANIMEXTS1.0' === $identifier ) {
+                        $sub = $pos + 12;
+
+                        if ( $sub + 3 <= $length && 3 === ord( $data[ $sub ] ) && 1 === ord( $data[ $sub + 1 ] ) ) {
+                            $count         = (int) unpack( 'v', substr( $data, $sub + 2, 2 ) )[1];
+                            $loop          = $count;
+                            $loop_infinite = 0 === $count;
+                        }
+                    }
+                }
+
+                // 跳过扩展的剩余子块。
+                while ( $pos < $length ) {
+                    $size = ord( $data[ $pos ] );
+                    $pos++;
+
+                    if ( 0 === $size ) {
+                        break;
+                    }
+
+                    $pos += $size;
+                }
+
+                continue;
+            }
+
+            if ( 0x2C !== $block ) {
+                return null;
+            }
+
+            // 图像描述符：块标记 1 字节 + 位置/尺寸 8 字节 + 打包字段 1 字节。
+            if ( $pos + 10 > $length ) {
+                return null;
+            }
+
+            $pos += 10;
+            $packed = ord( $data[ $pos - 1 ] );
+
+            if ( $packed & 0x80 ) {
+                $pos += 3 * ( 2 << ( $packed & 0x07 ) );
+            }
+
+            // LZW 最小码长 + 数据子块。
+            $pos++;
+
+            while ( $pos < $length ) {
+                $size = ord( $data[ $pos ] );
+                $pos++;
+
+                if ( 0 === $size ) {
+                    break;
+                }
+
+                $pos += $size;
+            }
+
+            $frames++;
+            $delays[] = $pending_delay;
+            $alpha    = $alpha || $pending_alpha;
+            $pending_delay = 0;
+            $pending_alpha = false;
         }
 
-        $size = preg_match( '/logical screen\s+(\d+)x(\d+)/i', $info, $screen ) ? array( (int) $screen[1], (int) $screen[2] ) : array( 0, 0 );
+        if ( $frames < 1 || count( $delays ) !== $frames ) {
+            return null;
+        }
 
         return array(
-            'frames'  => $frames,
-            'delays'  => $delays,
-            'loop'    => $loop,
+            'frames'        => $frames,
+            'delays'        => $delays,
+            'loop'          => $loop,
             'loop_infinite' => $loop_infinite,
-            'alpha'   => false !== stripos( $info, 'transparent' ),
-            'icc'     => false !== stripos( $info, 'ICCRGBG1012' ),
-            'width'   => $size[0],
-            'height'  => $size[1],
+            'alpha'         => $alpha,
+            'width'         => $width,
+            'height'        => $height,
         );
     }
 
@@ -254,10 +316,8 @@ class Libre_Compress_Animation {
             'loop'     => 0 === (int) $control['plays'] ? 0 : max( 0, (int) $control['plays'] - 1 ),
             'loop_infinite' => 0 === (int) $control['plays'],
             'alpha'    => in_array( $color, array( 4, 6 ), true ) || ! empty( $chunks['tRNS'] ),
-            'icc'      => ! empty( $chunks['iCCP'] ),
             'width'    => (int) $header['width'],
             'height'   => (int) $header['height'],
-            'depth'    => (int) $header['depth'],
         );
     }
 
@@ -317,7 +377,6 @@ class Libre_Compress_Animation {
             'loop'    => $loop,
             'loop_infinite' => $loop_infinite,
             'alpha'   => $alpha,
-            'icc'     => (bool) preg_match( '/Features present:[^\r\n]*ICC/i', $info ),
             'width'   => $canvas[0],
             'height'  => $canvas[1],
         );
@@ -378,64 +437,8 @@ class Libre_Compress_Animation {
             'loop'      => $loop_infinite ? 0 : ( preg_match( '/(?:Repetition|Repeat) Count\s*:\s*(\d+)/i', $info, $rep ) ? (int) $rep[1] : null ),
             'loop_infinite' => $loop_infinite,
             'alpha'     => '' !== $alpha_line && false === stripos( $alpha_line, 'absent' ),
-            'icc'       => (bool) preg_match( '/ICC Profile\s*:\s*(?!Absent\b)\S/i', $info ),
             'width'     => $resolution[0],
             'height'    => $resolution[1],
-            'depth'     => preg_match( '/Bit Depth\s*:\s*(\d+)/i', $info, $depth ) ? (int) $depth[1] : 0,
-            'premultiplied' => (bool) preg_match( '/^Premultiplied\b/i', $alpha_line ),
-        );
-    }
-
-    /**
-     * 用 jxlinfo -v 读取动画 JXL
-     *
-     * @param string $file_path JXL 路径
-     * @return array|null
-     */
-    private static function analyze_jxl( string $file_path ): ?array {
-        $jxlinfo = Libre_Compress_Output::find_local_tool( 'jxlinfo' );
-
-        if ( false === $jxlinfo ) {
-            return null;
-        }
-
-        $result = Libre_Compress_Tool_Base::run_command( array( $jxlinfo, '-v', $file_path ), 60 );
-        $info   = (string) $result['output'];
-
-        if ( ! preg_match( '/Have animation:\s*1/i', $info ) ) {
-            return null;
-        }
-
-        preg_match_all( '/duration:\s*([0-9.]+)\s*ms/i', $info, $delays );
-
-        if ( empty( $delays[1] ) ) {
-            return null;
-        }
-
-        $frames = count( $delays[1] );
-        $res    = preg_match( '/(\d+)\s*x\s*(\d+)/', $info, $size ) ? array( (int) $size[1], (int) $size[2] ) : array( 0, 0 );
-
-        $loop_infinite = false;
-        $loop          = 0;
-
-        if ( preg_match( '/Num loops:\s*(\d+)/i', $info, $loops ) ) {
-            $loop = (int) $loops[1];
-            $loop_infinite = 0 === $loop && false !== stripos( $info, '(looping)' );
-        }
-
-        return array(
-            'frames'  => $frames,
-            'delays'  => array_map(
-                static function ( $ms ) {
-                    return self::milliseconds( (float) $ms / 1000 );
-                },
-                $delays[1]
-            ),
-            'loop'    => $loop,
-            'loop_infinite' => $loop_infinite,
-            'alpha'   => false !== stripos( $info, '+Alpha' ) || false !== stripos( $info, 'Alpha: ' ),
-            'width'   => $res[0],
-            'height'  => $res[1],
         );
     }
 
@@ -443,7 +446,7 @@ class Libre_Compress_Animation {
      * 秒换算成毫秒
      *
      * 内部时长单位统一为毫秒：WebP 原生就是毫秒，AVIF 用 1000 的时间基准，
-     * JPEG XL 由 jxlinfo 直接报毫秒，GIF / APNG 换算过来都是精确值。
+     * GIF / APNG 换算过来都是精确值。
      *
      * @param float $seconds 秒
      * @return int
@@ -467,9 +470,9 @@ class Libre_Compress_Animation {
      * @return string[][]
      */
     public static function required_tool_groups( string $source, string $target = '' ): array {
-        $target = '' === $target ? $source : $target;
-        $readers = array( 'gif' => 'gifsicle', 'webp' => 'webpmux', 'avif' => 'avifdec', 'jxl' => 'jxlinfo' );
-        $group = array();
+        $target  = '' === $target ? $source : $target;
+        $readers = array( 'webp' => 'webpmux', 'avif' => 'avifdec' );
+        $group   = array();
 
         if ( isset( $readers[ $source ] ) ) {
             $group[] = $readers[ $source ];
@@ -490,10 +493,6 @@ class Libre_Compress_Animation {
             $group[] = 'cjxl';
         } else {
             return array();
-        }
-
-        if ( isset( $readers[ $target ] ) ) {
-            $group[] = $readers[ $target ];
         }
 
         return array( array_values( array_unique( $group ) ) );
@@ -679,24 +678,6 @@ class Libre_Compress_Animation {
             return $result;
         }
 
-        if ( 'jxl' === $target && 'jxl' !== $plan['format'] && empty( $plan['loop_infinite'] ) ) {
-            $result['message'] = __( 'JXL 工具无法保留这张动图的有限播放次数，已跳过以保护动画内容', 'libre-compress' );
-            return $result;
-        }
-
-        // 这些通道目前按 8 位直通透明编码，不能悄悄降低高位深或改变预乘透明的含义。
-        if ( in_array( $target, array( 'webp', 'avif' ), true )
-            && ( ( $plan['depth'] ?? 8 ) > 8 || ! empty( $plan['premultiplied'] ) ) ) {
-            $result['message'] = __( '当前动画工具无法完整保留这张图片的颜色精度或透明方式，已保留原文件', 'libre-compress' );
-            return $result;
-        }
-
-        // FFmpeg 的 WebP 输出不会写回 ICC，不能以可能偏色的结果替换原图。
-        if ( 'webp' === $target && 'png' === $plan['format'] && ! empty( $plan['icc'] ) ) {
-            $result['message'] = __( '当前动画工具无法保留这张图片的颜色配置，已保留原文件以避免偏色', 'libre-compress' );
-            return $result;
-        }
-
         // 动画 WebP 同格式压缩自己走一条链路，不经过聚合引擎，也不解码整画布。
         $reassembled = ( 'webp' === $target && 'webp' === $plan['format'] );
 
@@ -745,19 +726,6 @@ class Libre_Compress_Animation {
             }
         }
 
-        if ( 'webp' === $target && 'webp' === $plan['format'] && ! empty( $plan['icc'] )
-            && ! self::restore_webp_profile( $source, $output ) ) {
-            self::cleanup( array( $output ) );
-            $result['message'] = __( '当前动画工具无法保留这张图片的颜色配置，已保留原文件以避免偏色', 'libre-compress' );
-            return $result;
-        }
-
-        if ( ! self::matches_plan( $plan, self::analyze( $output ) ) ) {
-            self::cleanup( array( $output ) );
-            $result['message'] = __( '处理结果的动画、尺寸、播放次数、透明背景或颜色配置与原图不一致，已保留原文件', 'libre-compress' );
-            return $result;
-        }
-
         $result['success'] = true;
 
         if ( 'jxl' === $target ) {
@@ -777,7 +745,7 @@ class Libre_Compress_Animation {
     private static function build_native_command( string $source, string $target, string $output, array $plan ) {
         $settings = get_option( 'libre_compress_tools', array() );
         if ( 'jxl' === $target ) {
-            return Libre_Compress_Cjxl::build_command( $source, $output );
+            return Libre_Compress_Cjxl::build_command( $source, $output, 'convert_jxl_' );
         }
 
         if ( 'avif' === $target ) {
@@ -793,14 +761,15 @@ class Libre_Compress_Animation {
             return false;
         }
 
-        $lossless = 'lossless' === ( $settings['webp_mode'] ?? 'lossy' );
-        $quality = max( 0, min( 100, absint( $settings['webp_quality'] ?? 80 ) ) );
+        $lossless = 'lossless' === ( $settings['convert_webp_mode'] ?? 'lossy' );
+        $quality  = max( 0, min( 100, absint( $settings['convert_webp_quality'] ?? 80 ) ) );
 
         return array(
             self::tool( 'ffmpeg' ), '-nostdin', '-v', 'error', '-f', 'apng', '-ignore_loop', '1', '-i', $source,
             '-c:v', 'libwebp_anim', '-lossless', $lossless ? '1' : '0', '-quality', (string) $quality,
-            '-compression_level', (string) Libre_Compress_Settings::tool_speed( 'webp_method' ),
-            '-enc_time_base', '1:1000', '-fps_mode', 'passthrough', '-map_metadata', '-1',
+            '-compression_level', (string) Libre_Compress_Settings::tool_speed( 'convert_webp_method' ),
+            '-enc_time_base', '1:1000', '-fps_mode', 'passthrough',
+            '-map_metadata', Libre_Compress_Settings::strips_metadata() ? '-1' : '0',
             '-loop', $plan['loop_infinite'] ? '0' : (string) ( $plan['loop'] + 1 ), '-f', 'webp', $output,
         );
     }
@@ -823,10 +792,10 @@ class Libre_Compress_Animation {
         }
 
         $settings = get_option( 'libre_compress_tools', array() );
-        $lossless = 'lossless' === ( $settings['webp_mode'] ?? 'lossy' );
-        $quality  = max( 0, min( 100, absint( $settings['webp_quality'] ?? 80 ) ) );
+        $lossless = 'lossless' === ( $settings['convert_webp_mode'] ?? 'lossy' );
+        $quality  = max( 0, min( 100, absint( $settings['convert_webp_quality'] ?? 80 ) ) );
 
-        $command = array( $gif2webp, '-m', (string) Libre_Compress_Settings::tool_speed( 'gif2webp_method' ) );
+        $command = array( $gif2webp, '-m', (string) Libre_Compress_Settings::tool_speed( 'convert_webp_gif_method' ) );
 
         if ( ! $lossless ) {
             $command = array_merge( $command, array( '-lossy', '-q', (string) $quality ) );
@@ -875,8 +844,8 @@ class Libre_Compress_Animation {
         }
 
         $settings = get_option( 'libre_compress_tools', array() );
-        $lossless = 'lossless' === ( $settings['webp_mode'] ?? 'lossy' );
-        $quality  = max( 0, min( 100, absint( $settings['webp_quality'] ?? 80 ) ) );
+        $lossless = 'lossless' === ( $settings['webp_anim_mode'] ?? 'lossy' );
+        $quality  = max( 0, min( 100, absint( $settings['webp_anim_quality'] ?? 80 ) ) );
         $work     = rtrim( sys_get_temp_dir(), '/\\' ) . '/lc-webp-' . wp_generate_password( 12, false, false );
 
         if ( ! wp_mkdir_p( $work ) ) {
@@ -905,19 +874,15 @@ class Libre_Compress_Animation {
                 $encode = array_merge( $encode, array(
                     '-lossless',
                     '-z',
-                    (string) Libre_Compress_Settings::tool_speed( 'webp_lossless_level' ),
+                    (string) Libre_Compress_Settings::tool_speed( 'webp_anim_lossless_level' ),
                 ) );
             } else {
                 $encode = array_merge( $encode, array(
                     '-q',
                     (string) $quality,
                     '-m',
-                    (string) Libre_Compress_Settings::tool_speed( 'webp_method' ),
+                    (string) Libre_Compress_Settings::tool_speed( 'webp_anim_method' ),
                 ) );
-
-                if ( self::prefer_420() ) {
-                    $encode[] = '-sharp_yuv';
-                }
             }
 
             $encode = array_merge( $encode, array( '-exact', $raw, '-o', $new ) );
@@ -1090,9 +1055,12 @@ class Libre_Compress_Animation {
      */
     private static function build_avif_command( string $source, string $output, array $plan ) {
         $settings = get_option( 'libre_compress_tools', array() );
-        $lossless = 'lossless' === ( $settings['avif_mode'] ?? 'lossy' );
-        $quality = max( 0, min( 100, absint( $settings['avif_quality'] ?? 80 ) ) );
-        $command = array( self::tool( 'ffmpeg' ), '-nostdin', '-v', 'error' );
+        $same     = 'avif' === $plan['format'];
+        $prefix   = $same ? 'avif_anim_' : 'convert_avif_';
+        $lossless = 'lossless' === ( $settings[ $prefix . 'mode' ] ?? 'lossy' );
+        $quality  = max( 0, min( 100, absint( $settings[ $prefix . 'quality' ] ?? 80 ) ) );
+        $speed    = Libre_Compress_Settings::tool_speed( $same ? 'avif_anim_speed' : 'convert_avif_speed' );
+        $command  = array( self::tool( 'ffmpeg' ), '-nostdin', '-v', 'error' );
 
         if ( 'gif' === $plan['format'] ) {
             // 保留 GIF 的零延时与透明底色，不套用播放器的最小延时。
@@ -1102,8 +1070,8 @@ class Libre_Compress_Animation {
         }
         $command = array_merge( $command, array( '-i', $source ) );
 
-        $input = '[0:v:0]';
-        $alpha_input = '';
+        $input_stream = '0:v:0';
+        $alpha_stream = '';
         if ( 'avif' === $plan['format'] ) {
             // AVIF 同时可能有封面图与动画轨道，只选择完整动画，不能误压封面。
             $probe = Libre_Compress_Tool_Base::run_command( array( self::tool( 'ffprobe' ), '-v', 'error', '-show_streams', '-of', 'json', $source ), 30 );
@@ -1127,33 +1095,43 @@ class Libre_Compress_Animation {
             if ( 1 !== count( $colors ) || ( $plan['alpha'] && 1 !== count( $alphas ) ) ) {
                 return false;
             }
-            $input = '[0:' . $colors[0] . ']';
+            $input_stream = '0:' . $colors[0];
             if ( $plan['alpha'] ) {
-                $alpha_input = '[0:' . $alphas[0] . ']';
+                $alpha_stream = '0:' . $alphas[0];
             }
         }
 
-        $pixel_format = $lossless ? 'gbrp' : ( self::prefer_420() ? 'yuv420p' : 'yuv444p' );
-        if ( 'avif' === $plan['format'] && $lossless ) {
-            // 无损重压直接使用原颜色与透明轨道，避免颜色换算；颜色配置仍由输出校验把关。
-            $command = array_merge( $command, array( '-map', '0:' . $colors[0] ) );
+        if ( $same && $lossless ) {
+            // 无损重压直接使用原颜色与透明轨道，避免颜色换算。
+            $command = array_merge( $command, array( '-map', $input_stream ) );
             if ( $plan['alpha'] ) {
-                $command = array_merge( $command, array( '-map', '0:' . $alphas[0], '-colorspace:v:1', 'bt709' ) );
+                $command = array_merge( $command, array( '-map', $alpha_stream, '-colorspace:v:1', 'bt709' ) );
+            }
+        } elseif ( $lossless ) {
+            // 无损转换用 RGB，避免色度抽样造成损失。
+            if ( $plan['alpha'] ) {
+                $filter = '[' . $input_stream . ']split[color][alpha];[color]format=gbrp[c];[alpha]alphaextract,format=gray,setparams=colorspace=bt709[a]';
+                $command = array_merge( $command, array( '-filter_complex', $filter, '-map', '[c]', '-map', '[a]' ) );
+            } else {
+                $command = array_merge( $command, array( '-filter_complex', '[' . $input_stream . ']format=gbrp[c]', '-map', '[c]' ) );
             }
         } elseif ( $plan['alpha'] ) {
-            // 透明背景独立无损编码，避免有损颜色压缩把半透明边缘弄坏。
-            $filter = '' !== $alpha_input
-                ? $input . 'format=' . $pixel_format . '[c];' . $alpha_input . 'format=gray,setparams=colorspace=bt709[a]'
-                : $input . 'split[color][alpha];[color]format=' . $pixel_format . '[c];[alpha]alphaextract,format=gray,setparams=colorspace=bt709[a]';
-            $command = array_merge( $command, array( '-filter_complex', $filter, '-map', '[c]', '-map', '[a]' ) );
+            // 透明背景独立无损编码；颜色轨道不指定像素格式，交给编码器默认值。
+            $filter = '' !== $alpha_stream
+                ? '[' . $alpha_stream . ']format=gray,setparams=colorspace=bt709[a]'
+                : '[' . $input_stream . ']split[color][alpha];[alpha]alphaextract,format=gray,setparams=colorspace=bt709[a]';
+            $command = array_merge(
+                $command,
+                array( '-filter_complex', $filter, '-map', '' !== $alpha_stream ? $input_stream : '[color]', '-map', '[a]' )
+            );
         } else {
-            $command = array_merge( $command, array( '-filter_complex', $input . 'format=' . $pixel_format . '[c]', '-map', '[c]' ) );
+            $command = array_merge( $command, array( '-map', $input_stream ) );
         }
 
         $command = array_merge( $command, array(
             '-c:v', 'libaom-av1',
             '-crf', (string) ( $lossless ? 0 : max( 1, (int) round( ( 100 - $quality ) * 63 / 100 ) ) ),
-            '-b:v', '0', '-cpu-used', (string) min( 8, Libre_Compress_Settings::tool_speed( 'avif_speed' ) ),
+            '-b:v', '0', '-cpu-used', (string) min( 8, $speed ),
             '-threads', '4',
         ) );
         if ( $plan['alpha'] ) {
@@ -1166,49 +1144,6 @@ class Libre_Compress_Animation {
             '-f', 'avif', $output,
         ) );
         return $command;
-    }
-
-    /** 使用 WebP 自带工具原样复制颜色配置，不读取或重建动画帧。 */
-    private static function restore_webp_profile( string $source, string $output ): bool {
-        $profile = $output . '.lc-profile.icc';
-        $tagged = $output . '.lc-profile.webp';
-        if ( file_exists( $profile ) || file_exists( $tagged ) ) {
-            return false;
-        }
-        $extract = Libre_Compress_Tool_Base::run_command( array(
-            self::tool( 'webpmux' ), '-get', 'icc', $source, '-o', $profile,
-        ), 30 );
-        $ok = false;
-        if ( ! empty( $extract['success'] ) ) {
-            $attach = Libre_Compress_Tool_Base::run_command( array(
-                self::tool( 'webpmux' ), '-set', 'icc', $profile, $output, '-o', $tagged,
-            ), 30 );
-            $ok = ! empty( $attach['success'] ) && rename( $tagged, $output );
-        }
-        self::cleanup( array( $profile, $tagged ) );
-        return $ok;
-    }
-
-    /**
-     * 校验动画信息；读不出循环次数时不能把猜测当作成功。
-     */
-    public static function matches_plan( array $expected, ?array $actual ): bool {
-        if ( null === $actual || $actual['frames'] !== $expected['frames']
-            || $expected['width'] < 1 || $expected['height'] < 1
-            || $actual['width'] !== $expected['width'] || $actual['height'] !== $expected['height']
-            || $actual['loop_infinite'] !== $expected['loop_infinite']
-            || ( empty( $expected['loop_infinite'] ) && ( null === $expected['loop'] || null === $actual['loop'] || $expected['loop'] !== $actual['loop'] ) )
-            || ( $expected['alpha'] && ! $actual['alpha'] )
-            || ( ! empty( $expected['icc'] ) && empty( $actual['icc'] ) ) ) {
-            return false;
-        }
-        // 本层使用的工具均能表达毫秒，逐帧只容许换算造成的 1 毫秒误差。
-        foreach ( $expected['delays'] as $index => $delay ) {
-            if ( ! isset( $actual['delays'][ $index ] ) || abs( $actual['delays'][ $index ] - $delay ) > 1 ) {
-                return false;
-            }
-        }
-        return true;
     }
 
     /* ---------------------------------------------------------------------
@@ -1337,6 +1272,15 @@ class Libre_Compress_Animated_Handler {
      */
     public function get_name(): string {
         return 'animation:' . $this->extension;
+    }
+
+    /**
+     * 写入压缩记录的工具名
+     *
+     * @return string
+     */
+    public function get_used_tool_name(): string {
+        return $this->get_name();
     }
 
     /**
