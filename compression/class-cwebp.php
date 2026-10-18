@@ -90,19 +90,10 @@ class Libre_Compress_Cwebp extends Libre_Compress_Tool_Base {
             $args[] = (string) $quality;
             $args[] = '-m';
             $args[] = (string) Libre_Compress_Settings::param_int( $group . '_method' );
-            $args[] = '-segments';
-            $args[] = (string) Libre_Compress_Settings::param_int( $group . '_segments' );
-            $args[] = '-sns';
-            $args[] = (string) Libre_Compress_Settings::param_int( $group . '_sns' );
-            $args[] = '-f';
-            $args[] = (string) Libre_Compress_Settings::param_int( $group . '_filter' );
-            $args[] = '-sharpness';
-            $args[] = (string) Libre_Compress_Settings::param_int( $group . '_sharpness' );
-
-            if ( Libre_Compress_Settings::param_flag( $group . '_sharp_yuv' ) ) {
-                $args[] = '-sharp_yuv';
-            }
         }
+
+        // 分区、噪点整形、滤波强度/锐度、锐利色彩转换这些 cwebp 高级项一律不传，
+        // 交给 cwebp 自己的默认值，插件不替用户拍板。
 
         // 透明通道单独编码，100 即 alpha 无损；始终显式传入，省得默认值变化时悄悄掉画质。
         $args[] = '-alpha_q';

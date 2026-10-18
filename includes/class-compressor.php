@@ -74,11 +74,8 @@ class Libre_Compress_Compressor {
         $extension = strtolower( $extension );
 
         if ( 'png' === $extension ) {
-            $settings  = get_option( 'libre_compress_tools', array() );
-            $png_mode  = isset( $settings['png_mode'] ) ? $settings['png_mode'] : 'lossy';
-            $use_lossy = ( 'lossy' === $png_mode );
-
-            $tool_name = $use_lossy ? 'pngquant' : 'oxipng';
+            // 模式只从参数总表读，缺失或非法时与设置页显示的一致
+            $tool_name = 'lossy' === Libre_Compress_Settings::param_mode( 'png' ) ? 'pngquant' : 'oxipng';
 
             if ( isset( $this->tools[ $tool_name ] ) && $this->tools[ $tool_name ]->is_tool_available() ) {
                 return $this->tools[ $tool_name ];
@@ -445,6 +442,11 @@ class Libre_Compress_Compressor {
             if ( '' !== $native && isset( $this->tools[ $native ] ) ) {
                 // APNG 整只交给 oxipng：实测它能保住帧结构与每帧时长，不必拆帧
                 $tool = $this->tools[ $native ];
+
+                if ( 'png' === $extension ) {
+                    // 用 APNG 自己那一组 oxipng 参数，不沿用静态 PNG 的设置
+                    $options['png_group'] = 'apng';
+                }
             } elseif ( Libre_Compress_Animation::same_format_supported( $extension ) ) {
                 $tool = new Libre_Compress_Animated_Handler( $extension );
             } else {

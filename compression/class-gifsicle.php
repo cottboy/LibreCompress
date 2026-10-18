@@ -68,17 +68,14 @@ class Libre_Compress_Gifsicle extends Libre_Compress_Tool_Base {
         // --lossy 就是有损强度本身：数值越大压得越狠、噪点越多，界面直接填这个值，不做换算。
         $lossiness = Libre_Compress_Settings::param_int( 'gifsicle_lossy' );
 
-        if ( ! $lossless && $lossiness > 0 ) {
+        if ( ! $lossless ) {
+            // 填多少传多少：0 也照传，gifsicle 自己把 --lossy=0 当作不启用有损。
             $command_parts[] = '--lossy=' . $lossiness;
         }
 
-        // 调色板上限：256 是 GIF 的上限，等于不缩色，所以只在用户调低时才传。
-        $colors = Libre_Compress_Settings::param_int( 'gif_colors' );
-
-        if ( $colors < 256 ) {
-            $command_parts[] = '--colors';
-            $command_parts[] = (string) $colors;
-        }
+        // 调色板上限照填照传，256 就是 GIF 的上限（等于不缩色），不做“等于默认值就不传”的判断。
+        $command_parts[] = '--colors';
+        $command_parts[] = (string) Libre_Compress_Settings::param_int( 'gif_colors' );
 
         // GIF 的注释扩展块里常是作者与制作工具信息
         if ( Libre_Compress_Settings::strips_metadata() ) {

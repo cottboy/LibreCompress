@@ -61,8 +61,8 @@ class Libre_Compress_Animation {
      *
      * @return bool
      */
-    public static function apng_lossless_enabled(): bool {
-        return Libre_Compress_Settings::param_flag( 'apng_lossless' );
+    public static function apng_enabled(): bool {
+        return Libre_Compress_Settings::param_flag( 'apng_enabled' );
     }
 
     /* ---------------------------------------------------------------------
@@ -593,7 +593,8 @@ class Libre_Compress_Animation {
             return '';
         }
 
-        if ( 'lossless' !== Libre_Compress_Settings::param_mode( 'png' ) && ! self::apng_lossless_enabled() ) {
+        // APNG 有自己的一组参数与开关，与静态 PNG 的有损/无损模式无关。
+        if ( ! self::apng_enabled() ) {
             return '';
         }
 
@@ -773,16 +774,11 @@ class Libre_Compress_Animation {
      */
     private static function build_webp_command( string $source, string $output, array $plan ): array {
         $same     = 'webp' === $plan['format'];
-        $group    = $same ? 'webp' : 'convert_webp';
+        // 同格式重压用动图自己的参数组，APNG 转 WebP 用转换组的参数，两边互不影响。
+        $group    = $same ? 'webp_anim' : 'convert_webp';
         $lossless = 'lossless' === Libre_Compress_Settings::param_mode( $group );
         $quality  = Libre_Compress_Settings::param_int( $group . '_quality' );
-        $level    = Libre_Compress_Settings::param_int( $group . '_lossless_level' );
         $method   = Libre_Compress_Settings::param_int( $group . '_method' );
-
-        // cwebp 的无损级别是 0-9（-z），FFmpeg 只认 0-6（libwebp 的 method），
-        // 而且刻度不一样：实测 cwebp -z 6 的输出与 FFmpeg 4 档一致。按比例换算，
-        // 让界面上的 0-9 在动图这条路上落到同样的强度，而不是整体退两档。
-        $level = (int) round( $level * 6 / 9 );
 
         $command = array( self::tool( 'ffmpeg' ), '-nostdin', '-v', 'error' );
 
@@ -799,8 +795,9 @@ class Libre_Compress_Animation {
         // 实测会把 -lossless 抹成有损、把 -compression_level 抹回默认，
         // 只有 -quality 能留下。内容预设因此只对静图的 cwebp 生效。
 
+        // -compression_level 直接吃参数表里的 0-6，也就是 libwebp 的 method，不做任何折算。
         if ( $lossless ) {
-            $command = array_merge( $command, array( '-lossless', '1', '-compression_level', (string) $level ) );
+            $command = array_merge( $command, array( '-lossless', '1', '-compression_level', (string) $method ) );
         } else {
             $command = array_merge( $command, array( '-quality', (string) $quality, '-compression_level', (string) $method ) );
         }
@@ -1019,10 +1016,11 @@ class Libre_Compress_Animation {
      */
     private static function build_avif_command( string $source, string $output, array $plan ) {
         $same     = 'avif' === $plan['format'];
-        $group    = $same ? 'avif' : 'convert_avif';
-        $lossless = 'lossless' === Libre_Compress_Settings::param_mode( $group );
-        $quality  = Libre_Compress_Settings::param_int( $group . '_quality' );
-        $speed    = Libre_Compress_Settings::param_int( $group . '_speed' );
+        // 同格式重压用动图自己的参数组，GIF / APNG 转 AVIF 用转换组里那两项动图参数。
+        $lossless = 'lossless' === Libre_Compress_Settings::param_mode( $same ? 'avif_anim' : 'convert_avif' );
+        $crf      = Libre_Compress_Settings::param_int( $same ? 'avif_anim_crf' : 'convert_avif_anim_crf' );
+        $speed    = Libre_Compress_Settings::param_int( $same ? 'avif_anim_speed' : 'convert_avif_anim_speed' );
+        $threads  = Libre_Compress_Settings::param_int( $same ? 'avif_anim_threads' : 'convert_avif_anim_threads' );
         $command  = array( self::tool( 'ffmpeg' ), '-nostdin', '-v', 'error' );
 
         if ( 'gif' === $plan['format'] ) {
@@ -1091,12 +1089,21 @@ class Libre_Compress_Animation {
             $command = array_merge( $command, array( '-map', $input_stream ) );
         }
 
-        $command = array_merge( $command, array(
-            '-c:v', 'libaom-av1',
-            '-crf', (string) ( $lossless ? 0 : max( 1, (int) round( ( 100 - $quality ) * 63 / 100 ) ) ),
-            '-b:v', '0', '-cpu-used', (string) min( 8, $speed ),
-            '-threads', '4',
-        ) );
+        $encoder = array( '-c:v', 'libaom-av1' );
+
+        if ( $lossless ) {
+            // libaom 自己的无损开关，无损时不传 CRF。
+            $encoder = array_merge( $encoder, array( '-lossless', '1' ) );
+        } else {
+            // CRF 直接吃参数表里的 0-63，不做任何换算。
+            $encoder = array_merge( $encoder, array( '-crf', (string) $crf ) );
+        }
+
+        $command = array_merge(
+            $command,
+            $encoder,
+            array( '-b:v', '0', '-cpu-used', (string) $speed, '-threads', (string) $threads )
+        );
         if ( $plan['alpha'] ) {
             $command = array_merge( $command, array( '-crf:v:1', '0' ) );
         }
@@ -1168,7 +1175,7 @@ class Libre_Compress_Animation {
      */
     public static function skip_reason( string $extension, string $target = '' ): string {
         if ( 'png' === $extension && '' === $target ) {
-            return __( '有损 PNG 压缩会逐帧各自调色让 APNG 闪烁，已跳过；要压 APNG 请开启"APNG 自动无损压缩"或把 PNG 设为无损', 'libre-compress' );
+            return __( 'APNG 动图压缩已关闭，或缺少 oxipng，已跳过；要压 APNG 请到“压缩工具”页勾选“压缩 APNG”', 'libre-compress' );
         }
 
         return self::missing_tool_message( $extension, $target );
