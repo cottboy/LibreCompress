@@ -783,9 +783,9 @@ class Libre_Compress_Settings {
             <h3><?php esc_html_e( 'WebP 同格式压缩（静图与动图）', 'libre-compress' ); ?></h3>
             <table class="form-table">
                 <?php $this->render_mode_field( 'webp' ); ?>
-                <?php $this->render_quality_field( 'webp_quality', __( '有损质量', 'libre-compress' ), 80 ); ?>
-                <?php $this->render_speed_field( 'webp_method', __( 'cwebp 有损方法', 'libre-compress' ), $options ); ?>
-                <?php $this->render_speed_field( 'webp_lossless_level', __( 'cwebp 无损级别', 'libre-compress' ), $options ); ?>
+                <?php $this->render_quality_field( 'webp_quality', __( '有损质量', 'libre-compress' ), 80, __( '静图用 cwebp，动图用 FFmpeg。', 'libre-compress' ) ); ?>
+                <?php $this->render_speed_field( 'webp_method', __( 'cwebp / FFmpeg 有损方法', 'libre-compress' ), $options ); ?>
+                <?php $this->render_speed_field( 'webp_lossless_level', __( 'cwebp / FFmpeg 无损级别', 'libre-compress' ), $options ); ?>
             </table>
 
             <h3><?php esc_html_e( 'AVIF 同格式压缩（静图与动图）', 'libre-compress' ); ?></h3>

@@ -3,10 +3,10 @@
  * 动画图像统一处理层
  *
  * 完整动画直接交给 gifsicle、oxipng、gif2webp、cjxl 或 FFmpeg。
- * 动画 WebP 用 libwebp 自带的 webpmux + cwebp 原样重组：webpmux 按帧抽出压缩
- * 码流，cwebp 重压，再按原图的时间、偏移、处置、混合与背景色装回去，全程不
- * 经过任何聚合引擎，也不解码成整画布像素。
- * 插件只选择工具、读取播放参数，不拆帧、不重写透明像素。
+ * 动画 WebP 与动画 AVIF 都由 FFmpeg 一次读完整只动图再写回，不拆帧、不产生
+ * 逐帧临时文件，帧数再多也不会撑爆命令行；画布尺寸、逐帧时长、循环次数由
+ * FFmpeg 自己保住。webpmux 只负责读帧表，并在写回后修正末帧时长与背景色。
+ * 插件只选择工具、读取播放参数，不重写透明像素。
  * 工具执行失败时保留原文件。
  *
  * @package LibreCompress
@@ -305,6 +305,7 @@ class Libre_Compress_Animation {
         $control  = unpack( 'Nframes/Nplays', $chunks['acTL'] );
         $frames   = (int) $control['frames'];
         $delays   = array();
+        $details  = array();
 
         foreach ( $chunks['fcTL'] as $fctl ) {
             if ( 26 !== strlen( $fctl ) ) {
@@ -320,6 +321,14 @@ class Libre_Compress_Animation {
             // APNG 规范规定分母为 0 时按 100 处理，而不是把文件判为损坏。
             $denominator = empty( $delay['den'] ) ? 100 : (int) $delay['den'];
             $delays[]    = self::milliseconds( $delay['num'] / $denominator );
+
+            // 帧矩形与偏移决定"帧能否盖满画布"，末帧时长修正要靠它判断能不能动。
+            $details[] = array(
+                'width'  => (int) $delay['width'],
+                'height' => (int) $delay['height'],
+                'x'      => (int) $delay['x'],
+                'y'      => (int) $delay['y'],
+            );
         }
 
         if ( $frames < 1 || count( $delays ) !== $frames ) {
@@ -338,6 +347,7 @@ class Libre_Compress_Animation {
             'alpha'    => in_array( $color, array( 4, 6 ), true ) || ! empty( $chunks['tRNS'] ),
             'width'    => (int) $header['width'],
             'height'   => (int) $header['height'],
+            'frame_details' => $details,
         );
     }
 
@@ -368,8 +378,8 @@ class Libre_Compress_Animation {
 
         $frames = (int) $count[1];
 
-        // 一次读取就把逐帧重组要用的偏移、处置方式、混合方式和背景色全取回来，
-        // 重组阶段不再二次调用 webpmux。
+        // 一次读全逐帧时长、偏移和背景色：偏移用来判断帧能不能盖满画布，
+        // 背景色在 FFmpeg 写回后要按原图改回去。
         $parsed = self::parse_webp_frames( $info );
 
         if ( null === $parsed || count( $parsed['frames'] ) !== $frames ) {
@@ -506,7 +516,7 @@ class Libre_Compress_Animation {
         } elseif ( 'webp' === $target && 'png' === $source ) {
             $group[] = 'ffmpeg';
         } elseif ( 'webp' === $target && 'webp' === $source ) {
-            $group[] = 'cwebp';
+            $group[] = 'ffmpeg';
         } elseif ( 'avif' === $target && in_array( $source, array( 'gif', 'png', 'avif' ), true ) ) {
             $group[] = 'ffmpeg';
             if ( 'avif' === $source ) {
@@ -701,63 +711,30 @@ class Libre_Compress_Animation {
             return $result;
         }
 
-        // 动画 WebP 同格式压缩自己走一条链路，不经过聚合引擎，也不解码整画布。
-        $reassembled = ( 'webp' === $target && 'webp' === $plan['format'] );
+        $command = self::build_native_command( $source, $target, $output, $plan );
 
-        if ( $reassembled ) {
-            $native  = self::recompress_animated_webp( $source, $output, $plan );
-            $ran     = ! empty( $native['success'] );
-            $command = array( 'webpmux' );
-        } else {
-            $command = self::build_native_command( $source, $target, $output, $plan );
-            if ( false === $command ) {
-                $result['message'] = __( '当前工具无法完整处理这张动画，已保留原文件', 'libre-compress' );
-                return $result;
-            }
-
-            $run = Libre_Compress_Tool_Base::run_command( $command, 300 );
-            $ran = ! empty( $run['success'] );
-        }
-
-        clearstatcache( true, $output );
-        if ( ! $ran || ! file_exists( $output ) || 0 === (int) filesize( $output ) ) {
-            self::cleanup( array( $output ) );
-            if ( $reassembled ) {
-                $result['message'] = (string) $native['message'];
-            } else {
-                $result['message'] = __( '动图处理命令执行失败', 'libre-compress' );
-            }
+        if ( false === $command ) {
+            $result['message'] = __( '当前工具无法完整处理这张动画，已保留原文件', 'libre-compress' );
             return $result;
         }
 
-        if ( 'webp' === $target && 'png' === $plan['format'] ) {
-            // libwebp_anim 会推算末帧时长，交给 webpmux 按原图校正播放信息；不接触图像帧。
-            $timed = $output . '.lc-timing.webp';
-            if ( file_exists( $timed ) ) {
-                self::cleanup( array( $output ) );
-                $result['message'] = __( '无法安全处理这张动图，已保留原文件', 'libre-compress' );
-                return $result;
-            }
-            $timing = Libre_Compress_Tool_Base::run_command( array(
-                self::tool( 'webpmux' ), '-duration', (string) end( $plan['delays'] ) . ',' . $plan['frames'],
-                $output, '-o', $timed,
-            ), 60 );
-            if ( empty( $timing['success'] ) || ! rename( $timed, $output ) ) {
-                self::cleanup( array( $timed, $output ) );
-                $result['message'] = __( '动图处理命令执行失败', 'libre-compress' );
-                return $result;
-            }
+        $run = Libre_Compress_Tool_Base::run_command( $command, 300 );
+
+        clearstatcache( true, $output );
+        if ( empty( $run['success'] ) || ! file_exists( $output ) || 0 === (int) filesize( $output ) ) {
+            self::cleanup( array( $output ) );
+            $result['message'] = __( '动图处理命令执行失败', 'libre-compress' );
+            return $result;
+        }
+
+        if ( 'webp' === $target && ! self::restore_webp_playback( $output, $plan ) ) {
+            self::cleanup( array( $output ) );
+            $result['message'] = __( '动图处理命令执行失败', 'libre-compress' );
+            return $result;
         }
 
         $result['success'] = true;
-
-        if ( 'jxl' === $target ) {
-            $result['tool'] = 'cjxl';
-        } elseif ( $reassembled ) {
-            $result['tool'] = 'webpmux';
-        } else {
-            $result['tool'] = basename( $command[0], '.exe' );
-        }
+        $result['tool']    = 'jxl' === $target ? 'cjxl' : basename( $command[0], '.exe' );
 
         return $result;
     }
@@ -766,7 +743,6 @@ class Libre_Compress_Animation {
      * 工具接收完整动画，不生成逐帧临时图片。
      */
     private static function build_native_command( string $source, string $target, string $output, array $plan ) {
-        $settings = get_option( 'libre_compress_tools', array() );
         if ( 'jxl' === $target ) {
             return Libre_Compress_Cjxl::build_command( $source, $output, 'convert_jxl_' );
         }
@@ -779,22 +755,119 @@ class Libre_Compress_Animation {
             return self::gif2webp_command( $source, $output );
         }
 
-        // 剩下的只有动画 WebP 同格式压缩，它由 recompress_animated_webp() 用 libwebp 自带的 webpmux 与 cwebp 处理。
-        if ( 'png' !== $plan['format'] ) {
+        // 剩下的都是 WebP 目标：WebP 同格式重压与 APNG 转 WebP，都交给 FFmpeg 一次读写整只动图。
+        if ( ! in_array( $plan['format'], array( 'png', 'webp' ), true ) ) {
             return false;
         }
 
-        $lossless = 'lossless' === ( $settings['convert_webp_mode'] ?? 'lossy' );
-        $quality  = max( 0, min( 100, absint( $settings['convert_webp_quality'] ?? 80 ) ) );
+        return self::build_webp_command( $source, $output, $plan );
+    }
 
-        return array(
-            self::tool( 'ffmpeg' ), '-nostdin', '-v', 'error', '-f', 'apng', '-ignore_loop', '1', '-i', $source,
-            '-c:v', 'libwebp_anim', '-lossless', $lossless ? '1' : '0', '-quality', (string) $quality,
-            '-compression_level', (string) Libre_Compress_Settings::tool_speed( 'convert_webp_method' ),
+    /**
+     * 构建 WebP 输出命令
+     *
+     * libwebp_anim 自己会推算帧间差异矩形与画布尺寸，所以画布大小、帧偏移、
+     * 逐帧时长和循环次数都不用插件操心，帧数再多也只是一条命令。
+     * 同格式重压读 webp_* 设置，APNG 转 WebP 读 convert_webp_* 设置。
+     *
+     * @param string $source 源路径
+     * @param string $output 输出路径
+     * @param array  $plan   原动画信息
+     * @return array 命令参数
+     */
+    private static function build_webp_command( string $source, string $output, array $plan ): array {
+        $settings = get_option( 'libre_compress_tools', array() );
+        $same     = 'webp' === $plan['format'];
+        $prefix   = $same ? 'webp_' : 'convert_webp_';
+        $lossless = 'lossless' === ( $settings[ $prefix . 'mode' ] ?? 'lossy' );
+        $quality  = max( 0, min( 100, absint( $settings[ $prefix . 'quality' ] ?? 80 ) ) );
+        $level    = Libre_Compress_Settings::tool_speed( $same ? 'webp_lossless_level' : 'convert_webp_lossless_level' );
+        $method   = Libre_Compress_Settings::tool_speed( $same ? 'webp_method' : 'convert_webp_method' );
+
+        $command = array( self::tool( 'ffmpeg' ), '-nostdin', '-v', 'error' );
+
+        if ( ! $same ) {
+            $command = array_merge( $command, array( '-f', 'apng', '-ignore_loop', '1' ) );
+        }
+
+        $command = array_merge( $command, array( '-i', $source, '-c:v', 'libwebp_anim' ) );
+
+        if ( $lossless ) {
+            $command = array_merge( $command, array( '-lossless', '1', '-compression_level', (string) $level ) );
+        } else {
+            $command = array_merge( $command, array( '-quality', (string) $quality, '-compression_level', (string) $method ) );
+        }
+
+        return array_merge( $command, array(
             '-enc_time_base', '1:1000', '-fps_mode', 'passthrough',
             '-map_metadata', Libre_Compress_Settings::strips_metadata() ? '-1' : '0',
-            '-loop', $plan['loop_infinite'] ? '0' : (string) ( $plan['loop'] + 1 ), '-f', 'webp', $output,
+            '-loop', ! empty( $plan['loop_infinite'] ) ? '0' : (string) ( (int) $plan['loop'] + 1 ),
+            '-f', 'webp', $output,
+        ) );
+    }
+
+    /**
+     * 把 FFmpeg 写歪的播放参数改回原图
+     *
+     * 两处必须改：libwebp_anim 用平均帧时长推算末帧时长，背景色则一律写成不透明白。
+     * webpmux 的 -duration 会按帧包围盒重算画布，盖不满整张画布的动图（常见透明留白）
+     * 一改就会缩水，这种图只改背景色，时长保留 FFmpeg 的推算值。
+     *
+     * @param string $output 已写好的 WebP 路径，就地替换
+     * @param array  $plan   原动画信息
+     * @return bool 是否成功
+     */
+    private static function restore_webp_playback( string $output, array $plan ): bool {
+        $details = isset( $plan['frame_details'] ) ? (array) $plan['frame_details'] : array();
+
+        if ( self::frames_cover_canvas( $details, (int) $plan['width'], (int) $plan['height'] ) ) {
+            $duration = array(
+                '-duration',
+                (int) end( $plan['delays'] ) . ',' . (int) $plan['frames'],
+            );
+
+            if ( ! self::remux_webp( $output, $duration ) ) {
+                return false;
+            }
+        }
+
+        if ( ! empty( $plan['background_color'] ) ) {
+            return self::remux_webp( $output, array( '-set', 'bgcolor', (string) $plan['background_color'] ) );
+        }
+
+        return true;
+    }
+
+    /**
+     * 用 webpmux 就地改一项播放参数
+     *
+     * @param string $output  目标文件
+     * @param array  $options webpmux 的选项与参数
+     * @return bool 是否成功
+     */
+    private static function remux_webp( string $output, array $options ): bool {
+        $temp = $output . '.lc-webp-tmp';
+
+        self::cleanup( array( $temp ) );
+
+        $run = Libre_Compress_Tool_Base::run_command(
+            array_merge( array( self::tool( 'webpmux' ) ), $options, array( $output, '-o', $temp ) ),
+            60
         );
+
+        clearstatcache( true, $temp );
+
+        if ( empty( $run['success'] ) || ! is_file( $temp ) || 0 === (int) filesize( $temp ) ) {
+            self::cleanup( array( $temp ) );
+            return false;
+        }
+
+        if ( ! rename( $temp, $output ) ) {
+            self::cleanup( array( $temp ) );
+            return false;
+        }
+
+        return true;
     }
 
     /**
@@ -830,127 +903,13 @@ class Libre_Compress_Animation {
     }
 
     /**
-     * 用 libwebp 自带工具重压整张动画 WebP
-     *
-     * webpmux -get frame 抽出来的是压缩码流（VP8 / VP8L）而不是像素，cwebp 按设置
-     * 重压这一帧，再由 webpmux 按原图的时间、偏移、处置方式、混合方式、循环次数和
-     * 背景色原样装回去。alpha 平面与颜色平面各自独立，cwebp 的 -alpha_q 默认即为
-     * 无损，透明通道不会因为重压而损失；-exact 保证透明区域的 RGB 原样保留，动画的
-     * 帧间差分才不会被这点改动放大成杂边。
-     *
-     * @param string $source 原动画路径
-     * @param string $output 结果路径（调用方保证尚不存在）
-     * @param array  $plan   原动画信息
-     * @return array{success:bool,message:string}
-     */
-    private static function recompress_animated_webp( string $source, string $output, array $plan ): array {
-        $failed = static function ( string $message ) {
-            return array( 'success' => false, 'message' => $message );
-        };
-
-        // 帧信息已由 analyze() 一次读全，重组阶段不再二次调用 webpmux。
-        $parsed = $plan['frame_details'];
-
-        // webpmux 按帧的包围盒推导画布尺寸：盖不满整张画布的动图（常见的透明留白）
-        // 重组后画布会被裁小，这种图不动。
-        if ( ! self::frames_cover_canvas( $parsed, $plan['width'], $plan['height'] ) ) {
-            return $failed( __( '这张动图有透明留白区域，重组会改变画布尺寸，已保留原文件', 'libre-compress' ) );
-        }
-
-        $settings = get_option( 'libre_compress_tools', array() );
-        $lossless = 'lossless' === ( $settings['webp_mode'] ?? 'lossy' );
-        $quality  = max( 0, min( 100, absint( $settings['webp_quality'] ?? 80 ) ) );
-        $work     = rtrim( sys_get_temp_dir(), '/\\' ) . '/lc-webp-' . wp_generate_password( 12, false, false );
-
-        if ( ! wp_mkdir_p( $work ) ) {
-            return $failed( __( '无法创建动图处理的临时目录，已保留原文件', 'libre-compress' ) );
-        }
-
-        $encoded = array();
-
-        foreach ( $parsed as $frame ) {
-            $raw = $work . '/src-' . $frame['index'] . '.webp';
-            $new = $work . '/new-' . $frame['index'] . '.webp';
-
-            $get = Libre_Compress_Tool_Base::run_command(
-                array( self::tool( 'webpmux' ), '-get', 'frame', (string) $frame['index'], $source, '-o', $raw ),
-                60
-            );
-
-            if ( empty( $get['success'] ) || ! is_file( $raw ) || 0 === (int) filesize( $raw ) ) {
-                self::remove_directory( $work );
-                return $failed( __( '动图处理命令执行失败', 'libre-compress' ) );
-            }
-
-            $encode = array( self::tool( 'cwebp' ) );
-
-            if ( $lossless ) {
-                $encode = array_merge( $encode, array(
-                    '-lossless',
-                    '-z',
-                    (string) Libre_Compress_Settings::tool_speed( 'webp_lossless_level' ),
-                ) );
-            } else {
-                $encode = array_merge( $encode, array(
-                    '-q',
-                    (string) $quality,
-                    '-m',
-                    (string) Libre_Compress_Settings::tool_speed( 'webp_method' ),
-                ) );
-            }
-
-            $encode = array_merge( $encode, array( '-exact', $raw, '-o', $new ) );
-
-            $result = Libre_Compress_Tool_Base::run_command( $encode, 300 );
-
-            if ( empty( $result['success'] ) || ! is_file( $new ) || 0 === (int) filesize( $new ) ) {
-                self::remove_directory( $work );
-                return $failed( __( '动图处理命令执行失败', 'libre-compress' ) );
-            }
-
-            $encoded[] = $new;
-        }
-
-        $assemble = array( self::tool( 'webpmux' ) );
-
-        foreach ( $parsed as $position => $frame ) {
-            // 帧参数：文件 + 时长 + 横向偏移 + 纵向偏移 + 处置方式(0 不处置 / 1 还原背景) ± 混合方式
-            // 帧的路径与 "+时长+横偏移+纵偏移+处置±混合" 必须是两个独立参数，拼成一串 webpmux 会当成打不开的文件名。
-            $assemble[] = '-frame';
-            $assemble[] = $encoded[ $position ];
-            $assemble[] = '+' . $frame['duration'] . '+' . $frame['x'] . '+' . $frame['y']
-                . '+' . $frame['dispose'] . ( $frame['blend'] ? '+b' : '-b' );
-        }
-
-        $assemble[] = '-loop';
-        $assemble[] = (string) ( ! empty( $plan['loop_infinite'] ) ? 0 : $plan['loop'] + 1 );
-
-        if ( null !== $plan['background_color'] ) {
-            // 不显式写回背景色，webpmux 会把它重置成不透明白，透明背景就没了。
-            $assemble[] = '-bgcolor';
-            $assemble[] = $plan['background_color'];
-        }
-
-        $assemble[] = '-o';
-        $assemble[] = $output;
-
-        $built = Libre_Compress_Tool_Base::run_command( $assemble, 300 );
-        self::remove_directory( $work );
-
-        if ( empty( $built['success'] ) || ! is_file( $output ) || 0 === (int) filesize( $output ) ) {
-            return $failed( __( '动图处理命令执行失败', 'libre-compress' ) );
-        }
-
-        return array( 'success' => true, 'message' => '' );
-    }
-
-    /**
      * 解析 webpmux -info 的帧表
      *
-     * 帧表每行：序号 宽 高 alpha x y 时长(ms) dispose blend 大小 编码
+     * 帧表每行：序号 宽 高 alpha x y 时长(ms) dispose blend 大小 编码，
+     * 只取判定要用到的前七列，后面几列与插件无关。
      *
      * @param string $info webpmux -info 的完整输出
-     * @return array|null 每帧的序号、尺寸、是否带透明、偏移、时长、处置与混合方式；背景色单独返回，读不出返回 null
+     * @return array|null 每帧的尺寸、是否带透明、偏移与时长；背景色单独返回，读不出返回 null
      */
     private static function parse_webp_frames( string $info ): ?array {
         if ( ! preg_match( '/Number of frames:\s*(\d+)/i', $info, $count ) ) {
@@ -958,7 +917,7 @@ class Libre_Compress_Animation {
         }
 
         preg_match_all(
-            '/^\s*(\d+):\s+(\d+)\s+(\d+)\s+(yes|no)\s+(-?\d+)\s+(-?\d+)\s+(\d+)\s+(\S+)\s+(yes|no)\s+/m',
+            '/^\s*(\d+):\s+(\d+)\s+(\d+)\s+(yes|no)\s+(-?\d+)\s+(-?\d+)\s+(\d+)\s/m',
             $info,
             $rows,
             PREG_SET_ORDER
@@ -968,7 +927,7 @@ class Libre_Compress_Animation {
             return null;
         }
 
-        // 背景色是 0xAARRGGBB，webpmux -bgcolor 要的是 A,R,G,B 四个十进制数。
+        // 背景色是 0xAARRGGBB，webpmux -set bgcolor 要的是 A,R,G,B 四个十进制数。
         $background = preg_match( '/Background color\s*:\s*0x([0-9A-Fa-f]{8})/', $info, $bg )
             ? implode( ',', array_map( 'hexdec', str_split( strtoupper( $bg[1] ), 2 ) ) )
             : null;
@@ -977,15 +936,12 @@ class Libre_Compress_Animation {
 
         foreach ( $rows as $row ) {
             $frames[] = array(
-                'index'    => (int) $row[1],
                 'width'    => (int) $row[2],
                 'height'   => (int) $row[3],
                 'alpha'    => 'yes' === strtolower( $row[4] ),
                 'x'        => (int) $row[5],
                 'y'        => (int) $row[6],
                 'duration' => (int) $row[7],
-                'dispose'  => 'none' === strtolower( $row[8] ) ? 0 : 1,
-                'blend'    => 'yes' === strtolower( $row[9] ),
             );
         }
 
@@ -1050,21 +1006,6 @@ class Libre_Compress_Animation {
         }
 
         return true;
-    }
-
-    /** 清理本次动图处理用的临时目录。 */
-    private static function remove_directory( string $path ): void {
-        if ( ! is_dir( $path ) ) {
-            return;
-        }
-
-        foreach ( (array) glob( $path . '/*' ) as $file ) {
-            if ( is_file( $file ) ) {
-                unlink( $file ); // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
-            }
-        }
-
-        rmdir( $path );
     }
 
     /**

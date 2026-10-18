@@ -205,16 +205,12 @@ msgstr ""
 msgid "cjxl 压缩级别"
 msgstr ""
 
-#: includes/class-settings.php:822
+#: includes/class-settings.php:787 includes/class-settings.php:822
 msgid "cwebp / FFmpeg 有损方法"
 msgstr ""
 
-#: includes/class-settings.php:788 includes/class-settings.php:823
+#: includes/class-settings.php:823
 msgid "cwebp 无损级别"
-msgstr ""
-
-#: includes/class-settings.php:787
-msgid "cwebp 有损方法"
 msgstr ""
 
 #: includes/class-settings.php:824
@@ -398,12 +394,12 @@ msgstr ""
 msgid "删除未勾选尺寸的缩略图"
 msgstr ""
 
-#: includes/class-animation.php:728 includes/class-animation.php:747 includes/class-animation.php:882 includes/class-animation.php:908 includes/class-animation.php:941
+#: includes/class-animation.php:728 includes/class-animation.php:734
 msgid "动图处理命令执行失败"
 msgstr ""
 
 #, php-format
-#: includes/class-animation.php:1247
+#: includes/class-animation.php:1190
 msgid "动图处理需要 %s 工具，当前环境未配齐，已跳过"
 msgstr ""
 
@@ -476,7 +472,7 @@ msgstr ""
 msgid "压缩工具"
 msgstr ""
 
-#: compression/class-pngquant.php:90 compression/class-pngquant.php:104 compression/class-tool-base.php:523 includes/class-animation.php:674 includes/class-compressor.php:616 includes/class-converter.php:452 includes/class-converter.php:492
+#: compression/class-pngquant.php:90 compression/class-pngquant.php:104 compression/class-tool-base.php:523 includes/class-animation.php:686 includes/class-compressor.php:616 includes/class-converter.php:452 includes/class-converter.php:492
 msgid "压缩成功"
 msgstr ""
 
@@ -504,7 +500,7 @@ msgstr ""
 msgid "压缩结果无效且回滚失败，请保留回滚副本并检查磁盘状态"
 msgstr ""
 
-#: compression/class-tool-base.php:502 includes/class-animation.php:667
+#: compression/class-tool-base.php:502 includes/class-animation.php:679
 msgid "压缩结果替换失败，已保留原文件"
 msgstr ""
 
@@ -709,7 +705,7 @@ msgstr ""
 msgid "当前大小"
 msgstr ""
 
-#: includes/class-animation.php:714
+#: includes/class-animation.php:719
 msgid "当前工具无法完整处理这张动画，已保留原文件"
 msgstr ""
 
@@ -822,10 +818,6 @@ msgstr ""
 msgid "无法为源文件分配新文件名，已保留原文件"
 msgstr ""
 
-#: includes/class-animation.php:866
-msgid "无法创建动图处理的临时目录，已保留原文件"
-msgstr ""
-
 #: includes/class-processor.php:503
 msgid "无法创建原图备份，已停止压缩"
 msgstr ""
@@ -850,7 +842,7 @@ msgstr ""
 msgid "无法安全写入清理后的 SVG 文件"
 msgstr ""
 
-#: includes/class-animation.php:700 includes/class-animation.php:738
+#: includes/class-animation.php:712
 msgid "无法安全处理这张动图，已保留原文件"
 msgstr ""
 
@@ -890,7 +882,7 @@ msgstr ""
 msgid "暂无官方包，建议从 GitHub Releases 下载或自行编译"
 msgstr ""
 
-#: includes/class-animation.php:1225
+#: includes/class-animation.php:1168
 msgid "有损 PNG 压缩会逐帧各自调色让 APNG 闪烁，已跳过；要压 APNG 请开启\"APNG 自动无损压缩\"或把 PNG 设为无损"
 msgstr ""
 
@@ -1151,10 +1143,6 @@ msgstr ""
 msgid "转换结果没有变小，已保留原图"
 msgstr ""
 
-#: includes/class-animation.php:857
-msgid "这张动图有透明留白区域，重组会改变画布尺寸，已保留原文件"
-msgstr ""
-
 #: includes/class-settings.php:448
 msgid "选择目标格式：AVIF 压缩率更高但压缩更慢，WebP 兼容性最好，JPEG XL 同画质体积最小但浏览器支持仍不完整（动画 JXL 更是只有少数浏览器能播），选 JPEG XL 时建议同时开启上面的“兼容格式回退”。"
 msgstr ""
@@ -1220,4 +1208,12 @@ msgstr ""
 #, php-format
 #: includes/class-task.php:1151
 msgid "（共 %d 个，仅显示前 10 个）"
+msgstr ""
+
+#: includes/class-settings.php:786
+msgid "静图用 cwebp，动图用 FFmpeg。"
+msgstr ""
+
+#: includes/class-settings.php:788
+msgid "cwebp / FFmpeg 无损级别"
 msgstr ""

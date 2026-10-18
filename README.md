@@ -78,13 +78,13 @@
 | pngquant | PNG 有损压缩 |
 | oxipng | PNG 无损压缩，APNG 整只无损优化 |
 | gifsicle | GIF 同格式压缩 |
-| cwebp | WebP 同格式压缩、动画 WebP 逐帧重压，以及 PNG/JPG 输出为 WebP |
+| cwebp | 静态 WebP 同格式压缩，以及 PNG/JPG 输出为 WebP |
 | gif2webp | 静态与动画 GIF 输出为 WebP（整只 GIF 直读，不拆帧；单帧 GIF 出来即为静图） |
-| webpmux | 动画 WebP 抽帧与重组、信息读取、末帧时长修正 |
+| webpmux | 动画 WebP 信息读取、末帧时长与背景色修正 |
 | avifenc | 静态 AVIF 编码（不认 GIF，静态 GIF 转 AVIF 需先用 GD 解成 PNG） |
 | avifdec | 静态 AVIF 解码、动画 AVIF 信息读取 |
 | cjxl | JPEG XL 编码（同格式压缩、目标格式输出，并直接读 GIF / APNG 产出动画 JXL） |
-| ffmpeg | APNG 转动画 WebP、完整动画 AVIF 输出 |
+| ffmpeg | 动画 WebP 同格式重压、APNG 转动画 WebP、完整动画 AVIF 输出 |
 | ffprobe | 为 FFmpeg 挑选动画 AVIF 的颜色与透明轨道 |
 | oxvg | SVG 同格式压缩（Rust 单文件程序，不需要 Node.js） |
 
@@ -125,19 +125,19 @@ WebP、AVIF、JPEG XL 不作为转换源：它们只做同格式压缩。
 
 ### 动图处理
 
-整张动画直接交给以下工具处理。工具在内部读取和编码各帧，插件只调用工具并读取播放参数，不自行拆帧，也不自行整理透明通道。唯一的例外是动画 WebP 同格式重压（原因见下表之后）。
+整张动画直接交给以下工具处理。工具在内部读取和编码各帧，插件只调用工具并读取播放参数，不自行拆帧，也不自行整理透明通道。
 
 | 源格式 | 同格式压缩 | 输出 WebP | 输出 AVIF | 输出 JXL |
 | --- | --- | --- | --- | --- |
 | 动画 GIF | gifsicle | gif2webp | ffmpeg | cjxl |
 | APNG | oxipng | ffmpeg | ffmpeg | cjxl |
-| 动画 WebP | webpmux + cwebp | 不转换 | 不转换 | 不转换 |
+| 动画 WebP | ffmpeg（webpmux 读帧表并修播放参数） | 不转换 | 不转换 | 不转换 |
 | 动画 AVIF | ffmpeg + ffprobe + avifdec | 不转换 | 不转换 | 不转换 |
 | 动画 JXL | cjxl | 不转换 | 不转换 | 不转换 |
 
 缺少对应工具时跳过，不自行拆帧。
 
-唯一按帧处理的是动画 WebP 同格式重压：libwebp 没有能整只重压动画 WebP 的官方工具（cwebp 只出静图、webpmux 只搬容器不重压像素、gif2webp 只认 GIF），所以只能由 webpmux 把每帧的原始压缩码流抽到临时文件、cwebp 逐帧重压（带 `-exact`，透明区的颜色原样保留）、再按原图的帧时长、帧偏移、处置方式、混合方式、循环次数与背景色装回去。抽出来的是压缩码流而不是像素：插件不解整张画布、不合成帧、不重算帧间差分。插件不再在压缩前后逐项比对动画信息，工具执行成功且产物非空就保留结果。
+动画 WebP 同格式重压由 FFmpeg 的 `libwebp_anim` 一条命令完成：它内部解码整只动图、自己计算帧间差异矩形与画布尺寸，所以画布不会被裁小，帧数再多也只是一条命令。写回后由 webpmux 补两处播放参数——`libwebp_anim` 会用平均帧时长推算末帧时长，需要按原图改回来；背景色则一律写成不透明白，也要改回原值。末帧时长那一步会按帧包围盒重算画布，所以对"帧盖不满整张画布"的动图（常见透明留白）只改背景色、不动时长，宁可差几毫秒也不裁画布。FFmpeg 的 WebP 编码器没有 `-exact`，透明区域的 RGB 会被压平，这是相对逐帧 cwebp 唯一的画质退让点。
 
 WebP / AVIF / JPEG XL 无论静图动图都只做同格式压缩；APNG 与动画 GIF 是否转换，分别跟随设置里的 PNG、GIF 勾选。插件默认不往上传白名单里添加任何图片格式，也不补尺寸元数据；AVIF 从 WordPress 6.5 起原生支持上传，JXL 与其余格式的上传和媒体元数据完全交给 WordPress 自己处理。唯一的例外是设置里手动开启的 SVG 上传。
 
@@ -187,8 +187,8 @@ JPEG 有损压缩会优先使用 `cjpegli`（jpegli），没装时自动回退 `
 | --- | --- | --- | --- |
 | pngquant 有损 PNG 速度 | 1–11 | 越大越快 | 3 |
 | oxipng 无损 PNG / APNG 级别 | 0–6 | 越大越慢 | 4 |
-| cwebp WebP 有损方法（静图与动图共用） | 0–6 | 越大越慢 | 4 |
-| cwebp WebP 无损级别（静图与动图共用） | 0–9 | 越大越慢 | 6 |
+| cwebp / FFmpeg WebP 有损方法（静图与动图共用） | 0–6 | 越大越慢 | 4 |
+| cwebp / FFmpeg WebP 无损级别（静图与动图共用） | 0–9 | 越大越慢 | 6 |
 | AVIF 速度（avifenc 与 FFmpeg 共用） | 0–10 | 越大越快 | 6 |
 | gifsicle GIF 优化级别 | 1–3 | 越大越慢 | 2 |
 | cjxl JPEG XL 级别 | 1–9 | 越大越慢 | 7 |
