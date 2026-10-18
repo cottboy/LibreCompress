@@ -77,17 +77,6 @@ abstract class Libre_Compress_Tool_Base {
     abstract protected function build_command_chain( string $file_path, array $options ): array;
 
     /**
-     * 获取单张图片最大文件大小（MB）
-     *
-     * 默认无限制
-     *
-     * @return int 最大尺寸限制
-     */
-    public function get_max_file_size(): int {
-        return 0;
-    }
-
-    /**
      * 获取写入压缩记录的工具名
      *
      * 同一渠道可能根据环境切换具体可执行文件（例如 jpegli / jpegoptim），

@@ -41,7 +41,7 @@ msgid "%d 秒"
 msgstr ""
 
 #, php-format
-#: compression/class-tool-base.php:452
+#: compression/class-tool-base.php:441
 msgid "%s 不可用"
 msgstr ""
 
@@ -257,7 +257,7 @@ msgstr ""
 msgid "不支持"
 msgstr ""
 
-#: compression/class-tool-base.php:475
+#: compression/class-tool-base.php:464
 msgid "不支持的文件格式"
 msgstr ""
 
@@ -398,12 +398,12 @@ msgstr ""
 msgid "删除未勾选尺寸的缩略图"
 msgstr ""
 
-#: includes/class-animation.php:705 includes/class-animation.php:724 includes/class-animation.php:868 includes/class-animation.php:894 includes/class-animation.php:927
+#: includes/class-animation.php:728 includes/class-animation.php:747 includes/class-animation.php:882 includes/class-animation.php:908 includes/class-animation.php:941
 msgid "动图处理命令执行失败"
 msgstr ""
 
 #, php-format
-#: includes/class-animation.php:1230
+#: includes/class-animation.php:1247
 msgid "动图处理需要 %s 工具，当前环境未配齐，已跳过"
 msgstr ""
 
@@ -444,7 +444,7 @@ msgstr ""
 msgid "占用 %s"
 msgstr ""
 
-#: includes/class-media-library.php:235 includes/class-media-library.php:51
+#: includes/class-media-library.php:51 includes/class-media-library.php:235
 msgid "压缩"
 msgstr ""
 
@@ -460,7 +460,7 @@ msgstr ""
 msgid "压缩参数设置"
 msgstr ""
 
-#: includes/class-compressor.php:571
+#: includes/class-compressor.php:553
 msgid "压缩后体积没有变小，已保留原图"
 msgstr ""
 
@@ -468,7 +468,7 @@ msgstr ""
 msgid "压缩失败"
 msgstr ""
 
-#: includes/class-compressor.php:519
+#: includes/class-compressor.php:501
 msgid "压缩失败且回滚失败，请保留回滚副本并检查磁盘状态"
 msgstr ""
 
@@ -476,7 +476,7 @@ msgstr ""
 msgid "压缩工具"
 msgstr ""
 
-#: compression/class-pngquant.php:104 compression/class-pngquant.php:90 compression/class-tool-base.php:534 includes/class-animation.php:651 includes/class-compressor.php:634 includes/class-converter.php:452 includes/class-converter.php:492
+#: compression/class-pngquant.php:90 compression/class-pngquant.php:104 compression/class-tool-base.php:523 includes/class-animation.php:674 includes/class-compressor.php:616 includes/class-converter.php:452 includes/class-converter.php:492
 msgid "压缩成功"
 msgstr ""
 
@@ -488,7 +488,7 @@ msgstr ""
 msgid "压缩模式"
 msgstr ""
 
-#: compression/class-tool-base.php:526
+#: compression/class-tool-base.php:515
 msgid "压缩结果为空文件，已保留原文件"
 msgstr ""
 
@@ -500,15 +500,15 @@ msgstr ""
 msgid "压缩结果文件写入失败"
 msgstr ""
 
-#: includes/class-compressor.php:549
+#: includes/class-compressor.php:531
 msgid "压缩结果无效且回滚失败，请保留回滚副本并检查磁盘状态"
 msgstr ""
 
-#: compression/class-tool-base.php:513 includes/class-animation.php:644
+#: compression/class-tool-base.php:502 includes/class-animation.php:667
 msgid "压缩结果替换失败，已保留原文件"
 msgstr ""
 
-#: includes/class-compressor.php:619
+#: includes/class-compressor.php:601
 msgid "压缩记录保存失败且回滚失败，请保留回滚副本并检查数据库状态"
 msgstr ""
 
@@ -516,11 +516,11 @@ msgstr ""
 msgid "压缩记录保存失败，已保留原文件"
 msgstr ""
 
-#: includes/class-compressor.php:618
+#: includes/class-compressor.php:600
 msgid "压缩记录保存失败，已恢复原文件"
 msgstr ""
 
-#: includes/class-compressor.php:584 includes/class-converter.php:384
+#: includes/class-compressor.php:566 includes/class-converter.php:384
 msgid "压缩记录保存失败，请重新压缩"
 msgstr ""
 
@@ -544,7 +544,7 @@ msgstr ""
 msgid "同时删除备份文件、备份索引和格式转换映射，之后所有图片都可重新压缩；此操作不可撤销。"
 msgstr ""
 
-#: compression/class-tool-base.php:295
+#: compression/class-tool-base.php:284
 msgid "命令为空"
 msgstr ""
 
@@ -709,7 +709,7 @@ msgstr ""
 msgid "当前大小"
 msgstr ""
 
-#: includes/class-animation.php:691
+#: includes/class-animation.php:714
 msgid "当前工具无法完整处理这张动画，已保留原文件"
 msgstr ""
 
@@ -786,13 +786,8 @@ msgstr ""
 msgid "数值越大速度越快，通常文件越大；数值越小压缩越慢，通常文件越小。"
 msgstr ""
 
-#: compression/class-tool-base.php:464 includes/class-compressor.php:405 includes/class-converter.php:189 includes/class-processor.php:341 includes/class-processor.php:367
+#: compression/class-tool-base.php:453 includes/class-compressor.php:405 includes/class-converter.php:189 includes/class-processor.php:341 includes/class-processor.php:367
 msgid "文件不存在"
-msgstr ""
-
-#, php-format
-#: includes/class-compressor.php:484
-msgid "文件大小超过限制（最大 %d MB）"
 msgstr ""
 
 #: includes/class-compressor.php:413 includes/class-converter.php:194
@@ -827,7 +822,7 @@ msgstr ""
 msgid "无法为源文件分配新文件名，已保留原文件"
 msgstr ""
 
-#: includes/class-animation.php:852
+#: includes/class-animation.php:866
 msgid "无法创建动图处理的临时目录，已保留原文件"
 msgstr ""
 
@@ -835,11 +830,11 @@ msgstr ""
 msgid "无法创建原图备份，已停止压缩"
 msgstr ""
 
-#: compression/class-tool-base.php:318
+#: compression/class-tool-base.php:307
 msgid "无法创建命令输出缓冲区"
 msgstr ""
 
-#: includes/class-compressor.php:501
+#: includes/class-compressor.php:483
 msgid "无法创建回滚副本，已跳过压缩"
 msgstr ""
 
@@ -847,7 +842,7 @@ msgstr ""
 msgid "无法创建锁文件，请检查上传目录的写入权限"
 msgstr ""
 
-#: compression/class-tool-base.php:335
+#: compression/class-tool-base.php:324
 msgid "无法启动本地命令"
 msgstr ""
 
@@ -855,7 +850,7 @@ msgstr ""
 msgid "无法安全写入清理后的 SVG 文件"
 msgstr ""
 
-#: includes/class-animation.php:677 includes/class-animation.php:715
+#: includes/class-animation.php:700 includes/class-animation.php:738
 msgid "无法安全处理这张动图，已保留原文件"
 msgstr ""
 
@@ -883,10 +878,6 @@ msgstr ""
 msgid "无法读取图片详情"
 msgstr ""
 
-#: includes/class-animation.php:831 includes/class-animation.php:837
-msgid "无法读取这张动图的帧信息，已保留原文件"
-msgstr ""
-
 #: includes/class-processor.php:310
 msgid "旧兼容格式"
 msgstr ""
@@ -899,7 +890,7 @@ msgstr ""
 msgid "暂无官方包，建议从 GitHub Releases 下载或自行编译"
 msgstr ""
 
-#: includes/class-animation.php:1208
+#: includes/class-animation.php:1225
 msgid "有损 PNG 压缩会逐帧各自调色让 APNG 闪烁，已跳过；要压 APNG 请开启\"APNG 自动无损压缩\"或把 PNG 设为无损"
 msgstr ""
 
@@ -943,11 +934,11 @@ msgstr ""
 msgid "未缩放原图"
 msgstr ""
 
-#: compression/class-tool-base.php:302
+#: compression/class-tool-base.php:291
 msgid "本地命令执行功能不可用"
 msgstr ""
 
-#: compression/class-tool-base.php:375
+#: compression/class-tool-base.php:364
 msgid "本地命令执行超时"
 msgstr ""
 
@@ -1160,7 +1151,7 @@ msgstr ""
 msgid "转换结果没有变小，已保留原图"
 msgstr ""
 
-#: includes/class-animation.php:843
+#: includes/class-animation.php:857
 msgid "这张动图有透明留白区域，重组会改变画布尺寸，已保留原文件"
 msgstr ""
 

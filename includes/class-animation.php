@@ -37,6 +37,17 @@ class Libre_Compress_Animation {
      */
     private static $convert_sources = array( 'gif', 'png' );
 
+    /**
+     * 同一请求内读过的动图信息，按"路径 + 体积 + 修改时间"索引
+     *
+     * 调度器选路线、转换前判定是否动图、执行前拼参数都要读同一张图的信息，
+     * 文件没被改动过就不必反复起 webpmux / avifdec 进程。
+     * 文件被改写后体积或修改时间必然变化，缓存自动失效，不会拿旧结论处理新内容。
+     *
+     * @var array<string,array|null>
+     */
+    private static $plans = array();
+
     /* ---------------------------------------------------------------------
      * 设置读取
      * ------------------------------------------------------------------- */
@@ -97,6 +108,12 @@ class Libre_Compress_Animation {
             return null;
         }
 
+        $cache_key = $file_path . '|' . (int) filesize( $file_path ) . '|' . (int) filemtime( $file_path );
+
+        if ( array_key_exists( $cache_key, self::$plans ) ) {
+            return self::$plans[ $cache_key ];
+        }
+
         $extension = strtolower( pathinfo( $file_path, PATHINFO_EXTENSION ) );
 
         switch ( $extension ) {
@@ -117,10 +134,13 @@ class Libre_Compress_Animation {
         }
 
         if ( null === $plan || $plan['frames'] < 1 || count( $plan['delays'] ) !== $plan['frames'] ) {
+            self::$plans[ $cache_key ] = null;
             return null;
         }
 
         $plan['format'] = $extension;
+
+        self::$plans[ $cache_key ] = $plan;
 
         return $plan;
     }
@@ -334,7 +354,7 @@ class Libre_Compress_Animation {
             return null;
         }
 
-        $result = Libre_Compress_Tool_Base::run_command( array( $webpmux, '-info', $file_path ), 30 );
+        $result = Libre_Compress_Tool_Base::run_command( array( $webpmux, '-info', $file_path ), 60 );
 
         if ( empty( $result['success'] ) ) {
             return null;
@@ -348,20 +368,21 @@ class Libre_Compress_Animation {
 
         $frames = (int) $count[1];
 
-        // 帧表每行：序号 宽 高 alpha x y 时长(ms) dispose blend 大小 编码
-        preg_match_all( '/^\s*\d+:\s+(\d+)\s+(\d+)\s+(yes|no)\s+(-?\d+)\s+(-?\d+)\s+(\d+)\s+/m', $info, $rows, PREG_SET_ORDER );
+        // 一次读取就把逐帧重组要用的偏移、处置方式、混合方式和背景色全取回来，
+        // 重组阶段不再二次调用 webpmux。
+        $parsed = self::parse_webp_frames( $info );
 
-        if ( count( $rows ) !== $frames ) {
+        if ( null === $parsed || count( $parsed['frames'] ) !== $frames ) {
             return null;
         }
 
         $delays = array();
         $alpha  = false !== stripos( $info, 'transparency' );
 
-        foreach ( $rows as $row ) {
-            $delays[] = self::milliseconds( (int) $row[6] / 1000 );
+        foreach ( $parsed['frames'] as $frame ) {
+            $delays[] = $frame['duration'];
 
-            if ( 'yes' === $row[3] ) {
+            if ( $frame['alpha'] ) {
                 $alpha = true;
             }
         }
@@ -369,7 +390,7 @@ class Libre_Compress_Animation {
         $loop_infinite = (bool) preg_match( '/Loop Count\s*:\s*0\b/i', $info );
         // WebP 保存总播放次数，统一换成 GIF / AVIF 使用的额外播放次数。
         $loop = preg_match( '/Loop Count\s*:\s*(\d+)/i', $info, $lc ) ? max( 0, (int) $lc[1] - 1 ) : null;
-        $canvas = preg_match( '/Canvas size:\s*(\d+)\s*x\s*(\d+)/i', $info, $cs ) ? array( (int) $cs[1], (int) $cs[2] ) : array( (int) $rows[0][1], (int) $rows[0][2] );
+        $canvas = preg_match( '/Canvas size:\s*(\d+)\s*x\s*(\d+)/i', $info, $cs ) ? array( (int) $cs[1], (int) $cs[2] ) : array( (int) $parsed['frames'][0]['width'], (int) $parsed['frames'][0]['height'] );
 
         return array(
             'frames'  => $frames,
@@ -379,6 +400,8 @@ class Libre_Compress_Animation {
             'alpha'   => $alpha,
             'width'   => $canvas[0],
             'height'  => $canvas[1],
+            'frame_details'    => $parsed['frames'],
+            'background_color' => $parsed['background'],
         );
     }
 
@@ -825,21 +848,12 @@ class Libre_Compress_Animation {
             return array( 'success' => false, 'message' => $message );
         };
 
-        $info = Libre_Compress_Tool_Base::run_command( array( self::tool( 'webpmux' ), '-info', $source ), 60 );
-
-        if ( empty( $info['success'] ) ) {
-            return $failed( __( '无法读取这张动图的帧信息，已保留原文件', 'libre-compress' ) );
-        }
-
-        $parsed = self::parse_webp_frames( (string) $info['output'] );
-
-        if ( null === $parsed || count( $parsed['frames'] ) !== $plan['frames'] ) {
-            return $failed( __( '无法读取这张动图的帧信息，已保留原文件', 'libre-compress' ) );
-        }
+        // 帧信息已由 analyze() 一次读全，重组阶段不再二次调用 webpmux。
+        $parsed = $plan['frame_details'];
 
         // webpmux 按帧的包围盒推导画布尺寸：盖不满整张画布的动图（常见的透明留白）
         // 重组后画布会被裁小，这种图不动。
-        if ( ! self::frames_cover_canvas( $parsed['frames'], $plan['width'], $plan['height'] ) ) {
+        if ( ! self::frames_cover_canvas( $parsed, $plan['width'], $plan['height'] ) ) {
             return $failed( __( '这张动图有透明留白区域，重组会改变画布尺寸，已保留原文件', 'libre-compress' ) );
         }
 
@@ -854,7 +868,7 @@ class Libre_Compress_Animation {
 
         $encoded = array();
 
-        foreach ( $parsed['frames'] as $frame ) {
+        foreach ( $parsed as $frame ) {
             $raw = $work . '/src-' . $frame['index'] . '.webp';
             $new = $work . '/new-' . $frame['index'] . '.webp';
 
@@ -899,7 +913,7 @@ class Libre_Compress_Animation {
 
         $assemble = array( self::tool( 'webpmux' ) );
 
-        foreach ( $parsed['frames'] as $position => $frame ) {
+        foreach ( $parsed as $position => $frame ) {
             // 帧参数：文件 + 时长 + 横向偏移 + 纵向偏移 + 处置方式(0 不处置 / 1 还原背景) ± 混合方式
             // 帧的路径与 "+时长+横偏移+纵偏移+处置±混合" 必须是两个独立参数，拼成一串 webpmux 会当成打不开的文件名。
             $assemble[] = '-frame';
@@ -911,10 +925,10 @@ class Libre_Compress_Animation {
         $assemble[] = '-loop';
         $assemble[] = (string) ( ! empty( $plan['loop_infinite'] ) ? 0 : $plan['loop'] + 1 );
 
-        if ( null !== $parsed['background'] ) {
+        if ( null !== $plan['background_color'] ) {
             // 不显式写回背景色，webpmux 会把它重置成不透明白，透明背景就没了。
             $assemble[] = '-bgcolor';
-            $assemble[] = $parsed['background'];
+            $assemble[] = $plan['background_color'];
         }
 
         $assemble[] = '-o';
@@ -933,8 +947,10 @@ class Libre_Compress_Animation {
     /**
      * 解析 webpmux -info 的帧表
      *
+     * 帧表每行：序号 宽 高 alpha x y 时长(ms) dispose blend 大小 编码
+     *
      * @param string $info webpmux -info 的完整输出
-     * @return array|null 每帧的序号、尺寸、时长、偏移、处置与混合方式；背景色单独返回，读不出返回 null
+     * @return array|null 每帧的序号、尺寸、是否带透明、偏移、时长、处置与混合方式；背景色单独返回，读不出返回 null
      */
     private static function parse_webp_frames( string $info ): ?array {
         if ( ! preg_match( '/Number of frames:\s*(\d+)/i', $info, $count ) ) {
@@ -964,6 +980,7 @@ class Libre_Compress_Animation {
                 'index'    => (int) $row[1],
                 'width'    => (int) $row[2],
                 'height'   => (int) $row[3],
+                'alpha'    => 'yes' === strtolower( $row[4] ),
                 'x'        => (int) $row[5],
                 'y'        => (int) $row[6],
                 'duration' => (int) $row[7],
@@ -1246,7 +1263,7 @@ class Libre_Compress_Animation {
 /**
  * 动画同格式压缩的处理器
  *
- * 形状与 Libre_Compress_Tool_Base 的压缩入口一致（get_name / get_max_file_size / compress），
+ * 形状与 Libre_Compress_Tool_Base 的压缩入口一致（get_name / get_used_tool_name / compress），
  * 让压缩调度器能用同一套回滚副本与记录流程处理动图。
  */
 class Libre_Compress_Animated_Handler {
@@ -1281,15 +1298,6 @@ class Libre_Compress_Animated_Handler {
      */
     public function get_used_tool_name(): string {
         return $this->get_name();
-    }
-
-    /**
-     * 不额外限制体积
-     *
-     * @return int
-     */
-    public function get_max_file_size(): int {
-        return 0;
     }
 
     /**

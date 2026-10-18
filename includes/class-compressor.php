@@ -475,24 +475,6 @@ class Libre_Compress_Compressor {
             );
         }
 
-        $file_size      = filesize( $file_path );
-        $max_size_mb    = $tool->get_max_file_size();
-        $max_size_bytes = $max_size_mb * 1024 * 1024;
-
-        if ( $max_size_mb > 0 && $file_size > $max_size_bytes ) {
-            $message = sprintf(
-                __( '文件大小超过限制（最大 %d MB）', 'libre-compress' ),
-                $max_size_mb
-            );
-            $this->record_skipped_file( $attachment_id, $file_path, $size_type, $message );
-
-            return array(
-                'success' => false,
-                'message' => $message,
-                'status'  => 'skipped',
-            );
-        }
-
         // 使用唯一回滚副本，避免异常中断或并发遗留文件互相覆盖。
         $rollback_path = $file_path . '.lc-rollback-' . wp_generate_password( 12, false, false );
 
