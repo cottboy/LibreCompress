@@ -21,176 +21,812 @@ class Libre_Compress_Settings {
      */
     const IMAGE_SIZE_THRESHOLD_MAX = 20000;
 
-    // 统一约束保存值与命令参数，防止篡改选项绕过表单范围。
-    const SPEED_SETTINGS = array(
-        'pngquant_speed'              => array( 1, 11, 3 ),
-        'oxipng_level'                => array( 0, 6, 4 ),
-        'webp_method'                 => array( 0, 6, 4 ),
-        'webp_lossless_level'         => array( 0, 9, 6 ),
-        'avif_speed'                  => array( 0, 10, 6 ),
-        'jxl_effort'                  => array( 1, 10, 7 ),
-        'gifsicle_level'              => array( 1, 3, 2 ),
-        'convert_webp_method'         => array( 0, 6, 4 ),
-        'convert_webp_lossless_level' => array( 0, 9, 6 ),
-        'convert_webp_gif_method'     => array( 0, 6, 4 ),
-        'convert_avif_speed'          => array( 0, 10, 6 ),
-        'convert_jxl_effort'          => array( 1, 10, 7 ),
-    );
+    private $current_tab = 'general';
+
+    /* ---------------------------------------------------------------------
+     * 参数总表
+     *
+     * 设置页渲染、保存校验、工具拼命令全部只认这一份表：
+     * 一处改范围，界面、校验、实际传参同时生效，不会再出现界面写 0-100、
+     * 工具只认 0-80 这种两边不一致的情况。
+     * ------------------------------------------------------------------- */
 
     /**
-     * 值域由工具决定、不是 0-100 的数值参数
+     * 压缩模式参数（各路径共用同一套文案）
      *
-     * @var array<string,int[]>
+     * @return array
      */
-    const LIMIT_SETTINGS = array(
-        'gif_colors' => array( 2, 256, 256 ),
-    );
+    private static function mode_param(): array {
+        return array(
+            'type'    => 'mode',
+            'label'   => __( '压缩模式', 'libre-compress' ),
+            'flag'    => '',
+            'default' => 'lossy',
+            'desc'    => __( '有损会丢掉部分画面细节来换更小体积；无损只重排压缩数据，画面一个像素都不变。', 'libre-compress' ),
+        );
+    }
 
     /**
-     * 枚举型参数与允许的取值
+     * 所有压缩路径的参数定义
      *
-     * @var array<string,string[]>
-     */
-    const CHOICE_SETTINGS = array(
-        'webp_preset' => array( 'default', 'photo', 'picture', 'drawing', 'icon', 'text' ),
-        'avif_chroma' => array( 'auto', '444', '420' ),
-    );
-
-    /**
-     * 开关型参数与默认值
+     * 每个参数都写清楚：界面上叫什么、实际传给工具的哪个参数、取值范围、默认值。
+     * type 取值：
+     * - int    整数，必须有 min / max
+     * - choice 枚举，必须有 choices
+     * - bool   开关
+     * - mode   有损 / 无损二选一
      *
-     * @var array<string,bool>
+     * @return array
      */
-    const FLAG_SETTINGS = array(
-        'webp_exact' => false,
-    );
+    public static function param_groups(): array {
+        static $groups = null;
 
-    /**
-     * 各压缩路径的压缩模式设置
-     *
-     * @var string[]
-     */
-    const MODE_SETTINGS = array(
-        'jpeg',
-        'png',
-        'gif',
-        'webp',
-        'avif',
-        'jxl',
-        'convert_webp',
-        'convert_avif',
-        'convert_jxl',
-    );
-
-    /**
-     * 各压缩路径的压缩质量设置与默认值
-     *
-     * @var array<string,int>
-     */
-    const QUALITY_SETTINGS = array(
-        'jpeg_quality'         => 80,
-        'png_lossy_quality'    => 80,
-        'gif_quality'          => 60,
-        'webp_quality'         => 80,
-        'webp_alpha_quality'   => 100,
-        'avif_quality'         => 80,
-        'avif_alpha_quality'   => 80,
-        'jxl_quality'          => 80,
-        'convert_webp_quality' => 80,
-        'convert_avif_quality' => 80,
-        'convert_jxl_quality'  => 80,
-    );
-
-    /**
-     * 按值域表把输入夹到合法整数
-     *
-     * @param string $key   设置键名
-     * @param mixed  $value 原始值
-     * @param array  $table 值域表：键名 => [最小, 最大, 默认]
-     * @return int
-     */
-    private static function normalize_int( string $key, $value, array $table ): int {
-        list( $min, $max, $default ) = $table[ $key ];
-
-        if ( ( ! is_int( $value ) && ! is_string( $value ) ) || ! preg_match( '/^-?\d+$/D', (string) $value ) ) {
-            return $default;
+        if ( null !== $groups ) {
+            return $groups;
         }
 
-        return (int) max( $min, min( $max, (float) $value ) );
-    }
+        $groups = array(
+            'jpeg'             => array(
+                'title'  => __( 'JPEG 同格式压缩', 'libre-compress' ),
+                'note'   => __( '有损优先用 jpegli：cjpegli 读不了 JPEG，所以先由 djpegli 解成 PPM，再交给 cjpegli 重新编码。没装 jpegli、或这里强制用 jpegoptim 时走 jpegoptim。无损压缩始终由 jpegoptim 负责。', 'libre-compress' ),
+                'params' => array(
+                    'jpeg_encoder'      => array(
+                        'type'    => 'choice',
+                        'label'   => __( '有损编码器', 'libre-compress' ),
+                        'flag'    => 'cjpegli / jpegoptim',
+                        'choices' => array(
+                            'auto'      => __( '自动（装了 jpegli 就用 jpegli）', 'libre-compress' ),
+                            'cjpegli'   => __( '只用 jpegli', 'libre-compress' ),
+                            'jpegoptim' => __( '只用 jpegoptim', 'libre-compress' ),
+                        ),
+                        'default' => 'auto',
+                        'desc'    => __( 'jpegli 需要 cjpegli 和 djpegli 两个文件同时存在。jpegli 解码时会丢掉 EXIF、ICC 等元数据；要保留元数据请选 jpegoptim。', 'libre-compress' ),
+                    ),
+                    'jpeg_mode'         => self::mode_param(),
+                    'jpeg_quality'      => array(
+                        'type'    => 'int',
+                        'label'   => __( '有损质量', 'libre-compress' ),
+                        'flag'    => 'cjpegli -q / jpegoptim --max',
+                        'min'     => 1,
+                        'max'     => 100,
+                        'default' => 80,
+                        'desc'    => __( '只有有损压缩有效。jpegli 官方建议 68-96，80 左右肉眼基本看不出差别。', 'libre-compress' ),
+                    ),
+                    'jpeg_chroma'       => array(
+                        'type'    => 'choice',
+                        'label'   => __( '色度抽样', 'libre-compress' ),
+                        'flag'    => 'cjpegli --chroma_subsampling',
+                        'choices' => array(
+                            'auto' => __( '自动（交给 jpegli 决定）', 'libre-compress' ),
+                            '444'  => __( '4:4:4（色彩最准，文件最大）', 'libre-compress' ),
+                            '440'  => __( '4:4:0（少见的纵向抽样）', 'libre-compress' ),
+                            '422'  => __( '4:2:2（横向减半）', 'libre-compress' ),
+                            '420'  => __( '4:2:0（最省体积，彩色边缘略糊）', 'libre-compress' ),
+                        ),
+                        'default' => 'auto',
+                        'desc'    => __( '只有 jpegli 有损压缩有效，jpegoptim 没有这个开关。', 'libre-compress' ),
+                    ),
+                    'jpeg_progressive'  => array(
+                        'type'    => 'choice',
+                        'label'   => __( '渐进式编码', 'libre-compress' ),
+                        'flag'    => 'cjpegli -p / jpegoptim --all-progressive',
+                        'choices' => array(
+                            'auto'        => __( '自动（让 jpegoptim 挑更小的，jpegli 用默认 2 级）', 'libre-compress' ),
+                            'normal'      => __( '顺序式（边下边显示，整张出现）', 'libre-compress' ),
+                            'progressive' => __( '渐进式（先糊后清，首屏更快）', 'libre-compress' ),
+                        ),
+                        'default' => 'progressive',
+                        'desc'    => __( '渐进式通常体积更小、加载观感更好；个别老软件不认渐进式就选顺序式。', 'libre-compress' ),
+                    ),
+                ),
+            ),
+            'png'              => array(
+                'title'  => __( 'PNG / APNG 同格式压缩', 'libre-compress' ),
+                'note'   => __( '有损走 pngquant，无损走 oxipng。APNG 只能无损，检测到动画会自动改走 oxipng。', 'libre-compress' ),
+                'params' => array(
+                    'png_mode'          => self::mode_param(),
+                    'png_quality_min'   => array(
+                        'type'    => 'int',
+                        'label'   => __( '有损质量下限', 'libre-compress' ),
+                        'flag'    => 'pngquant --quality 下限',
+                        'min'     => 0,
+                        'max'     => 100,
+                        'default' => 60,
+                        'desc'    => __( '低于这个质量就不保存、直接保留原图，用来防止压得太糊。0 表示不设下限。', 'libre-compress' ),
+                    ),
+                    'png_quality_max'   => array(
+                        'type'    => 'int',
+                        'label'   => __( '有损质量上限', 'libre-compress' ),
+                        'flag'    => 'pngquant --quality 上限',
+                        'min'     => 0,
+                        'max'     => 100,
+                        'default' => 80,
+                        'desc'    => __( '追求的最高质量，凑不到时会自动减少颜色数。下限大于上限时会自动对调。', 'libre-compress' ),
+                    ),
+                    'pngquant_speed'    => array(
+                        'type'    => 'int',
+                        'label'   => __( 'pngquant 速度', 'libre-compress' ),
+                        'flag'    => 'pngquant --speed',
+                        'min'     => 1,
+                        'max'     => 11,
+                        'default' => 4,
+                        'desc'    => __( '数值越大越快越省 CPU，画质越粗糙；1 最慢最细，4 是 pngquant 默认值。', 'libre-compress' ),
+                    ),
+                    'pngquant_dither'   => array(
+                        'type'    => 'bool',
+                        'label'   => __( '抖动', 'libre-compress' ),
+                        'flag'    => 'pngquant（关掉时加 --nofs）',
+                        'default' => true,
+                        'desc'    => __( '勾选：减少颜色后用抖动过渡，照片类渐变更自然；取消：色块更干净、体积更小，适合扁平图标。', 'libre-compress' ),
+                    ),
+                    'oxipng_level'      => array(
+                        'type'    => 'int',
+                        'label'   => __( 'oxipng 无损级别', 'libre-compress' ),
+                        'flag'    => 'oxipng -o',
+                        'min'     => 0,
+                        'max'     => 6,
+                        'default' => 2,
+                        'desc'    => __( '数值越大压得越小、越慢（6 非常慢）。2 是 oxipng 默认值，日常够用。', 'libre-compress' ),
+                    ),
+                    'oxipng_alpha'      => array(
+                        'type'    => 'bool',
+                        'label'   => __( '优化透明通道', 'libre-compress' ),
+                        'flag'    => 'oxipng -a',
+                        'default' => false,
+                        'desc'    => __( '把完全透明的像素颜色改写成可压缩的值，带透明的大图能再小一截。只在无损压缩时有用。', 'libre-compress' ),
+                    ),
+                    'oxipng_zopfli'     => array(
+                        'type'    => 'bool',
+                        'label'   => __( 'Zopfli 极限压缩', 'libre-compress' ),
+                        'flag'    => 'oxipng --zopfli',
+                        'default' => false,
+                        'desc'    => __( '更慢更狠的压缩算法，通常还能再省几个百分点。大图会很慢，容易把服务器拖到超时。', 'libre-compress' ),
+                    ),
+                    'apng_lossless'     => array(
+                        'type'    => 'bool',
+                        'label'   => __( 'APNG 自动无损压缩', 'libre-compress' ),
+                        'flag'    => 'APNG 改走 oxipng',
+                        'default' => true,
+                        'desc'    => __( '有损 PNG 靠 pngquant 逐帧各自挑调色板，APNG 这样压会闪，所以检测到 APNG 一律改用 oxipng 只做无损。取消勾选则 PNG 为有损时 APNG 原样不压（PNG 本身设为无损时与本项无关）。', 'libre-compress' ),
+                    ),
+                ),
+            ),
+            'gif'              => array(
+                'title'  => __( 'GIF 同格式压缩', 'libre-compress' ),
+                'note'   => __( '整只 GIF（含动画）交给 gifsicle，插件不拆帧、不动透明像素。', 'libre-compress' ),
+                'params' => array(
+                    'gif_mode'        => self::mode_param(),
+                    'gifsicle_lossy'  => array(
+                        'type'    => 'int',
+                        'label'   => __( '有损强度', 'libre-compress' ),
+                        'flag'    => 'gifsicle --lossy',
+                        'min'     => 0,
+                        'max'     => 1000,
+                        'default' => 80,
+                        'desc'    => __( '直接对应 gifsicle 的 --lossy，数值越大文件越小、噪点越多，常用 20-200；填 0 表示不加有损参数。只有有损模式有效。', 'libre-compress' ),
+                    ),
+                    'gif_colors'      => array(
+                        'type'    => 'int',
+                        'label'   => __( '调色板颜色数', 'libre-compress' ),
+                        'flag'    => 'gifsicle --colors',
+                        'min'     => 2,
+                        'max'     => 256,
+                        'default' => 256,
+                        'desc'    => __( 'GIF 最多 256 色。256 等于不缩色；调低后体积更小但会掉色，图标类 64-128 往往够用。', 'libre-compress' ),
+                    ),
+                    'gifsicle_level'  => array(
+                        'type'    => 'int',
+                        'label'   => __( '优化级别', 'libre-compress' ),
+                        'flag'    => 'gifsicle -O',
+                        'min'     => 1,
+                        'max'     => 3,
+                        'default' => 2,
+                        'desc'    => __( '3 会多存一张透明度索引表，能再小一点；2 是官方推荐的平衡档。', 'libre-compress' ),
+                    ),
+                ),
+            ),
+            'webp'             => array(
+                'title'  => __( 'WebP 同格式压缩（静图与动图）', 'libre-compress' ),
+                'note'   => __( '静图用 cwebp，动图用 FFmpeg 的 libwebp_anim。动图只认质量、方法和无损级别三项，其余开关只对静图生效。', 'libre-compress' ),
+                'params' => array(
+                    'webp_mode'            => self::mode_param(),
+                    'webp_quality'         => array(
+                        'type'    => 'int',
+                        'label'   => __( '有损质量', 'libre-compress' ),
+                        'flag'    => 'cwebp -q / FFmpeg -quality',
+                        'min'     => 0,
+                        'max'     => 100,
+                        'default' => 80,
+                        'desc'    => __( '0 最省体积、100 最好。照片一般 75-85，截图和图标可以再低一些。', 'libre-compress' ),
+                    ),
+                    'webp_method'          => array(
+                        'type'    => 'int',
+                        'label'   => __( '有损压缩方法', 'libre-compress' ),
+                        'flag'    => 'cwebp -m / FFmpeg -compression_level',
+                        'min'     => 0,
+                        'max'     => 6,
+                        'default' => 4,
+                        'desc'    => __( '0 最快、6 最慢但最小。方法只影响压缩耗时和体积，不影响画质。', 'libre-compress' ),
+                    ),
+                    'webp_lossless_level'  => array(
+                        'type'    => 'int',
+                        'label'   => __( '无损级别', 'libre-compress' ),
+                        'flag'    => 'cwebp -z',
+                        'min'     => 0,
+                        'max'     => 9,
+                        'default' => 6,
+                        'desc'    => __( '只有无损模式有效，0 最快、9 最小。动图按比例换算成 FFmpeg 的 0-6 档。', 'libre-compress' ),
+                    ),
+                    'webp_alpha_quality'   => array(
+                        'type'    => 'int',
+                        'label'   => __( '透明通道质量', 'libre-compress' ),
+                        'flag'    => 'cwebp -alpha_q',
+                        'min'     => 0,
+                        'max'     => 100,
+                        'default' => 100,
+                        'desc'    => __( '100 表示透明通道无损。动图由 FFmpeg 编码，没有这个开关。', 'libre-compress' ),
+                    ),
+                    'webp_preset'          => array(
+                        'type'    => 'choice',
+                        'label'   => __( '内容预设', 'libre-compress' ),
+                        'flag'    => 'cwebp -preset',
+                        'choices' => array(
+                            'default' => __( '默认', 'libre-compress' ),
+                            'photo'   => __( '照片', 'libre-compress' ),
+                            'picture' => __( '室内人像', 'libre-compress' ),
+                            'drawing' => __( '绘图 / 线稿', 'libre-compress' ),
+                            'icon'    => __( '图标 / 小彩图', 'libre-compress' ),
+                            'text'    => __( '文字截图', 'libre-compress' ),
+                        ),
+                        'default' => 'default',
+                        'desc'    => __( '按内容类型预调滤镜与分区参数。预设会覆盖方法和质量，所以它永远排在这些参数前面；下面高级参数里手填的值优先级更高。', 'libre-compress' ),
+                    ),
+                    'webp_exact'           => array(
+                        'type'    => 'bool',
+                        'label'   => __( '保留透明区域颜色', 'libre-compress' ),
+                        'flag'    => 'cwebp -exact',
+                        'default' => false,
+                        'desc'    => __( '默认会把全透明像素的 RGB 抹平。透明图以后还要再编辑就勾上，代价是体积约多 16%。', 'libre-compress' ),
+                    ),
+                    'webp_segments'        => array(
+                        'type'      => 'int',
+                        'label'     => __( '分区数量', 'libre-compress' ),
+                        'flag'      => 'cwebp -segments',
+                        'min'       => 1,
+                        'max'       => 4,
+                        'default'   => 4,
+                        'advanced'  => true,
+                        'desc'      => __( '把图切成几块分别量化，4 最均匀也最慢。', 'libre-compress' ),
+                    ),
+                    'webp_sns'             => array(
+                        'type'      => 'int',
+                        'label'     => __( '空间噪点整形', 'libre-compress' ),
+                        'flag'      => 'cwebp -sns',
+                        'min'       => 0,
+                        'max'       => 100,
+                        'default'   => 50,
+                        'advanced'  => true,
+                        'desc'      => __( '把量化误差藏进纹理里，让人眼不易察觉。0 关闭，100 最强。', 'libre-compress' ),
+                    ),
+                    'webp_filter'          => array(
+                        'type'      => 'int',
+                        'label'     => __( '滤波强度', 'libre-compress' ),
+                        'flag'      => 'cwebp -f',
+                        'min'       => 0,
+                        'max'       => 100,
+                        'default'   => 60,
+                        'advanced'  => true,
+                        'desc'      => __( '编码前先平滑画面，0 关闭、100 最强。纹理丰富的照片不要调太高。', 'libre-compress' ),
+                    ),
+                    'webp_sharpness'       => array(
+                        'type'      => 'int',
+                        'label'     => __( '滤波锐度', 'libre-compress' ),
+                        'flag'      => 'cwebp -sharpness',
+                        'min'       => 0,
+                        'max'       => 7,
+                        'default'   => 0,
+                        'advanced'  => true,
+                        'desc'      => __( '0 最锐、7 最柔。线条和文字截图建议留在 0。', 'libre-compress' ),
+                    ),
+                    'webp_sharp_yuv'       => array(
+                        'type'      => 'bool',
+                        'label'     => __( '锐利色彩转换', 'libre-compress' ),
+                        'flag'      => 'cwebp -sharp_yuv',
+                        'default'   => false,
+                        'advanced'  => true,
+                        'desc'      => __( 'RGB 转 YUV 时用更准的算法，红色和暗部更干净，编码稍慢。', 'libre-compress' ),
+                    ),
+                ),
+            ),
+            'avif'             => array(
+                'title'  => __( 'AVIF 同格式压缩（静图与动图）', 'libre-compress' ),
+                'note'   => __( '静图先由 avifdec 解成 PNG 再交给 avifenc 重压；动图由 FFmpeg 一次处理完。动图只用质量与速度，其余开关只对静图生效。', 'libre-compress' ),
+                'params' => array(
+                    'avif_mode'           => self::mode_param(),
+                    'avif_quality'        => array(
+                        'type'    => 'int',
+                        'label'   => __( '有损质量', 'libre-compress' ),
+                        'flag'    => 'avifenc -q / FFmpeg -crf',
+                        'min'     => 0,
+                        'max'     => 100,
+                        'default' => 80,
+                        'desc'    => __( '100 为无损，0 最省体积。AVIF 的 80 大致相当于 JPEG 的 90。', 'libre-compress' ),
+                    ),
+                    'avif_alpha_quality'  => array(
+                        'type'    => 'int',
+                        'label'   => __( '透明通道质量', 'libre-compress' ),
+                        'flag'    => 'avifenc --qalpha',
+                        'min'     => 0,
+                        'max'     => 100,
+                        'default' => 80,
+                        'desc'    => __( '100 为透明通道无损；半透明边缘多的图建议调高。动图的透明通道由 FFmpeg 固定无损。', 'libre-compress' ),
+                    ),
+                    'avif_speed'          => array(
+                        'type'    => 'int',
+                        'label'   => __( '速度', 'libre-compress' ),
+                        'flag'    => 'avifenc -s / FFmpeg -cpu-used',
+                        'min'     => 0,
+                        'max'     => 10,
+                        'default' => 6,
+                        'desc'    => __( '0 最慢最小、10 最快最大。动图的 FFmpeg 最高只到 8，超过按 8 处理。', 'libre-compress' ),
+                    ),
+                    'avif_chroma'         => array(
+                        'type'    => 'choice',
+                        'label'   => __( '色度抽样', 'libre-compress' ),
+                        'flag'    => 'avifenc -y',
+                        'choices' => array(
+                            'auto' => __( '自动（按输入决定）', 'libre-compress' ),
+                            '444'  => __( '4:4:4（色彩最准）', 'libre-compress' ),
+                            '422'  => __( '4:2:2（横向减半）', 'libre-compress' ),
+                            '420'  => __( '4:2:0 + sharpyuv（最小，边缘略糊）', 'libre-compress' ),
+                        ),
+                        'default' => 'auto',
+                        'desc'    => __( '只有有损有效。选 4:2:0 会带 sharpyuv，让彩色边缘不至于太糊。', 'libre-compress' ),
+                    ),
+                    'avif_depth'          => array(
+                        'type'    => 'choice',
+                        'label'   => __( '位深', 'libre-compress' ),
+                        'flag'    => 'avifenc -d',
+                        'choices' => array(
+                            '8'  => __( '8 位（默认，浏览器都能显示）', 'libre-compress' ),
+                            '10' => __( '10 位（更平滑的渐变，体积略大）', 'libre-compress' ),
+                            '12' => __( '12 位（几乎用不到）', 'libre-compress' ),
+                        ),
+                        'default' => '8',
+                        'desc'    => __( '位深越高渐变越平滑，但 10/12 位文件更大，老设备可能不支持。', 'libre-compress' ),
+                    ),
+                    'avif_jobs'           => array(
+                        'type'    => 'int',
+                        'label'   => __( '并行线程数', 'libre-compress' ),
+                        'flag'    => 'avifenc -j',
+                        'min'     => 1,
+                        'max'     => 16,
+                        'default' => 4,
+                        'desc'    => __( '同时开几个编码线程。开太多会和网站抢 CPU，4 左右比较稳。', 'libre-compress' ),
+                    ),
+                ),
+            ),
+            'jxl'              => array(
+                'title'  => __( 'JPEG XL 同格式压缩（静图与动图）', 'libre-compress' ),
+                'note'   => __( 'cjxl 能直接读写动画 JXL，一条命令重编码，不需要拆帧。', 'libre-compress' ),
+                'params' => array(
+                    'jxl_mode'    => self::mode_param(),
+                    'jxl_quality' => array(
+                        'type'    => 'int',
+                        'label'   => __( '有损质量', 'libre-compress' ),
+                        'flag'    => 'cjxl -q',
+                        'min'     => 0,
+                        'max'     => 100,
+                        'default' => 80,
+                        'desc'    => __( '100 等于数学无损，90 已经是视觉无损。官方建议 68-96。', 'libre-compress' ),
+                    ),
+                    'jxl_effort'  => array(
+                        'type'    => 'int',
+                        'label'   => __( '压缩级别', 'libre-compress' ),
+                        'flag'    => 'cjxl -e',
+                        'min'     => 1,
+                        'max'     => 10,
+                        'default' => 7,
+                        'desc'    => __( '级别越高越慢、同样画质体积越小。7 是 cjxl 默认值，8 以上明显变慢。', 'libre-compress' ),
+                    ),
+                ),
+            ),
+            'svg'              => array(
+                'title'  => __( 'SVG 同格式压缩', 'libre-compress' ),
+                'note'   => __( '由 oxvg 处理，两种预设都会删掉 <metadata> 和注释。', 'libre-compress' ),
+                'params' => array(
+                    'svg_preset' => array(
+                        'type'    => 'choice',
+                        'label'   => __( '优化预设', 'libre-compress' ),
+                        'flag'    => 'oxvg optimise -e',
+                        'choices' => array(
+                            'default' => __( '常规（default）', 'libre-compress' ),
+                            'safe'    => __( '保守（safe，几乎不改视觉）', 'libre-compress' ),
+                        ),
+                        'default' => 'default',
+                        'desc'    => __( '常规会合并路径、精简属性；保守只做绝对安全的重写。', 'libre-compress' ),
+                    ),
+                ),
+            ),
+            'convert_webp'     => array(
+                'title'  => __( '格式转换：输出 WebP', 'libre-compress' ),
+                'note'   => __( 'PNG / JPG 用 cwebp，GIF 用 gif2webp，APNG 用 FFmpeg。这三处的参数都在这里分开设置。', 'libre-compress' ),
+                'params' => array(
+                    'convert_webp_mode'           => self::mode_param(),
+                    'convert_webp_quality'        => array(
+                        'type'    => 'int',
+                        'label'   => __( '有损质量', 'libre-compress' ),
+                        'flag'    => 'cwebp -q / gif2webp -q / FFmpeg -quality',
+                        'min'     => 0,
+                        'max'     => 100,
+                        'default' => 80,
+                        'desc'    => __( '三条转换路线共用这一个质量。', 'libre-compress' ),
+                    ),
+                    'convert_webp_method'         => array(
+                        'type'    => 'int',
+                        'label'   => __( 'cwebp / FFmpeg 有损方法', 'libre-compress' ),
+                        'flag'    => 'cwebp -m / FFmpeg -compression_level',
+                        'min'     => 0,
+                        'max'     => 6,
+                        'default' => 4,
+                        'desc'    => __( '0 最快、6 最慢但最小。', 'libre-compress' ),
+                    ),
+                    'convert_webp_lossless_level' => array(
+                        'type'    => 'int',
+                        'label'   => __( '无损级别', 'libre-compress' ),
+                        'flag'    => 'cwebp -z',
+                        'min'     => 0,
+                        'max'     => 9,
+                        'default' => 6,
+                        'desc'    => __( '只有无损模式有效。动图按比例换算成 FFmpeg 的 0-6 档。', 'libre-compress' ),
+                    ),
+                    'convert_webp_gif_method'     => array(
+                        'type'    => 'int',
+                        'label'   => __( 'gif2webp 方法', 'libre-compress' ),
+                        'flag'    => 'gif2webp -m',
+                        'min'     => 0,
+                        'max'     => 6,
+                        'default' => 4,
+                        'desc'    => __( 'GIF 转 WebP 单独用这一档，和上面的 cwebp 方法互不影响。', 'libre-compress' ),
+                    ),
+                    'convert_webp_alpha_quality'  => array(
+                        'type'    => 'int',
+                        'label'   => __( '透明通道质量', 'libre-compress' ),
+                        'flag'    => 'cwebp -alpha_q',
+                        'min'     => 0,
+                        'max'     => 100,
+                        'default' => 100,
+                        'desc'    => __( '100 为透明通道无损。GIF / APNG 转 WebP 时透明通道由各自工具处理。', 'libre-compress' ),
+                    ),
+                    'convert_webp_preset'         => array(
+                        'type'    => 'choice',
+                        'label'   => __( '内容预设', 'libre-compress' ),
+                        'flag'    => 'cwebp -preset',
+                        'choices' => array(
+                            'default' => __( '默认', 'libre-compress' ),
+                            'photo'   => __( '照片', 'libre-compress' ),
+                            'picture' => __( '室内人像', 'libre-compress' ),
+                            'drawing' => __( '绘图 / 线稿', 'libre-compress' ),
+                            'icon'    => __( '图标 / 小彩图', 'libre-compress' ),
+                            'text'    => __( '文字截图', 'libre-compress' ),
+                        ),
+                        'default' => 'default',
+                        'desc'    => __( '只对 PNG / JPG 转 WebP 生效，GIF 与 APNG 不走 cwebp。', 'libre-compress' ),
+                    ),
+                    'convert_webp_exact'          => array(
+                        'type'    => 'bool',
+                        'label'   => __( '保留透明区域颜色', 'libre-compress' ),
+                        'flag'    => 'cwebp -exact',
+                        'default' => false,
+                        'desc'    => __( '保留全透明像素的 RGB，体积约多 16%。', 'libre-compress' ),
+                    ),
+                    'convert_webp_segments'       => array(
+                        'type'     => 'int',
+                        'label'    => __( '分区数量', 'libre-compress' ),
+                        'flag'     => 'cwebp -segments',
+                        'min'      => 1,
+                        'max'      => 4,
+                        'default'  => 4,
+                        'advanced' => true,
+                        'desc'     => __( '把图切成几块分别量化，4 最均匀也最慢。', 'libre-compress' ),
+                    ),
+                    'convert_webp_sns'            => array(
+                        'type'     => 'int',
+                        'label'    => __( '空间噪点整形', 'libre-compress' ),
+                        'flag'     => 'cwebp -sns',
+                        'min'      => 0,
+                        'max'      => 100,
+                        'default'  => 50,
+                        'advanced' => true,
+                        'desc'     => __( '把量化误差藏进纹理里，0 关闭、100 最强。', 'libre-compress' ),
+                    ),
+                    'convert_webp_filter'         => array(
+                        'type'     => 'int',
+                        'label'    => __( '滤波强度', 'libre-compress' ),
+                        'flag'     => 'cwebp -f',
+                        'min'      => 0,
+                        'max'      => 100,
+                        'default'  => 60,
+                        'advanced' => true,
+                        'desc'     => __( '编码前先平滑画面，0 关闭、100 最强。', 'libre-compress' ),
+                    ),
+                    'convert_webp_sharpness'      => array(
+                        'type'     => 'int',
+                        'label'    => __( '滤波锐度', 'libre-compress' ),
+                        'flag'     => 'cwebp -sharpness',
+                        'min'      => 0,
+                        'max'      => 7,
+                        'default'  => 0,
+                        'advanced' => true,
+                        'desc'     => __( '0 最锐、7 最柔。', 'libre-compress' ),
+                    ),
+                    'convert_webp_sharp_yuv'      => array(
+                        'type'     => 'bool',
+                        'label'    => __( '锐利色彩转换', 'libre-compress' ),
+                        'flag'     => 'cwebp -sharp_yuv',
+                        'default'  => false,
+                        'advanced' => true,
+                        'desc'     => __( 'RGB 转 YUV 时用更准的算法，红色和暗部更干净。', 'libre-compress' ),
+                    ),
+                ),
+            ),
+            'convert_avif'     => array(
+                'title'  => __( '格式转换：输出 AVIF', 'libre-compress' ),
+                'note'   => __( 'PNG / JPG 与静态 GIF 走 avifenc，动画 GIF 与 APNG 走 FFmpeg。动图只用质量与速度。', 'libre-compress' ),
+                'params' => array(
+                    'convert_avif_mode'          => self::mode_param(),
+                    'convert_avif_quality'       => array(
+                        'type'    => 'int',
+                        'label'   => __( '有损质量', 'libre-compress' ),
+                        'flag'    => 'avifenc -q / FFmpeg -crf',
+                        'min'     => 0,
+                        'max'     => 100,
+                        'default' => 80,
+                        'desc'    => __( '100 为无损，0 最省体积。', 'libre-compress' ),
+                    ),
+                    'convert_avif_alpha_quality' => array(
+                        'type'    => 'int',
+                        'label'   => __( '透明通道质量', 'libre-compress' ),
+                        'flag'    => 'avifenc --qalpha',
+                        'min'     => 0,
+                        'max'     => 100,
+                        'default' => 80,
+                        'desc'    => __( '100 为透明通道无损。动图的透明通道由 FFmpeg 固定无损。', 'libre-compress' ),
+                    ),
+                    'convert_avif_speed'         => array(
+                        'type'    => 'int',
+                        'label'   => __( '速度', 'libre-compress' ),
+                        'flag'    => 'avifenc -s / FFmpeg -cpu-used',
+                        'min'     => 0,
+                        'max'     => 10,
+                        'default' => 6,
+                        'desc'    => __( '0 最慢最小、10 最快最大。动图最高只到 8。', 'libre-compress' ),
+                    ),
+                    'convert_avif_chroma'        => array(
+                        'type'    => 'choice',
+                        'label'   => __( '色度抽样', 'libre-compress' ),
+                        'flag'    => 'avifenc -y',
+                        'choices' => array(
+                            'auto' => __( '自动（按输入决定）', 'libre-compress' ),
+                            '444'  => __( '4:4:4（色彩最准）', 'libre-compress' ),
+                            '422'  => __( '4:2:2（横向减半）', 'libre-compress' ),
+                            '420'  => __( '4:2:0 + sharpyuv（最小，边缘略糊）', 'libre-compress' ),
+                        ),
+                        'default' => 'auto',
+                        'desc'    => __( '只有有损有效。', 'libre-compress' ),
+                    ),
+                    'convert_avif_depth'         => array(
+                        'type'    => 'choice',
+                        'label'   => __( '位深', 'libre-compress' ),
+                        'flag'    => 'avifenc -d',
+                        'choices' => array(
+                            '8'  => __( '8 位（默认，浏览器都能显示）', 'libre-compress' ),
+                            '10' => __( '10 位（渐变更平滑，体积略大）', 'libre-compress' ),
+                            '12' => __( '12 位（几乎用不到）', 'libre-compress' ),
+                        ),
+                        'default' => '8',
+                        'desc'    => __( '位深越高渐变越平滑，但体积更大、老设备可能不支持。', 'libre-compress' ),
+                    ),
+                    'convert_avif_jobs'          => array(
+                        'type'    => 'int',
+                        'label'   => __( '并行线程数', 'libre-compress' ),
+                        'flag'    => 'avifenc -j',
+                        'min'     => 1,
+                        'max'     => 16,
+                        'default' => 4,
+                        'desc'    => __( '同时开几个编码线程，开太多会和网站抢 CPU。', 'libre-compress' ),
+                    ),
+                ),
+            ),
+            'convert_jxl'      => array(
+                'title'  => __( '格式转换：输出 JPEG XL', 'libre-compress' ),
+                'note'   => __( '静态 GIF、APNG 都由 cjxl 直读，图像与动画共用这一组参数。', 'libre-compress' ),
+                'params' => array(
+                    'convert_jxl_mode'    => self::mode_param(),
+                    'convert_jxl_quality' => array(
+                        'type'    => 'int',
+                        'label'   => __( '有损质量', 'libre-compress' ),
+                        'flag'    => 'cjxl -q',
+                        'min'     => 0,
+                        'max'     => 100,
+                        'default' => 80,
+                        'desc'    => __( '100 等于数学无损，90 已经是视觉无损。', 'libre-compress' ),
+                    ),
+                    'convert_jxl_effort'  => array(
+                        'type'    => 'int',
+                        'label'   => __( '压缩级别', 'libre-compress' ),
+                        'flag'    => 'cjxl -e',
+                        'min'     => 1,
+                        'max'     => 10,
+                        'default' => 7,
+                        'desc'    => __( '级别越高越慢、同样画质体积越小。', 'libre-compress' ),
+                    ),
+                ),
+            ),
+        );
 
-    public static function normalize_speed( string $key, $value ): int {
-        return self::normalize_int( $key, $value, self::SPEED_SETTINGS );
-    }
-
-    public static function tool_speed( string $key ): int {
-        $settings = get_option( 'libre_compress_tools', array() );
-        return self::normalize_speed( $key, $settings[ $key ] ?? null );
+        return $groups;
     }
 
     /**
-     * 读取值域由工具决定的数值参数
+     * 把分组表拍平成 键名 => 参数定义
      *
-     * @param string $key 设置键名
+     * @return array<string,array>
+     */
+    public static function param_map(): array {
+        static $map = null;
+
+        if ( null !== $map ) {
+            return $map;
+        }
+
+        $map = array();
+
+        foreach ( self::param_groups() as $group_id => $group ) {
+            foreach ( $group['params'] as $key => $param ) {
+                $param['group'] = $group_id;
+                $map[ $key ]    = $param;
+            }
+        }
+
+        return $map;
+    }
+
+    /**
+     * 全部参数的默认值
+     *
+     * @return array
+     */
+    public static function defaults(): array {
+        $defaults = array();
+
+        foreach ( self::param_map() as $key => $param ) {
+            $defaults[ $key ] = $param['default'];
+        }
+
+        return $defaults;
+    }
+
+    /**
+     * 按定义把单个值夹到合法范围
+     *
+     * 非法输入（数组、对象、非数字、空值）一律回落到默认值，绝不把可疑数据带进命令行。
+     *
+     * @param array $param 参数定义
+     * @param mixed $value 原始值
+     * @return mixed
+     */
+    public static function normalize_param( array $param, $value ) {
+        switch ( $param['type'] ) {
+            case 'int':
+                if ( ( ! is_int( $value ) && ! is_string( $value ) ) || ! preg_match( '/^-?\d+$/D', (string) $value ) ) {
+                    return (int) $param['default'];
+                }
+
+                return (int) max( (int) $param['min'], min( (int) $param['max'], (int) $value ) );
+
+            case 'choice':
+                return ( is_string( $value ) && array_key_exists( $value, $param['choices'] ) ) ? $value : $param['default'];
+
+            case 'bool':
+                return isset( $value ) ? ! empty( $value ) : (bool) $param['default'];
+
+            case 'mode':
+                return ( 'lossless' === $value ) ? 'lossless' : 'lossy';
+        }
+
+        return $param['default'];
+    }
+
+    /**
+     * 整表归一化
+     *
+     * @param array $input 表单或选项原始值
+     * @return array
+     */
+    public static function normalize_all( array $input ): array {
+        $normalized = array();
+
+        foreach ( self::param_map() as $key => $param ) {
+            $normalized[ $key ] = self::normalize_param( $param, $input[ $key ] ?? null );
+        }
+
+        // pngquant 的质量区间必须下限不大于上限，填反了直接对调，别让它悄悄压成最差质量。
+        if ( $normalized['png_quality_min'] > $normalized['png_quality_max'] ) {
+            $swap                          = $normalized['png_quality_min'];
+            $normalized['png_quality_min'] = $normalized['png_quality_max'];
+            $normalized['png_quality_max'] = $swap;
+        }
+
+        return $normalized;
+    }
+
+    /**
+     * 读取单个已归一化的参数
+     *
+     * @param string $key 参数键名
+     * @return mixed
+     */
+    public static function param( string $key ) {
+        $map = self::param_map();
+
+        if ( ! isset( $map[ $key ] ) ) {
+            return null;
+        }
+
+        $settings = get_option( 'libre_compress_tools', array() );
+        $settings = is_array( $settings ) ? $settings : array();
+
+        return self::normalize_param( $map[ $key ], $settings[ $key ] ?? null );
+    }
+
+    /**
+     * 读取整数参数
+     *
+     * @param string $key 参数键名
      * @return int
      */
-    public static function tool_limit( string $key ): int {
-        $settings = get_option( 'libre_compress_tools', array() );
-        return self::normalize_int( $key, $settings[ $key ] ?? null, self::LIMIT_SETTINGS );
+    public static function param_int( string $key ): int {
+        return (int) self::param( $key );
     }
 
     /**
-     * 读取枚举型参数
+     * 读取枚举参数
      *
-     * @param string $key 设置键名
-     * @return string 合法值之一
+     * @param string $key 参数键名
+     * @return string
      */
-    public static function tool_choice( string $key ): string {
-        $settings = get_option( 'libre_compress_tools', array() );
-        $value    = $settings[ $key ] ?? '';
+    public static function param_choice( string $key ): string {
+        $value = self::param( $key );
 
-        return in_array( $value, self::CHOICE_SETTINGS[ $key ], true ) ? $value : self::CHOICE_SETTINGS[ $key ][0];
+        return is_string( $value ) ? $value : '';
     }
 
     /**
-     * 读取开关型参数
+     * 读取开关参数
      *
-     * @param string $key 设置键名
+     * @param string $key 参数键名
      * @return bool
      */
-    public static function tool_flag( string $key ): bool {
-        $settings = get_option( 'libre_compress_tools', array() );
-
-        return isset( $settings[ $key ] ) ? ! empty( $settings[ $key ] ) : self::FLAG_SETTINGS[ $key ];
+    public static function param_flag( string $key ): bool {
+        return (bool) self::param( $key );
     }
 
     /**
-     * 读取压缩模式
+     * 读取某条压缩路径的压缩模式
      *
-     * @param string $prefix 路径前缀，例如 jpeg、webp、convert_webp
+     * @param string $group 分组键名，例如 jpeg、webp、convert_webp
      * @return string lossy|lossless
      */
-    public static function tool_mode( string $prefix ): string {
-        $settings = get_option( 'libre_compress_tools', array() );
-        $value    = $settings[ $prefix . '_mode' ] ?? 'lossy';
+    public static function param_mode( string $group ): string {
+        $value = self::param( $group . '_mode' );
 
         return 'lossless' === $value ? 'lossless' : 'lossy';
     }
 
-    /**
-     * 读取压缩质量
-     *
-     * @param string $key     质量设置键名
-     * @param int    $default 默认值
-     * @return int 0-100
-     */
-    public static function tool_quality( string $key, int $default = 80 ): int {
-        $settings = get_option( 'libre_compress_tools', array() );
-
-        return max( 0, min( 100, absint( $settings[ $key ] ?? $default ) ) );
-    }
-
-    private $current_tab = 'general';
+    /* ---------------------------------------------------------------------
+     * 基本设置
+     * ------------------------------------------------------------------- */
 
     /**
      * 归一化原图备份保留时长
@@ -351,45 +987,17 @@ class Libre_Compress_Settings {
         return $sanitized;
     }
 
+    /**
+     * 保存压缩参数
+     *
+     * 表单一共提交哪些字段就校验哪些字段，全部按参数总表夹取；
+     * 既不做缺省补全以外的手工拼装，也不给任何字段留“漏了就归零”的口子。
+     *
+     * @param mixed $input 表单提交值
+     * @return array
+     */
     public function sanitize_tools_settings( $input ) {
-        $input     = is_array( $input ) ? $input : array();
-        $sanitized = array();
-
-        foreach ( self::MODE_SETTINGS as $prefix ) {
-            $key              = $prefix . '_mode';
-            $sanitized[ $key ] = isset( $input[ $key ] ) && in_array( $input[ $key ], array( 'lossy', 'lossless' ), true )
-                ? $input[ $key ]
-                : 'lossy';
-        }
-
-        foreach ( self::QUALITY_SETTINGS as $key => $default ) {
-            $sanitized[ $key ] = max( 0, min( 100, isset( $input[ $key ] ) ? absint( $input[ $key ] ) : $default ) );
-        }
-
-        foreach ( self::SPEED_SETTINGS as $key => $range ) {
-            $sanitized[ $key ] = self::normalize_speed( $key, $input[ $key ] ?? null );
-        }
-
-        foreach ( self::LIMIT_SETTINGS as $key => $range ) {
-            $sanitized[ $key ] = self::normalize_int( $key, $input[ $key ] ?? null, self::LIMIT_SETTINGS );
-        }
-
-        foreach ( self::CHOICE_SETTINGS as $key => $allowed ) {
-            $sanitized[ $key ] = isset( $input[ $key ] ) && in_array( $input[ $key ], $allowed, true )
-                ? $input[ $key ]
-                : $allowed[0];
-        }
-
-        foreach ( self::FLAG_SETTINGS as $key => $default ) {
-            $sanitized[ $key ] = ! empty( $input[ $key ] );
-        }
-
-        $sanitized['apng_lossless'] = ! empty( $input['apng_lossless'] );
-        $sanitized['svg_preset']    = isset( $input['svg_preset'] ) && in_array( $input['svg_preset'], array( 'default', 'safe' ), true )
-            ? $input['svg_preset']
-            : 'default';
-
-        return $sanitized;
+        return self::normalize_all( is_array( $input ) ? $input : array() );
     }
 
     public function render_settings_page() {
@@ -710,8 +1318,6 @@ class Libre_Compress_Settings {
     }
 
     private function render_tools_tab() {
-        $options = get_option( 'libre_compress_tools', array() );
-
         $compressor       = libre_compress()->compressor;
         $output_processor = libre_compress()->output_processor;
         $tools            = $compressor->get_tools();
@@ -722,6 +1328,7 @@ class Libre_Compress_Settings {
         $all_tools = array(
             array( 'name' => 'jpegoptim', 'tool' => null, 'path' => $output_processor->find_local_tool( 'jpegoptim' ), 'url' => 'https://github.com/tjko/jpegoptim' ),
             array( 'name' => 'cjpegli', 'tool' => null, 'path' => $output_processor->find_local_tool( 'cjpegli' ), 'url' => 'https://github.com/google/jpegli' ),
+            array( 'name' => 'djpegli', 'tool' => null, 'path' => $output_processor->find_local_tool( 'djpegli' ), 'url' => 'https://github.com/google/jpegli' ),
             array( 'name' => 'pngquant', 'tool' => $tools['pngquant'] ),
             array( 'name' => 'oxipng', 'tool' => $tools['oxipng'] ),
             array( 'name' => 'gifsicle', 'tool' => $tools['gifsicle'] ),
@@ -803,7 +1410,7 @@ class Libre_Compress_Settings {
         </table>
 
         <p class="description" style="max-width: 900px; margin-top: 10px;">
-            <?php esc_html_e( '安装方式：① 把可执行文件直接放进 /wp-content/LibreCompress-bin 目录；② 把工具所在文件夹加入系统 Path 环境变量；③ 使用包管理器安装。', 'libre-compress' ); ?>
+            <?php esc_html_e( '安装方式：① 把可执行文件直接放进 /wp-content/LibreCompress-bin 目录；② 把工具所在文件夹加入系统 Path 环境变量；③ 使用包管理器安装。用 jpegli 必须同时放 cjpegli 和 djpegli 两个文件。', 'libre-compress' ); ?>
         </p>
 
         <h2 style="margin-top: 30px;"><?php esc_html_e( '路径支持状态', 'libre-compress' ); ?></h2>
@@ -837,139 +1444,45 @@ class Libre_Compress_Settings {
 
         <hr>
 
-        <h2><?php esc_html_e( '压缩参数设置', 'libre-compress' ); ?></h2>
+        <h2><?php esc_html_e( '压缩参数', 'libre-compress' ); ?></h2>
+        <p class="description" style="max-width: 900px;">
+            <?php esc_html_e( '每条压缩路径的参数都在下面单独设置，输入框后面标的是它实际传给哪个工具的哪个参数，范围就是工具本身认可的范围：填超了保存时会自动夹到边界，不会静默改成别的值。改动只影响之后的压缩，已经压好的图片不会自动重压。', 'libre-compress' ); ?>
+        </p>
         <form method="post" action="options.php">
             <?php settings_fields( 'libre_compress_tools_group' ); ?>
 
-            <h3 style="margin-top: 30px;"><?php esc_html_e( 'JPEG 同格式压缩', 'libre-compress' ); ?></h3>
-            <table class="form-table">
-                <?php $this->render_mode_field( 'jpeg' ); ?>
-                <?php $this->render_quality_field( 'jpeg_quality', __( '有损质量', 'libre-compress' ), 80, __( '有损压缩优先用 jpegli，没装 jpegli 时自动用 jpegoptim；无损压缩始终用 jpegoptim。', 'libre-compress' ) ); ?>
-            </table>
-
-            <h3><?php esc_html_e( 'PNG / APNG 同格式压缩', 'libre-compress' ); ?></h3>
-            <table class="form-table">
-                <?php $this->render_mode_field( 'png' ); ?>
-                <?php $this->render_quality_field( 'png_lossy_quality', __( '有损质量', 'libre-compress' ), 80, __( '仅 pngquant 有损压缩有效。', 'libre-compress' ) ); ?>
-                <?php $this->render_speed_field( 'pngquant_speed', __( 'pngquant 有损速度', 'libre-compress' ), $options ); ?>
-                <?php $this->render_speed_field( 'oxipng_level', __( 'oxipng 无损级别', 'libre-compress' ), $options ); ?>
-                <tr>
-                    <th scope="row"><?php esc_html_e( 'APNG 无损压缩', 'libre-compress' ); ?></th>
-                    <td>
-                        <label style="display:block;">
-                            <input type="checkbox" name="libre_compress_tools[apng_lossless]" value="1" <?php checked( $options['apng_lossless'] ?? true ); ?>>
-                            <?php esc_html_e( 'APNG 一律自动无损压缩', 'libre-compress' ); ?>
-                        </label>
-                        <p class="description"><?php esc_html_e( '有损 PNG 靠 pngquant 逐帧各自挑 256 色调色板，APNG 这样处理会闪烁，所以 APNG 只走 oxipng 的无损通道。取消勾选后，PNG 为有损时 APNG 原样保留不压；PNG 为无损时本来就走 oxipng，与本项无关。', 'libre-compress' ); ?></p>
-                    </td>
-                </tr>
-            </table>
-
-            <h3><?php esc_html_e( 'GIF 同格式压缩', 'libre-compress' ); ?></h3>
-            <table class="form-table">
-                <?php $this->render_mode_field( 'gif' ); ?>
-                <?php $this->render_quality_field( 'gif_quality', __( '有损质量', 'libre-compress' ), 60, __( '仅 gifsicle 有损压缩有效：数值越低画质越差、文件越小。', 'libre-compress' ) ); ?>
-                <?php $this->render_limit_field( 'gif_colors', __( '调色板颜色数', 'libre-compress' ), __( 'gifsicle 的 --colors，GIF 最多 256 色；调低后体积更小但会掉色。', 'libre-compress' ) ); ?>
-                <?php $this->render_speed_field( 'gifsicle_level', __( 'gifsicle 优化级别', 'libre-compress' ), $options ); ?>
-            </table>
-
-            <h3><?php esc_html_e( 'WebP 同格式压缩（静图与动图）', 'libre-compress' ); ?></h3>
-            <table class="form-table">
-                <?php $this->render_mode_field( 'webp' ); ?>
-                <?php $this->render_quality_field( 'webp_quality', __( '有损质量', 'libre-compress' ), 80, __( '静图用 cwebp，动图用 FFmpeg。', 'libre-compress' ) ); ?>
-                <?php $this->render_speed_field( 'webp_method', __( 'cwebp / FFmpeg 有损方法', 'libre-compress' ), $options ); ?>
-                <?php $this->render_speed_field( 'webp_lossless_level', __( 'cwebp / FFmpeg 无损级别', 'libre-compress' ), $options, __( '动图按比例换算成 FFmpeg 的 0-6 档。', 'libre-compress' ) ); ?>
-            </table>
-            <details style="margin: -6px 0 18px;">
-                <summary style="cursor: pointer; color: #2271b1;"><?php esc_html_e( '高级参数（仅静图）', 'libre-compress' ); ?></summary>
+            <?php foreach ( self::param_groups() as $group ) : ?>
+                <h3 style="margin-top: 28px;"><?php echo esc_html( $group['title'] ); ?></h3>
+                <?php if ( ! empty( $group['note'] ) ) : ?>
+                    <p class="description" style="max-width: 900px;"><?php echo esc_html( $group['note'] ); ?></p>
+                <?php endif; ?>
                 <table class="form-table">
                     <?php
-                    $this->render_choice_field(
-                        'webp_preset',
-                        __( '内容预设', 'libre-compress' ),
-                        array(
-                            'default' => __( '默认', 'libre-compress' ),
-                            'photo'   => __( '照片', 'libre-compress' ),
-                            'picture' => __( '图片（室内人像）', 'libre-compress' ),
-                            'drawing' => __( '绘图 / 线稿', 'libre-compress' ),
-                            'icon'    => __( '图标 / 小彩图', 'libre-compress' ),
-                            'text'    => __( '文字截图', 'libre-compress' ),
-                        ),
-                        __( 'cwebp -preset，按内容类型微调滤镜与分区参数。动图不走这里：FFmpeg 的 preset 会把无损与压缩方法一起覆盖掉。', 'libre-compress' )
-                    );
-                    ?>
-                    <?php $this->render_quality_field( 'webp_alpha_quality', __( '透明通道质量', 'libre-compress' ), 100, __( 'cwebp 的 -alpha_q，100 为透明通道无损。动图的 FFmpeg 编码器没有这个开关。', 'libre-compress' ) ); ?>
-                    <?php $this->render_flag_field( 'webp_exact', __( '透明区域颜色', 'libre-compress' ), __( '保留透明区域的 RGB 原值（cwebp -exact），会给透明图带来约 16% 的体积开销；动图不支持。', 'libre-compress' ) ); ?>
-                </table>
-            </details>
+                    $advanced = array();
 
-            <h3><?php esc_html_e( 'AVIF 同格式压缩（静图与动图）', 'libre-compress' ); ?></h3>
-            <table class="form-table">
-                <?php $this->render_mode_field( 'avif' ); ?>
-                <?php $this->render_quality_field( 'avif_quality', __( '有损质量', 'libre-compress' ), 80, __( '静图用 avifenc，动图用 FFmpeg。', 'libre-compress' ) ); ?>
-                <?php $this->render_speed_field( 'avif_speed', __( 'avifenc / FFmpeg 速度', 'libre-compress' ), $options, __( '动图的 FFmpeg 最高只到 8，超过按 8 处理。', 'libre-compress' ) ); ?>
-            </table>
-            <details style="margin: -6px 0 18px;">
-                <summary style="cursor: pointer; color: #2271b1;"><?php esc_html_e( '高级参数（仅静图）', 'libre-compress' ); ?></summary>
-                <table class="form-table">
-                    <?php $this->render_quality_field( 'avif_alpha_quality', __( '透明通道质量', 'libre-compress' ), 80, __( 'avifenc 的 --qalpha，100 为透明通道无损。以前不传时它直接跟随颜色质量，现在独立设置。', 'libre-compress' ) ); ?>
-                    <?php
-                    $this->render_choice_field(
-                        'avif_chroma',
-                        __( '色度抽样', 'libre-compress' ),
-                        array(
-                            'auto' => __( '自动（PNG 输出 4:4:4，JPEG 跟随原图）', 'libre-compress' ),
-                            '444'  => __( '4:4:4（最清晰，文件最大）', 'libre-compress' ),
-                            '420'  => __( '4:2:0 + sharpyuv（更小，边缘颜色略糊）', 'libre-compress' ),
-                        ),
-                        __( '只对有损有效。动图由 FFmpeg 编码，这一项不生效。', 'libre-compress' )
-                    );
+                    foreach ( $group['params'] as $key => $param ) {
+                        if ( ! empty( $param['advanced'] ) ) {
+                            $advanced[ $key ] = $param;
+                            continue;
+                        }
+
+                        $this->render_param_row( $key, $param );
+                    }
                     ?>
                 </table>
-            </details>
-
-            <h3><?php esc_html_e( 'JPEG XL 同格式压缩（静图与动图）', 'libre-compress' ); ?></h3>
-            <table class="form-table">
-                <?php $this->render_mode_field( 'jxl' ); ?>
-                <?php $this->render_quality_field( 'jxl_quality', __( '有损质量', 'libre-compress' ), 80 ); ?>
-                <?php $this->render_speed_field( 'jxl_effort', __( 'cjxl 压缩级别', 'libre-compress' ), $options ); ?>
-            </table>
-
-            <h3><?php esc_html_e( 'SVG 同格式压缩', 'libre-compress' ); ?></h3>
-            <table class="form-table">
-                <tr>
-                    <th scope="row"><label for="libre-compress-svg-preset"><?php esc_html_e( 'oxvg 优化预设', 'libre-compress' ); ?></label></th>
-                    <td>
-                        <select id="libre-compress-svg-preset" name="libre_compress_tools[svg_preset]">
-                            <option value="default" <?php selected( $options['svg_preset'] ?? 'default', 'default' ); ?>><?php esc_html_e( '常规（default）', 'libre-compress' ); ?></option>
-                            <option value="safe" <?php selected( $options['svg_preset'] ?? 'default', 'safe' ); ?>><?php esc_html_e( '保守（safe，几乎不改视觉）', 'libre-compress' ); ?></option>
-                        </select>
-                    </td>
-                </tr>
-            </table>
-
-            <h3><?php esc_html_e( '格式转换：输出 WebP', 'libre-compress' ); ?></h3>
-            <table class="form-table">
-                <?php $this->render_mode_field( 'convert_webp' ); ?>
-                <?php $this->render_quality_field( 'convert_webp_quality', __( '有损质量', 'libre-compress' ), 80, __( 'PNG / JPG 用 cwebp，GIF 用 gif2webp，APNG 用 FFmpeg。', 'libre-compress' ) ); ?>
-                <?php $this->render_speed_field( 'convert_webp_method', __( 'cwebp / FFmpeg 有损方法', 'libre-compress' ), $options ); ?>
-                <?php $this->render_speed_field( 'convert_webp_lossless_level', __( 'cwebp / FFmpeg 无损级别', 'libre-compress' ), $options ); ?>
-                <?php $this->render_speed_field( 'convert_webp_gif_method', __( 'gif2webp 方法', 'libre-compress' ), $options ); ?>
-            </table>
-
-            <h3><?php esc_html_e( '格式转换：输出 AVIF', 'libre-compress' ); ?></h3>
-            <table class="form-table">
-                <?php $this->render_mode_field( 'convert_avif' ); ?>
-                <?php $this->render_quality_field( 'convert_avif_quality', __( '有损质量', 'libre-compress' ), 80, __( '静态图用 avifenc，动图用 FFmpeg。', 'libre-compress' ) ); ?>
-                <?php $this->render_speed_field( 'convert_avif_speed', __( 'avifenc / FFmpeg 速度', 'libre-compress' ), $options, __( '动图的 FFmpeg 最高只到 8，超过按 8 处理。', 'libre-compress' ) ); ?>
-            </table>
-
-            <h3><?php esc_html_e( '格式转换：输出 JPEG XL', 'libre-compress' ); ?></h3>
-            <table class="form-table">
-                <?php $this->render_mode_field( 'convert_jxl' ); ?>
-                <?php $this->render_quality_field( 'convert_jxl_quality', __( '有损质量', 'libre-compress' ), 80 ); ?>
-                <?php $this->render_speed_field( 'convert_jxl_effort', __( 'cjxl 压缩级别', 'libre-compress' ), $options ); ?>
-            </table>
+                <?php if ( ! empty( $advanced ) ) : ?>
+                    <details style="margin: -6px 0 18px;">
+                        <summary style="cursor: pointer; color: #2271b1;"><?php esc_html_e( '高级参数（多数情况不用动）', 'libre-compress' ); ?></summary>
+                        <table class="form-table">
+                            <?php
+                            foreach ( $advanced as $key => $param ) {
+                                $this->render_param_row( $key, $param );
+                            }
+                            ?>
+                        </table>
+                    </details>
+                <?php endif; ?>
+            <?php endforeach; ?>
 
             <?php submit_button(); ?>
         </form>
@@ -977,142 +1490,66 @@ class Libre_Compress_Settings {
     }
 
     /**
-     * 渲染压缩模式单选
+     * 按参数定义渲染一行设置
      *
-     * @param string $prefix 路径前缀
+     * @param string $key   参数键名
+     * @param array  $param 参数定义
      */
-    private function render_mode_field( string $prefix ): void {
-        $key   = $prefix . '_mode';
-        $value = self::tool_mode( $prefix );
+    private function render_param_row( string $key, array $param ): void {
+        $value = self::param( $key );
+        $id    = 'libre-compress-' . $key;
         ?>
         <tr>
-            <th scope="row"><?php esc_html_e( '压缩模式', 'libre-compress' ); ?></th>
+            <th scope="row"><label for="<?php echo esc_attr( $id ); ?>"><?php echo esc_html( $param['label'] ); ?></label></th>
             <td>
-                <label>
-                    <input type="radio" name="libre_compress_tools[<?php echo esc_attr( $key ); ?>]" value="lossy" <?php checked( $value, 'lossy' ); ?>>
-                    <?php esc_html_e( '有损压缩', 'libre-compress' ); ?>
-                </label>
-                &nbsp;&nbsp;
-                <label>
-                    <input type="radio" name="libre_compress_tools[<?php echo esc_attr( $key ); ?>]" value="lossless" <?php checked( $value, 'lossless' ); ?>>
-                    <?php esc_html_e( '无损压缩', 'libre-compress' ); ?>
-                </label>
-            </td>
-        </tr>
-        <?php
-    }
-
-    /**
-     * 渲染值域由工具决定的数值滑块
-     *
-     * @param string $key         设置键名
-     * @param string $label       显示名称
-     * @param string $description 补充说明
-     */
-    private function render_limit_field( string $key, string $label, string $description ): void {
-        list( $min, $max, $default ) = self::LIMIT_SETTINGS[ $key ];
-        $value = self::tool_limit( $key );
-        ?>
-        <tr>
-            <th scope="row"><label for="libre-compress-<?php echo esc_attr( $key ); ?>"><?php echo esc_html( $label ); ?></label></th>
-            <td>
-                <input type="range" id="libre-compress-<?php echo esc_attr( $key ); ?>" name="libre_compress_tools[<?php echo esc_attr( $key ); ?>]" value="<?php echo esc_attr( $value ); ?>" min="<?php echo esc_attr( $min ); ?>" max="<?php echo esc_attr( $max ); ?>" step="1" oninput="this.nextElementSibling.value = this.value">
-                <output><?php echo esc_html( $value ); ?></output>
-                <p class="description"><?php
-                    /* translators: 1: 最小取值，2: 最大取值，3: 默认值。 */
-                    echo esc_html( sprintf( __( '范围 %1$d-%2$d，默认 %3$d。', 'libre-compress' ), $min, $max, $default ) . $description );
-                ?></p>
-            </td>
-        </tr>
-        <?php
-    }
-
-    /**
-     * 渲染枚举下拉框
-     *
-     * @param string   $key         设置键名
-     * @param string   $label       显示名称
-     * @param string[] $choices     取值 => 显示名称
-     * @param string   $description 补充说明
-     */
-    private function render_choice_field( string $key, string $label, array $choices, string $description = '' ): void {
-        $value = self::tool_choice( $key );
-        ?>
-        <tr>
-            <th scope="row"><label for="libre-compress-<?php echo esc_attr( $key ); ?>"><?php echo esc_html( $label ); ?></label></th>
-            <td>
-                <select id="libre-compress-<?php echo esc_attr( $key ); ?>" name="libre_compress_tools[<?php echo esc_attr( $key ); ?>]">
-                    <?php foreach ( $choices as $choice => $text ) : ?>
-                        <option value="<?php echo esc_attr( $choice ); ?>" <?php selected( $value, $choice ); ?>><?php echo esc_html( $text ); ?></option>
-                    <?php endforeach; ?>
-                </select>
-                <?php if ( '' !== $description ) : ?>
-                    <p class="description"><?php echo esc_html( $description ); ?></p>
+                <?php if ( 'mode' === $param['type'] ) : ?>
+                    <label>
+                        <input type="radio" name="libre_compress_tools[<?php echo esc_attr( $key ); ?>]" value="lossy" <?php checked( $value, 'lossy' ); ?>>
+                        <?php esc_html_e( '有损压缩', 'libre-compress' ); ?>
+                    </label>
+                    &nbsp;&nbsp;
+                    <label>
+                        <input type="radio" name="libre_compress_tools[<?php echo esc_attr( $key ); ?>]" value="lossless" <?php checked( $value, 'lossless' ); ?>>
+                        <?php esc_html_e( '无损压缩', 'libre-compress' ); ?>
+                    </label>
+                <?php elseif ( 'choice' === $param['type'] ) : ?>
+                    <select id="<?php echo esc_attr( $id ); ?>" name="libre_compress_tools[<?php echo esc_attr( $key ); ?>]">
+                        <?php foreach ( $param['choices'] as $choice => $text ) : ?>
+                            <option value="<?php echo esc_attr( $choice ); ?>" <?php selected( (string) $value, (string) $choice ); ?>><?php echo esc_html( $text ); ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                <?php elseif ( 'bool' === $param['type'] ) : ?>
+                    <input type="hidden" name="libre_compress_tools[<?php echo esc_attr( $key ); ?>]" value="0">
+                    <label>
+                        <input type="checkbox" id="<?php echo esc_attr( $id ); ?>" name="libre_compress_tools[<?php echo esc_attr( $key ); ?>]" value="1" <?php checked( (bool) $value ); ?>>
+                        <?php echo esc_html( $param['desc'] ); ?>
+                    </label>
+                <?php else : ?>
+                    <input type="number" id="<?php echo esc_attr( $id ); ?>" name="libre_compress_tools[<?php echo esc_attr( $key ); ?>]" value="<?php echo esc_attr( $value ); ?>" min="<?php echo esc_attr( $param['min'] ); ?>" max="<?php echo esc_attr( $param['max'] ); ?>" step="1" class="small-text">
                 <?php endif; ?>
-            </td>
-        </tr>
-        <?php
-    }
 
-    /**
-     * 渲染开关
-     *
-     * @param string $key         设置键名
-     * @param string $label       显示名称
-     * @param string $description 补充说明
-     */
-    private function render_flag_field( string $key, string $label, string $description ): void {
-        ?>
-        <tr>
-            <th scope="row"><?php echo esc_html( $label ); ?></th>
-            <td>
-                <label>
-                    <input type="checkbox" name="libre_compress_tools[<?php echo esc_attr( $key ); ?>]" value="1" <?php checked( self::tool_flag( $key ) ); ?>>
-                    <?php echo esc_html( $description ); ?>
-                </label>
-            </td>
-        </tr>
-        <?php
-    }
+                <?php if ( ! empty( $param['flag'] ) ) : ?>
+                    <code style="margin-left: 6px; font-size: 11px;"><?php echo esc_html( $param['flag'] ); ?></code>
+                <?php endif; ?>
 
-    /**
-     * 渲染压缩质量滑块
-     *
-     * @param string $key         设置键名
-     * @param string $label       显示名称
-     * @param int    $default     默认值
-     * @param string $description 补充说明
-     */
-    private function render_quality_field( string $key, string $label, int $default, string $description = '' ): void {
-        $value = self::tool_quality( $key, $default );
-        ?>
-        <tr>
-            <th scope="row"><label for="libre-compress-<?php echo esc_attr( $key ); ?>"><?php echo esc_html( $label ); ?></label></th>
-            <td>
-                <input type="range" id="libre-compress-<?php echo esc_attr( $key ); ?>" name="libre_compress_tools[<?php echo esc_attr( $key ); ?>]" value="<?php echo esc_attr( $value ); ?>" min="0" max="100" oninput="this.nextElementSibling.value = this.value">
-                <output><?php echo esc_html( $value ); ?></output>
-                <p class="description"><?php echo esc_html( __( '0-100，数值越高质量越好，文件越大（仅有损压缩有效）。', 'libre-compress' ) . ( '' !== $description ? ' ' . $description : '' ) ); ?></p>
-            </td>
-        </tr>
-        <?php
-    }
+                <?php if ( 'bool' !== $param['type'] ) : ?>
+                    <p class="description">
+                        <?php
+                        if ( 'int' === $param['type'] ) {
+                            printf(
+                                /* translators: 1: 最小取值，2: 最大取值，3: 默认值 */
+                                esc_html__( '范围 %1$d-%2$d，默认 %3$d。', 'libre-compress' ),
+                                (int) $param['min'],
+                                (int) $param['max'],
+                                (int) $param['default']
+                            );
+                            echo ' ';
+                        }
 
-    private function render_speed_field( string $key, string $label, array $options, string $extra = '' ): void {
-        list( $min, $max, $default ) = self::SPEED_SETTINGS[ $key ];
-        $value = self::normalize_speed( $key, $options[ $key ] ?? null );
-        $description = in_array( $key, array( 'pngquant_speed', 'avif_speed', 'convert_avif_speed' ), true )
-            ? __( '数值越大速度越快，通常文件越大；数值越小压缩越慢，通常文件越小。', 'libre-compress' )
-            : __( '数值越大压缩越慢，通常文件越小；数值越小速度越快，通常文件越大。', 'libre-compress' );
-        ?>
-        <tr>
-            <th scope="row"><label for="libre-compress-<?php echo esc_attr( $key ); ?>"><?php echo esc_html( $label ); ?></label></th>
-            <td>
-                <input type="range" id="libre-compress-<?php echo esc_attr( $key ); ?>" name="libre_compress_tools[<?php echo esc_attr( $key ); ?>]" value="<?php echo esc_attr( $value ); ?>" min="<?php echo esc_attr( $min ); ?>" max="<?php echo esc_attr( $max ); ?>" step="1" oninput="this.nextElementSibling.value = this.value">
-                <output><?php echo esc_html( $value ); ?></output>
-                <p class="description"><?php
-                    /* translators: 1: 最小档位，2: 最大档位，3: 默认档位。 */
-                    echo esc_html( sprintf( __( '范围 %1$d-%2$d，默认 %3$d。', 'libre-compress' ), $min, $max, $default ) . $description . $extra );
-                ?></p>
+                        echo esc_html( $param['desc'] );
+                        ?>
+                    </p>
+                <?php endif; ?>
             </td>
         </tr>
         <?php
@@ -1144,13 +1581,14 @@ class Libre_Compress_Settings {
         $available['gd']       = function_exists( 'imagecreatefromgif' ) && function_exists( 'imagepng' );
 
         // 动图处理用到的 libwebp 与 libavif 附带工具按可执行文件独立判定
-        foreach ( array( 'ffprobe', 'webpmux', 'cjpegli' ) as $helper ) {
+        foreach ( array( 'ffprobe', 'webpmux', 'cjpegli', 'djpegli' ) as $helper ) {
             $available[ $helper ] = false !== $output_processor->find_local_tool( $helper );
         }
 
         $dep_labels = array(
             'jpegoptim' => 'jpegoptim',
             'cjpegli'   => 'cjpegli',
+            'djpegli'   => 'djpegli',
             'pngquant'  => 'pngquant',
             'oxipng'    => 'oxipng',
             'cwebp'     => 'cwebp',
@@ -1167,7 +1605,7 @@ class Libre_Compress_Settings {
         );
 
         $rows_definition = array(
-            array( 'label' => __( 'JPEG 有损压缩', 'libre-compress' ), 'groups' => array( array( 'jpegoptim' ), array( 'cjpegli' ) ) ),
+            array( 'label' => __( 'JPEG 有损压缩', 'libre-compress' ), 'groups' => array( array( 'jpegoptim' ), array( 'cjpegli', 'djpegli' ) ) ),
             array( 'label' => __( 'JPEG 无损压缩', 'libre-compress' ), 'groups' => array( array( 'jpegoptim' ) ) ),
             array( 'label' => __( 'PNG 有损压缩', 'libre-compress' ), 'groups' => array( array( 'pngquant' ) ) ),
             array( 'label' => __( 'PNG / APNG 无损压缩', 'libre-compress' ), 'groups' => array( array( 'oxipng' ) ) ),

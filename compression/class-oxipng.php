@@ -54,16 +54,27 @@ class Libre_Compress_Oxipng extends Libre_Compress_Tool_Base {
     protected function build_command_chain( string $file_path, array $options ): array {
         $executable = $this->get_executable_path();
 
-        $level = Libre_Compress_Settings::tool_speed( 'oxipng_level' );
+        $level = Libre_Compress_Settings::param_int( 'oxipng_level' );
 
-        // 构建命令：-o 无损级别，--strip 元数据取舍，--quiet 静默
-        return array( array(
+        // 构建命令：-o 无损级别，--strip 元数据取舍，--alpha 优化透明通道，--quiet 静默
+        $command_parts = array(
             $executable,
             sprintf( '-o%d', $level ),
             Libre_Compress_Settings::strips_metadata() ? '--strip=safe' : '--strip=none',
             '--quiet',
-            $file_path,
-        ) );
+        );
+
+        if ( Libre_Compress_Settings::param_flag( 'oxipng_alpha' ) ) {
+            $command_parts[] = '--alpha';
+        }
+
+        if ( Libre_Compress_Settings::param_flag( 'oxipng_zopfli' ) ) {
+            $command_parts[] = '--zopfli';
+        }
+
+        $command_parts[] = $file_path;
+
+        return array( $command_parts );
     }
 
     /**

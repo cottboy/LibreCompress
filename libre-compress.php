@@ -3,7 +3,7 @@
  * Plugin Name: LibreCompress
  * Plugin URI: https://github.com/cottboy/libre-compress
  * Description: 免费的 WordPress 图片压缩插件。
- * Version: 1.5.0
+ * Version: 1.6.0
  * Author: cottboy
  * Author URI: https://github.com/cottboy
  * License: GPL v2 or later
@@ -24,7 +24,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 /**
  * 插件版本号
  */
-define( 'LIBRE_COMPRESS_VERSION', '1.5.0' );
+define( 'LIBRE_COMPRESS_VERSION', '1.6.0' );
 
 /**
  * 插件文件路径
@@ -306,46 +306,8 @@ function libre_compress_activate() {
         'output_format'         => 'avif',
     );
 
-    $default_tools = array(
-        'jpeg_mode'             => 'lossy',
-        'jpeg_quality'          => 80,
-        'png_mode'              => 'lossy',
-        'png_lossy_quality'     => 80,
-        'apng_lossless'         => true,
-        'gif_mode'              => 'lossy',
-        'gif_quality'           => 60,
-        'webp_mode'             => 'lossy',
-        'webp_quality'          => 80,
-        'webp_alpha_quality'    => 100,
-        'avif_mode'             => 'lossy',
-        'avif_quality'          => 80,
-        'avif_alpha_quality'    => 80,
-        'jxl_mode'              => 'lossy',
-        'jxl_quality'           => 80,
-        'convert_webp_mode'     => 'lossy',
-        'convert_webp_quality'  => 80,
-        'convert_avif_mode'     => 'lossy',
-        'convert_avif_quality'  => 80,
-        'convert_jxl_mode'      => 'lossy',
-        'convert_jxl_quality'   => 80,
-        'svg_preset'            => 'default',
-    );
-
-    foreach ( Libre_Compress_Settings::SPEED_SETTINGS as $key => $range ) {
-        $default_tools[ $key ] = $range[2];
-    }
-
-    foreach ( Libre_Compress_Settings::LIMIT_SETTINGS as $key => $range ) {
-        $default_tools[ $key ] = $range[2];
-    }
-
-    foreach ( Libre_Compress_Settings::CHOICE_SETTINGS as $key => $allowed ) {
-        $default_tools[ $key ] = $allowed[0];
-    }
-
-    foreach ( Libre_Compress_Settings::FLAG_SETTINGS as $key => $default ) {
-        $default_tools[ $key ] = $default;
-    }
+    // 压缩参数的默认值只从参数总表取，不再在激活代码里抄第二份。
+    $default_tools = Libre_Compress_Settings::defaults();
 
     // 只在选项不存在时添加默认值
     if ( false === get_option( 'libre_compress_general' ) ) {

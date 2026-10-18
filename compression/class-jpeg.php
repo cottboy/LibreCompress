@@ -13,8 +13,11 @@ if ( ! defined( 'ABSPATH' ) ) {
 /**
  * JPEG 压缩渠道
  *
- * 有损压缩优先使用 jpegli（cjpegli），未安装时回退 jpegoptim；
- * 无损压缩始终使用 jpegoptim。jpegli 只是更好的选择，不是必需依赖。
+ * 有损压缩优先使用 jpegli，未安装时回退 jpegoptim；无损压缩始终使用 jpegoptim。
+ *
+ * cjpegli 只能读 PPM / PNM / PFM / PAM / PGX，读不了 JPEG，所以 jpegli 这条路上
+ * 必须先由 djpegli 把 JPEG 解成 PPM，再交给 cjpegli 重新编码。少了这一步，
+ * cjpegli 会直接报「Failed to decode input image」退出，压缩永远失败。
  */
 class Libre_Compress_Jpeg extends Libre_Compress_Tool_Base {
 
@@ -26,14 +29,21 @@ class Libre_Compress_Jpeg extends Libre_Compress_Tool_Base {
     private $options = array();
 
     /**
-     * 本次是否使用 jpegli
+     * 本次实际使用的编码器：cjpegli|jpegoptim
+     *
+     * @var string
+     */
+    private $encoder = '';
+
+    /**
+     * 本次是否无损压缩
      *
      * @var bool
      */
-    private $use_jpegli = false;
+    private $lossless = false;
 
     /**
-     * 是否已完成模式判定
+     * 是否已完成编码器判定
      *
      * @var bool
      */
@@ -72,9 +82,7 @@ class Libre_Compress_Jpeg extends Libre_Compress_Tool_Base {
      * @return string
      */
     public function get_used_tool_name(): string {
-        $this->resolve_mode( $this->options );
-
-        return $this->use_jpegli ? 'jpegli' : 'jpegoptim';
+        return 'cjpegli' === $this->resolve_encoder( $this->options ) ? 'jpegli' : 'jpegoptim';
     }
 
     /**
@@ -87,7 +95,7 @@ class Libre_Compress_Jpeg extends Libre_Compress_Tool_Base {
     public function compress( string $file_path, array $options = array() ): array {
         $this->options  = $options;
         $this->resolved = false;
-        $this->resolve_mode( $options );
+        $this->resolve_encoder( $options );
 
         return parent::compress( $file_path, $options );
     }
@@ -100,9 +108,7 @@ class Libre_Compress_Jpeg extends Libre_Compress_Tool_Base {
      * @return bool 是否可用
      */
     public function is_tool_available(): bool {
-        $this->resolve_mode( $this->options );
-
-        if ( $this->use_jpegli ) {
+        if ( 'cjpegli' === $this->resolve_encoder( $this->options ) ) {
             return true;
         }
 
@@ -112,22 +118,29 @@ class Libre_Compress_Jpeg extends Libre_Compress_Tool_Base {
     /**
      * 判定本次使用 jpegli 还是 jpegoptim
      *
+     * jpegli 需要 cjpegli 与 djpegli 同时存在：解码一步由 djpegli 完成，缺一个都跑不起来。
+     * 设置了「只用 jpegli」但文件不齐时退回 jpegoptim，压缩继续，不会整条路径失效。
+     *
      * @param array $options 压缩选项
+     * @return string cjpegli|jpegoptim
      */
-    private function resolve_mode( array $options ): void {
+    private function resolve_encoder( array $options ): string {
         if ( $this->resolved ) {
-            return;
+            return $this->encoder;
         }
 
-        $settings = get_option( 'libre_compress_tools', array() );
-        $lossless = 'lossless' === ( $settings['jpeg_mode'] ?? 'lossy' );
+        $this->resolved = true;
 
-        if ( isset( $options['lossless'] ) ) {
-            $lossless = (bool) $options['lossless'];
-        }
+        $lossless = 'lossless' === Libre_Compress_Settings::param_mode( 'jpeg' );
 
-        $this->use_jpegli = ! $lossless && false !== Libre_Compress_Output::find_local_tool( 'cjpegli' );
-        $this->resolved   = true;
+        $this->lossless = $lossless;
+
+        $preference = Libre_Compress_Settings::param_choice( 'jpeg_encoder' );
+        $jpegli     = false !== Libre_Compress_Output::find_local_tool( 'cjpegli' ) && false !== Libre_Compress_Output::find_local_tool( 'djpegli' );
+
+        $this->encoder = ( ! $lossless && 'jpegoptim' !== $preference && $jpegli ) ? 'cjpegli' : 'jpegoptim';
+
+        return $this->encoder;
     }
 
     /**
@@ -138,64 +151,122 @@ class Libre_Compress_Jpeg extends Libre_Compress_Tool_Base {
      * @return array[] 命令链
      */
     protected function build_command_chain( string $file_path, array $options ): array {
-        $this->resolve_mode( $options );
+        $quality = Libre_Compress_Settings::param_int( 'jpeg_quality' );
 
-        $settings = get_option( 'libre_compress_tools', array() );
-        $quality  = isset( $settings['jpeg_quality'] ) ? absint( $settings['jpeg_quality'] ) : 80;
-        $lossless = 'lossless' === ( $settings['jpeg_mode'] ?? 'lossy' );
-
-        if ( isset( $options['quality'] ) ) {
-            $quality = absint( $options['quality'] );
-        }
-        if ( isset( $options['lossless'] ) ) {
-            $lossless = (bool) $options['lossless'];
+        if ( 'cjpegli' === $this->resolve_encoder( $options ) ) {
+            return $this->build_jpegli_chain( $file_path, $quality );
         }
 
-        $quality = max( 0, min( 100, $quality ) );
+        return $this->build_jpegoptim_chain( $file_path, $quality, $this->lossless );
+    }
 
-        if ( $this->use_jpegli ) {
-            // cjpegli 默认不复制 EXIF/XMP 等元数据，删除元数据设置自然生效。
-            $jpegli = Libre_Compress_Output::find_local_tool( 'cjpegli' );
+    /**
+     * jpegli 命令链：djpegli 解码到 PPM，再交给 cjpegli 编码
+     *
+     * @param string $file_path 文件路径
+     * @param int    $quality   有损质量
+     * @return array[]
+     */
+    private function build_jpegli_chain( string $file_path, int $quality ): array {
+        $decoder = Libre_Compress_Output::find_local_tool( 'djpegli' );
+        $encoder = Libre_Compress_Output::find_local_tool( 'cjpegli' );
 
-            return array( array(
-                $jpegli,
-                $file_path,
-                $this->get_temp_output_path( $file_path ),
-                '-q',
-                (string) max( 1, $quality ),
-                '--quiet',
-            ) );
+        if ( false === $decoder || false === $encoder ) {
+            return array();
         }
 
+        $decode = array(
+            $decoder,
+            $file_path,
+            $this->get_decode_temp_path( $file_path ),
+            '--bitdepth=8',
+            '--quiet',
+        );
+
+        $encode = array(
+            $encoder,
+            $this->get_decode_temp_path( $file_path ),
+            $this->get_temp_output_path( $file_path ),
+            '-q',
+            (string) $quality,
+        );
+
+        $progressive = Libre_Compress_Settings::param_choice( 'jpeg_progressive' );
+
+        if ( 'normal' === $progressive ) {
+            $encode[] = '-p';
+            $encode[] = '0';
+        } elseif ( 'progressive' === $progressive ) {
+            $encode[] = '-p';
+            $encode[] = '2';
+        }
+
+        $chroma = Libre_Compress_Settings::param_choice( 'jpeg_chroma' );
+
+        if ( 'auto' !== $chroma ) {
+            $encode[] = '--chroma_subsampling=' . $chroma;
+        }
+
+        $encode[] = '--quiet';
+
+        return array( $decode, $encode );
+    }
+
+    /**
+     * jpegoptim 命令：原地覆盖
+     *
+     * @param string $file_path 文件路径
+     * @param int    $quality   有损质量
+     * @param bool   $lossless  是否无损
+     * @return array[]
+     */
+    private function build_jpegoptim_chain( string $file_path, int $quality, bool $lossless ): array {
         $executable = $this->get_executable_path();
 
         if ( false === $executable ) {
             return array();
         }
 
-        // 构建命令
-        $command_parts = array(
-            $executable,
-            '--all-progressive',  // 编码为渐进式 JPEG
-        );
+        $command = array( $executable, '--quiet' );
+
+        $progressive = Libre_Compress_Settings::param_choice( 'jpeg_progressive' );
+
+        if ( 'normal' === $progressive ) {
+            $command[] = '--all-normal';
+        } elseif ( 'progressive' === $progressive ) {
+            $command[] = '--all-progressive';
+        } else {
+            $command[] = '--auto-mode';
+        }
 
         // 只删隐私类元数据；ICC 色彩配置留着，删掉会让广色域图偏色。
         if ( Libre_Compress_Settings::strips_metadata() ) {
-            $command_parts[] = '--strip-exif';
-            $command_parts[] = '--strip-iptc';
-            $command_parts[] = '--strip-com';
+            $command[] = '--strip-exif';
+            $command[] = '--strip-xmp';
+            $command[] = '--strip-iptc';
+            $command[] = '--strip-com';
         } else {
-            $command_parts[] = '--strip-none';
+            $command[] = '--strip-none';
         }
 
         if ( ! $lossless ) {
             // 有损压缩设置最大质量；无损下不传质量参数，jpegoptim 默认就是无损的
-            $command_parts[] = sprintf( '--max=%d', $quality );
+            $command[] = '--max=' . $quality;
         }
 
-        $command_parts[] = $file_path;
+        $command[] = $file_path;
 
-        return array( $command_parts );
+        return array( $command );
+    }
+
+    /**
+     * jpegli 解码出来的 PPM 中间文件路径
+     *
+     * @param string $file_path 文件路径
+     * @return string
+     */
+    private function get_decode_temp_path( string $file_path ): string {
+        return $file_path . '.lc-jpegli.ppm';
     }
 
     /**
@@ -207,9 +278,19 @@ class Libre_Compress_Jpeg extends Libre_Compress_Tool_Base {
      * @return string
      */
     protected function get_temp_output_path( string $file_path ): string {
-        $this->resolve_mode( $this->options );
+        return 'cjpegli' === $this->resolve_encoder( $this->options ) ? $file_path . '.lc-jpegli.jpg' : '';
+    }
 
-        return $this->use_jpegli ? $file_path . '.lc-jpegli.jpg' : '';
+    /**
+     * 获取解码中间文件
+     *
+     * @param string $file_path 文件路径
+     * @return string[]
+     */
+    protected function get_extra_temp_paths( string $file_path ): array {
+        return 'cjpegli' === $this->resolve_encoder( $this->options )
+            ? array( $this->get_decode_temp_path( $file_path ) )
+            : array();
     }
 
     /**
@@ -233,7 +314,7 @@ class Libre_Compress_Jpeg extends Libre_Compress_Tool_Base {
             'centos'  => 'sudo yum install jpegoptim',
             'fedora'  => 'sudo dnf install jpegoptim',
             'macos'   => 'brew install jpegoptim',
-            'windows' => __( '从 GitHub 下载预编译的二进制文件；可选安装 libjxl 提供的 cjpegli 提升有损压缩效果', 'libre-compress' ),
+            'windows' => __( '从 GitHub 下载预编译的 jpegoptim.exe；要用 jpegli 请把 jpegli 项目编译出的 cjpegli.exe 与 djpegli.exe 一起放进工具目录', 'libre-compress' ),
         );
     }
 }

@@ -48,33 +48,31 @@ class Libre_Compress_Cjxl extends Libre_Compress_Tool_Base {
      *
      * @param string $source 输入文件路径
      * @param string $output 输出文件路径
-     * @param string $prefix 设置前缀：同格式压缩用 jxl_，格式转换用 convert_jxl_
+     * @param string $group  设置分组：jxl 或 convert_jxl
      * @return array|false 参数数组，工具不可用时返回 false
      */
-    public static function build_command( string $source, string $output, string $prefix = 'jxl_' ) {
-        $cjxl     = Libre_Compress_Output::find_local_tool( 'cjxl' );
-        $settings = get_option( 'libre_compress_tools', array() );
+    public static function build_command( string $source, string $output, string $group = 'jxl' ) {
+        $cjxl = Libre_Compress_Output::find_local_tool( 'cjxl' );
 
         if ( false === $cjxl ) {
             return false;
         }
 
-        $mode    = isset( $settings[ $prefix . 'mode' ] ) ? $settings[ $prefix . 'mode' ] : 'lossy';
-        $quality = isset( $settings[ $prefix . 'quality' ] ) ? absint( $settings[ $prefix . 'quality' ] ) : 80;
+        $lossless = 'lossless' === Libre_Compress_Settings::param_mode( $group );
 
         $command = array(
             $cjxl,
             '-e',
-            (string) Libre_Compress_Settings::tool_speed( $prefix . 'effort' ),
+            (string) Libre_Compress_Settings::param_int( $group . '_effort' ),
         );
 
-        if ( 'lossless' === $mode ) {
+        if ( $lossless ) {
             // 距离 0 即无损
             $command[] = '-d';
             $command[] = '0';
         } else {
             $command[] = '-q';
-            $command[] = (string) max( 0, min( 100, $quality ) );
+            $command[] = (string) Libre_Compress_Settings::param_int( $group . '_quality' );
         }
 
         // JPEG 输入时 cjxl 默认走"JPEG 无损重构"，与 -q/-d 冲突会直接失败，统一关掉

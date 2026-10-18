@@ -62,9 +62,7 @@ class Libre_Compress_Animation {
      * @return bool
      */
     public static function apng_lossless_enabled(): bool {
-        $tools = get_option( 'libre_compress_tools', array() );
-
-        return ! isset( $tools['apng_lossless'] ) || ! empty( $tools['apng_lossless'] );
+        return Libre_Compress_Settings::param_flag( 'apng_lossless' );
     }
 
     /* ---------------------------------------------------------------------
@@ -595,9 +593,7 @@ class Libre_Compress_Animation {
             return '';
         }
 
-        $settings = get_option( 'libre_compress_tools', array() );
-
-        if ( 'lossless' !== ( isset( $settings['png_mode'] ) ? $settings['png_mode'] : 'lossy' ) && ! self::apng_lossless_enabled() ) {
+        if ( 'lossless' !== Libre_Compress_Settings::param_mode( 'png' ) && ! self::apng_lossless_enabled() ) {
             return '';
         }
 
@@ -744,7 +740,7 @@ class Libre_Compress_Animation {
      */
     private static function build_native_command( string $source, string $target, string $output, array $plan ) {
         if ( 'jxl' === $target ) {
-            return Libre_Compress_Cjxl::build_command( $source, $output, 'convert_jxl_' );
+            return Libre_Compress_Cjxl::build_command( $source, $output, 'convert_jxl' );
         }
 
         if ( 'avif' === $target ) {
@@ -776,13 +772,12 @@ class Libre_Compress_Animation {
      * @return array 命令参数
      */
     private static function build_webp_command( string $source, string $output, array $plan ): array {
-        $settings = get_option( 'libre_compress_tools', array() );
         $same     = 'webp' === $plan['format'];
-        $prefix   = $same ? 'webp_' : 'convert_webp_';
-        $lossless = 'lossless' === ( $settings[ $prefix . 'mode' ] ?? 'lossy' );
-        $quality  = max( 0, min( 100, absint( $settings[ $prefix . 'quality' ] ?? 80 ) ) );
-        $level    = Libre_Compress_Settings::tool_speed( $same ? 'webp_lossless_level' : 'convert_webp_lossless_level' );
-        $method   = Libre_Compress_Settings::tool_speed( $same ? 'webp_method' : 'convert_webp_method' );
+        $group    = $same ? 'webp' : 'convert_webp';
+        $lossless = 'lossless' === Libre_Compress_Settings::param_mode( $group );
+        $quality  = Libre_Compress_Settings::param_int( $group . '_quality' );
+        $level    = Libre_Compress_Settings::param_int( $group . '_lossless_level' );
+        $method   = Libre_Compress_Settings::param_int( $group . '_method' );
 
         // cwebp 的无损级别是 0-9（-z），FFmpeg 只认 0-6（libwebp 的 method），
         // 而且刻度不一样：实测 cwebp -z 6 的输出与 FFmpeg 4 档一致。按比例换算，
@@ -899,11 +894,10 @@ class Libre_Compress_Animation {
             return false;
         }
 
-        $settings = get_option( 'libre_compress_tools', array() );
-        $lossless = 'lossless' === ( $settings['convert_webp_mode'] ?? 'lossy' );
-        $quality  = max( 0, min( 100, absint( $settings['convert_webp_quality'] ?? 80 ) ) );
+        $lossless = 'lossless' === Libre_Compress_Settings::param_mode( 'convert_webp' );
+        $quality  = Libre_Compress_Settings::param_int( 'convert_webp_quality' );
 
-        $command = array( $gif2webp, '-m', (string) Libre_Compress_Settings::tool_speed( 'convert_webp_gif_method' ) );
+        $command = array( $gif2webp, '-m', (string) Libre_Compress_Settings::param_int( 'convert_webp_gif_method' ) );
 
         if ( ! $lossless ) {
             $command = array_merge( $command, array( '-lossy', '-q', (string) $quality ) );
@@ -1024,12 +1018,11 @@ class Libre_Compress_Animation {
      * FFmpeg 内部处理颜色和透明背景，全程不把动画帧交给 PHP。
      */
     private static function build_avif_command( string $source, string $output, array $plan ) {
-        $settings = get_option( 'libre_compress_tools', array() );
         $same     = 'avif' === $plan['format'];
-        $prefix   = $same ? 'avif_' : 'convert_avif_';
-        $lossless = 'lossless' === ( $settings[ $prefix . 'mode' ] ?? 'lossy' );
-        $quality  = max( 0, min( 100, absint( $settings[ $prefix . 'quality' ] ?? 80 ) ) );
-        $speed    = Libre_Compress_Settings::tool_speed( $same ? 'avif_speed' : 'convert_avif_speed' );
+        $group    = $same ? 'avif' : 'convert_avif';
+        $lossless = 'lossless' === Libre_Compress_Settings::param_mode( $group );
+        $quality  = Libre_Compress_Settings::param_int( $group . '_quality' );
+        $speed    = Libre_Compress_Settings::param_int( $group . '_speed' );
         $command  = array( self::tool( 'ffmpeg' ), '-nostdin', '-v', 'error' );
 
         if ( 'gif' === $plan['format'] ) {

@@ -52,7 +52,7 @@ class Libre_Compress_Cwebp extends Libre_Compress_Tool_Base {
      * @return array[] 命令链
      */
     protected function build_command_chain( string $file_path, array $options ): array {
-        $args = self::build_encode_args( 'webp_', $file_path, $this->get_temp_output_path( $file_path ), $options );
+        $args = self::build_encode_args( 'webp', $file_path, $this->get_temp_output_path( $file_path ) );
 
         return array( array_merge( array( $this->get_executable_path() ), $args ) );
     }
@@ -60,53 +60,56 @@ class Libre_Compress_Cwebp extends Libre_Compress_Tool_Base {
     /**
      * 构建 cwebp 的参数
      *
-     * 同格式压缩与格式转换共用这一份参数拼装，避免两边各写一遍走样。
-     * -preset 必须排在其它编码参数前面：它会重置质量等方法参数，后面的显式值才生效。
+     * 同格式压缩与格式转换共用这一份参数拼装，两份设置各自独立（webp_* 与 convert_webp_*），
+     * 不会出现改了转换路径却把同格式路径一起带跑的情况。
      *
-     * @param string $prefix  设置前缀：同格式压缩用 webp_，格式转换用 convert_webp_
-     * @param string $source  源文件路径
-     * @param string $output  输出文件路径
-     * @param array  $options 调用方覆盖项（quality / lossless）
+     * -preset 必须排在最前面：它会重置质量、方法等参数，后面的显式值才生效。
+     *
+     * @param string $group  设置分组：webp 或 convert_webp
+     * @param string $source 源文件路径
+     * @param string $output 输出文件路径
      * @return array 参数数组（不含可执行文件）
      */
-    public static function build_encode_args( string $prefix, string $source, string $output, array $options = array() ): array {
-        $settings = get_option( 'libre_compress_tools', array() );
-        $mode     = isset( $settings[ $prefix . 'mode' ] ) ? $settings[ $prefix . 'mode' ] : 'lossy';
-        $quality  = isset( $settings[ $prefix . 'quality' ] ) ? absint( $settings[ $prefix . 'quality' ] ) : 80;
-
-        if ( isset( $options['quality'] ) ) {
-            $quality = absint( $options['quality'] );
-        }
-        if ( isset( $options['lossless'] ) ) {
-            $mode = $options['lossless'] ? 'lossless' : 'lossy';
-        }
-
-        $quality = max( 0, min( 100, $quality ) );
+    public static function build_encode_args( string $group, string $source, string $output ): array {
+        $lossless = 'lossless' === Libre_Compress_Settings::param_mode( $group );
+        $quality  = Libre_Compress_Settings::param_int( $group . '_quality' );
 
         $args = array(
+            '-preset',
+            Libre_Compress_Settings::param_choice( $group . '_preset' ),
             '-quiet',
             '-mt',
-            '-preset',
-            Libre_Compress_Settings::tool_choice( 'webp_preset' ),
         );
 
-        if ( 'lossless' === $mode ) {
+        if ( $lossless ) {
             $args[] = '-lossless';
             $args[] = '-z';
-            $args[] = (string) Libre_Compress_Settings::tool_speed( $prefix . 'lossless_level' );
+            $args[] = (string) Libre_Compress_Settings::param_int( $group . '_lossless_level' );
         } else {
             $args[] = '-q';
             $args[] = (string) $quality;
             $args[] = '-m';
-            $args[] = (string) Libre_Compress_Settings::tool_speed( $prefix . 'method' );
+            $args[] = (string) Libre_Compress_Settings::param_int( $group . '_method' );
+            $args[] = '-segments';
+            $args[] = (string) Libre_Compress_Settings::param_int( $group . '_segments' );
+            $args[] = '-sns';
+            $args[] = (string) Libre_Compress_Settings::param_int( $group . '_sns' );
+            $args[] = '-f';
+            $args[] = (string) Libre_Compress_Settings::param_int( $group . '_filter' );
+            $args[] = '-sharpness';
+            $args[] = (string) Libre_Compress_Settings::param_int( $group . '_sharpness' );
+
+            if ( Libre_Compress_Settings::param_flag( $group . '_sharp_yuv' ) ) {
+                $args[] = '-sharp_yuv';
+            }
         }
 
-        // 透明通道单独编码，默认 100 即 alpha 无损；这里始终显式传入，省得默认值变化时悄悄掉画质。
+        // 透明通道单独编码，100 即 alpha 无损；始终显式传入，省得默认值变化时悄悄掉画质。
         $args[] = '-alpha_q';
-        $args[] = (string) Libre_Compress_Settings::tool_quality( 'webp_alpha_quality', 100 );
+        $args[] = (string) Libre_Compress_Settings::param_int( $group . '_alpha_quality' );
 
         // 透明区域的 RGB 默认会被压平，开源图或要再做透明处理时把它保下来。
-        if ( Libre_Compress_Settings::tool_flag( 'webp_exact' ) ) {
+        if ( Libre_Compress_Settings::param_flag( $group . '_exact' ) ) {
             $args[] = '-exact';
         }
 

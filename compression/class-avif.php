@@ -129,7 +129,7 @@ class Libre_Compress_Avif extends Libre_Compress_Tool_Base {
         $decode = array( $decoder, $file_path, $temp_png );
         $encode = array_merge(
             array( $this->get_executable_path() ),
-            self::build_encode_args( 'avif_', $temp_png, $temp_avif, $options )
+            self::build_encode_args( 'avif', $temp_png, $temp_avif )
         );
 
         return array( $decode, $encode );
@@ -138,34 +138,30 @@ class Libre_Compress_Avif extends Libre_Compress_Tool_Base {
     /**
      * 构建 avifenc 的参数
      *
-     * 同格式压缩与格式转换共用这一份参数拼装，避免两边各写一遍走样。
+     * 同格式压缩与格式转换共用这一份参数拼装，两份设置各自独立。
      *
-     * @param string $prefix  设置前缀：同格式压缩用 avif_，格式转换用 convert_avif_
-     * @param string $source  源文件路径
-     * @param string $output  输出文件路径
-     * @param array  $options 调用方覆盖项（quality / lossless）
+     * @param string $group  设置分组：avif 或 convert_avif
+     * @param string $source 源文件路径
+     * @param string $output 输出文件路径
      * @return array 参数数组（不含可执行文件）
      */
-    public static function build_encode_args( string $prefix, string $source, string $output, array $options = array() ): array {
-        $settings = get_option( 'libre_compress_tools', array() );
-        $mode     = isset( $settings[ $prefix . 'mode' ] ) ? $settings[ $prefix . 'mode' ] : 'lossy';
-        $quality  = isset( $settings[ $prefix . 'quality' ] ) ? absint( $settings[ $prefix . 'quality' ] ) : 80;
-
-        if ( isset( $options['quality'] ) ) {
-            $quality = absint( $options['quality'] );
-        }
-        if ( isset( $options['lossless'] ) ) {
-            $mode = $options['lossless'] ? 'lossless' : 'lossy';
-        }
-
-        $quality = max( 0, min( 100, $quality ) );
+    public static function build_encode_args( string $group, string $source, string $output ): array {
+        $lossless = 'lossless' === Libre_Compress_Settings::param_mode( $group );
+        $quality  = Libre_Compress_Settings::param_int( $group . '_quality' );
 
         $args = array(
             '-j',
-            '4',
+            (string) Libre_Compress_Settings::param_int( $group . '_jobs' ),
             '-s',
-            (string) Libre_Compress_Settings::tool_speed( $prefix . 'speed' ),
+            (string) Libre_Compress_Settings::param_int( $group . '_speed' ),
         );
+
+        $depth = Libre_Compress_Settings::param_choice( $group . '_depth' );
+
+        if ( '8' !== $depth ) {
+            $args[] = '-d';
+            $args[] = $depth;
+        }
 
         // avifenc 默认会把输入里的 EXIF/XMP 原样搬进 AVIF，而产物是对外公开访问的文件
         if ( Libre_Compress_Settings::strips_metadata() ) {
@@ -173,7 +169,7 @@ class Libre_Compress_Avif extends Libre_Compress_Tool_Base {
             $args[] = '--ignore-xmp';
         }
 
-        if ( 'lossless' === $mode ) {
+        if ( $lossless ) {
             $args[] = '--lossless';
         } else {
             $args[] = '-q';
@@ -181,18 +177,18 @@ class Libre_Compress_Avif extends Libre_Compress_Tool_Base {
 
             // 透明通道单独编码；不传时 avifenc 直接套用颜色质量，半透明边缘会被一起压。
             $args[] = '--qalpha';
-            $args[] = (string) Libre_Compress_Settings::tool_quality( 'avif_alpha_quality', 80 );
+            $args[] = (string) Libre_Compress_Settings::param_int( $group . '_alpha_quality' );
 
             // 色度抽样只存在于有损 YUV：4:2:0 更小但边缘颜色会糊，无损模式下不传。
-            $chroma = Libre_Compress_Settings::tool_choice( 'avif_chroma' );
+            $chroma = Libre_Compress_Settings::param_choice( $group . '_chroma' );
 
-            if ( '444' === $chroma ) {
+            if ( 'auto' !== $chroma ) {
                 $args[] = '-y';
-                $args[] = '444';
-            } elseif ( '420' === $chroma ) {
-                $args[] = '-y';
-                $args[] = '420';
-                $args[] = '--sharpyuv';
+                $args[] = $chroma;
+
+                if ( '420' === $chroma ) {
+                    $args[] = '--sharpyuv';
+                }
             }
         }
 

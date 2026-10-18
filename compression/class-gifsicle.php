@@ -54,24 +54,7 @@ class Libre_Compress_Gifsicle extends Libre_Compress_Tool_Base {
     protected function build_command_chain( string $file_path, array $options ): array {
         $executable = $this->get_executable_path();
 
-        // 获取压缩设置
-        $settings = get_option( 'libre_compress_tools', array() );
-        $quality  = isset( $settings['gif_quality'] ) ? absint( $settings['gif_quality'] ) : 60;
-        $mode     = isset( $settings['gif_mode'] ) ? $settings['gif_mode'] : 'lossy';
-        $lossless = ( 'lossless' === $mode );
-
-        // 允许通过选项覆盖设置
-        if ( isset( $options['quality'] ) ) {
-            $quality = absint( $options['quality'] );
-        }
-        if ( isset( $options['lossless'] ) ) {
-            $lossless = (bool) $options['lossless'];
-        }
-
-        // gifsicle 的 --lossy 参数语义与质量相反：数值越大压缩越狠、质量越差
-        // 将 0-100 的质量映射为 20-200 的有损强度：质量 60 对应 gifsicle 官方推荐的 80
-        $lossiness = (int) round( 200 - $quality * 2 );
-        $lossiness = max( 20, min( 200, $lossiness ) );
+        $lossless = 'lossless' === Libre_Compress_Settings::param_mode( 'gif' );
 
         // 编码结果先落到临时文件，替换由基类用 PHP 文件函数完成
         $temp_output = $this->get_temp_output_path( $file_path );
@@ -79,16 +62,18 @@ class Libre_Compress_Gifsicle extends Libre_Compress_Tool_Base {
         // 构建命令
         $command_parts = array(
             $executable,
-            '-O' . Libre_Compress_Settings::tool_speed( 'gifsicle_level' ),
+            '-O' . Libre_Compress_Settings::param_int( 'gifsicle_level' ),
         );
 
-        if ( ! $lossless ) {
-            // 有损压缩
-            $command_parts[] = sprintf( '--lossy=%d', $lossiness );
+        // --lossy 就是有损强度本身：数值越大压得越狠、噪点越多，界面直接填这个值，不做换算。
+        $lossiness = Libre_Compress_Settings::param_int( 'gifsicle_lossy' );
+
+        if ( ! $lossless && $lossiness > 0 ) {
+            $command_parts[] = '--lossy=' . $lossiness;
         }
 
         // 调色板上限：256 是 GIF 的上限，等于不缩色，所以只在用户调低时才传。
-        $colors = Libre_Compress_Settings::tool_limit( 'gif_colors' );
+        $colors = Libre_Compress_Settings::param_int( 'gif_colors' );
 
         if ( $colors < 256 ) {
             $command_parts[] = '--colors';

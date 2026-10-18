@@ -126,34 +126,32 @@ class Libre_Compress_Pngquant extends Libre_Compress_Tool_Base {
     protected function build_command_chain( string $file_path, array $options ): array {
         $executable = $this->get_executable_path();
 
-        // 获取压缩设置
-        $settings = get_option( 'libre_compress_tools', array() );
-        $quality  = isset( $settings['png_lossy_quality'] ) ? absint( $settings['png_lossy_quality'] ) : 80;
+        // pngquant 的质量本身就是「下限-上限」两段：低于下限就不保存、保留原图，
+        // 上限用来决定最多保留多少颜色。界面直接对应这两个参数，不做二次换算。
+        $min_quality = Libre_Compress_Settings::param_int( 'png_quality_min' );
+        $max_quality = Libre_Compress_Settings::param_int( 'png_quality_max' );
 
-        // 允许通过选项覆盖设置
-        if ( isset( $options['quality'] ) ) {
-            $quality = absint( $options['quality'] );
+        if ( $min_quality > $max_quality ) {
+            $min_quality = $max_quality;
         }
-
-        // 确保质量在有效范围内
-        $quality = max( 0, min( 100, $quality ) );
-
-        // pngquant 使用质量范围，最小值设为质量的一半
-        $min_quality = max( 0, $quality - 20 );
 
         // 构建命令
         // --force: 覆盖输出文件
         // --output: 指定输出文件（覆盖原文件）
-        // --quality: 设置质量范围
+        // --quality: 质量下限-上限
         // --skip-if-larger: 如果压缩后更大则跳过
         $command_parts = array(
             $executable,
             '--force',
             '--skip-if-larger',
-            sprintf( '--quality=%d-%d', $min_quality, $quality ),
+            sprintf( '--quality=%d-%d', $min_quality, $max_quality ),
             '--speed',
-            (string) Libre_Compress_Settings::tool_speed( 'pngquant_speed' ),
+            (string) Libre_Compress_Settings::param_int( 'pngquant_speed' ),
         );
+
+        if ( ! Libre_Compress_Settings::param_flag( 'pngquant_dither' ) ) {
+            $command_parts[] = '--nofs';
+        }
 
         // pngquant 只在 macOS 上默认清元数据，其他平台要显式加 --strip
         if ( Libre_Compress_Settings::strips_metadata() ) {

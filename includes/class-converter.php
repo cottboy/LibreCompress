@@ -300,7 +300,7 @@ class Libre_Compress_Output {
                 $gif2webp = Libre_Compress_Animation::gif2webp_command( $file_path, $temp_output );
                 $command  = false === $gif2webp ? false : array( $gif2webp );
             } elseif ( 'jxl' === $target ) {
-                $cjxl    = Libre_Compress_Cjxl::build_command( $file_path, $temp_output, 'convert_jxl_' );
+                $cjxl    = Libre_Compress_Cjxl::build_command( $file_path, $temp_output, 'convert_jxl' );
                 $command = false === $cjxl ? false : array( $cjxl );
             } else {
                 $temp_source = $file_path . '.lc-source-' . $temp_token . '.png';
@@ -2036,16 +2036,16 @@ class Libre_Compress_Output {
 
         if ( 'webp' === $target ) {
             // 参数拼装与同格式压缩共用一份，避免两边走样。
-            return array( array_merge( array( $binary ), Libre_Compress_Cwebp::build_encode_args( 'convert_webp_', $source, $output ) ) );
+            return array( array_merge( array( $binary ), Libre_Compress_Cwebp::build_encode_args( 'convert_webp', $source, $output ) ) );
         }
 
         if ( 'jxl' === $target ) {
-            $command = Libre_Compress_Cjxl::build_command( $source, $output, 'convert_jxl_' );
+            $command = Libre_Compress_Cjxl::build_command( $source, $output, 'convert_jxl' );
 
             return false === $command ? false : array( $command );
         }
 
-        return array( array_merge( array( $binary ), Libre_Compress_Avif::build_encode_args( 'convert_avif_', $source, $output ) ) );
+        return array( array_merge( array( $binary ), Libre_Compress_Avif::build_encode_args( 'convert_avif', $source, $output ) ) );
     }
 
     /**
