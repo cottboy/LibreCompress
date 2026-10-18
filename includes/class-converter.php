@@ -2032,35 +2032,11 @@ class Libre_Compress_Output {
             return false;
         }
 
-        $binary   = $tools[ $tool_name ]->get_tool_binary_path();
-        $settings = get_option( 'libre_compress_tools', array() );
+        $binary = $tools[ $tool_name ]->get_tool_binary_path();
 
         if ( 'webp' === $target ) {
-            $mode    = isset( $settings['convert_webp_mode'] ) ? $settings['convert_webp_mode'] : 'lossy';
-            $encode  = array( $binary, '-quiet', '-mt' );
-
-            if ( 'lossless' === $mode ) {
-                $encode[] = '-lossless';
-                $encode[] = '-z';
-                $encode[] = (string) Libre_Compress_Settings::tool_speed( 'convert_webp_lossless_level' );
-            } else {
-                $quality = isset( $settings['convert_webp_quality'] ) ? absint( $settings['convert_webp_quality'] ) : 80;
-                $quality = max( 0, min( 100, $quality ) );
-
-                $encode[] = '-q';
-                $encode[] = (string) $quality;
-                $encode[] = '-m';
-                $encode[] = (string) Libre_Compress_Settings::tool_speed( 'convert_webp_method' );
-            }
-
-            // cwebp 默认不复制任何元数据；删除元数据时只保留 ICC。
-            $encode[] = '-metadata';
-            $encode[] = Libre_Compress_Settings::strips_metadata() ? 'icc' : 'all';
-            $encode[] = $source;
-            $encode[] = '-o';
-            $encode[] = $output;
-
-            return array( $encode );
+            // 参数拼装与同格式压缩共用一份，避免两边走样。
+            return array( array_merge( array( $binary ), Libre_Compress_Cwebp::build_encode_args( 'convert_webp_', $source, $output ) ) );
         }
 
         if ( 'jxl' === $target ) {
@@ -2069,29 +2045,7 @@ class Libre_Compress_Output {
             return false === $command ? false : array( $command );
         }
 
-        $mode = isset( $settings['convert_avif_mode'] ) ? $settings['convert_avif_mode'] : 'lossy';
-
-        // avifenc 默认会把输入图片里的 EXIF/XMP 原样搬进 AVIF，而转换结果正是对外访问的那张图
-        $encode = array( $binary, '-j', '4', '-s', (string) Libre_Compress_Settings::tool_speed( 'convert_avif_speed' ) );
-
-        if ( Libre_Compress_Settings::strips_metadata() ) {
-            $encode[] = '--ignore-exif';
-            $encode[] = '--ignore-xmp';
-        }
-
-        if ( 'lossless' === $mode ) {
-            $encode[] = '--lossless';
-        } else {
-            $quality = isset( $settings['convert_avif_quality'] ) ? absint( $settings['convert_avif_quality'] ) : 80;
-            $quality = max( 0, min( 100, $quality ) );
-            $encode[] = '-q';
-            $encode[] = (string) $quality;
-        }
-
-        $encode[] = $source;
-        $encode[] = $output;
-
-        return array( $encode );
+        return array( array_merge( array( $binary ), Libre_Compress_Avif::build_encode_args( 'convert_avif_', $source, $output ) ) );
     }
 
     /**

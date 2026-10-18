@@ -28,13 +28,41 @@ class Libre_Compress_Settings {
         'webp_method'                 => array( 0, 6, 4 ),
         'webp_lossless_level'         => array( 0, 9, 6 ),
         'avif_speed'                  => array( 0, 10, 6 ),
-        'jxl_effort'                  => array( 1, 9, 7 ),
+        'jxl_effort'                  => array( 1, 10, 7 ),
         'gifsicle_level'              => array( 1, 3, 2 ),
         'convert_webp_method'         => array( 0, 6, 4 ),
         'convert_webp_lossless_level' => array( 0, 9, 6 ),
         'convert_webp_gif_method'     => array( 0, 6, 4 ),
         'convert_avif_speed'          => array( 0, 10, 6 ),
-        'convert_jxl_effort'          => array( 1, 9, 7 ),
+        'convert_jxl_effort'          => array( 1, 10, 7 ),
+    );
+
+    /**
+     * 值域由工具决定、不是 0-100 的数值参数
+     *
+     * @var array<string,int[]>
+     */
+    const LIMIT_SETTINGS = array(
+        'gif_colors' => array( 2, 256, 256 ),
+    );
+
+    /**
+     * 枚举型参数与允许的取值
+     *
+     * @var array<string,string[]>
+     */
+    const CHOICE_SETTINGS = array(
+        'webp_preset' => array( 'default', 'photo', 'picture', 'drawing', 'icon', 'text' ),
+        'avif_chroma' => array( 'auto', '444', '420' ),
+    );
+
+    /**
+     * 开关型参数与默认值
+     *
+     * @var array<string,bool>
+     */
+    const FLAG_SETTINGS = array(
+        'webp_exact' => false,
     );
 
     /**
@@ -64,15 +92,25 @@ class Libre_Compress_Settings {
         'png_lossy_quality'    => 80,
         'gif_quality'          => 60,
         'webp_quality'         => 80,
+        'webp_alpha_quality'   => 100,
         'avif_quality'         => 80,
+        'avif_alpha_quality'   => 80,
         'jxl_quality'          => 80,
         'convert_webp_quality' => 80,
         'convert_avif_quality' => 80,
         'convert_jxl_quality'  => 80,
     );
 
-    public static function normalize_speed( string $key, $value ): int {
-        list( $min, $max, $default ) = self::SPEED_SETTINGS[ $key ];
+    /**
+     * 按值域表把输入夹到合法整数
+     *
+     * @param string $key   设置键名
+     * @param mixed  $value 原始值
+     * @param array  $table 值域表：键名 => [最小, 最大, 默认]
+     * @return int
+     */
+    private static function normalize_int( string $key, $value, array $table ): int {
+        list( $min, $max, $default ) = $table[ $key ];
 
         if ( ( ! is_int( $value ) && ! is_string( $value ) ) || ! preg_match( '/^-?\d+$/D', (string) $value ) ) {
             return $default;
@@ -81,9 +119,49 @@ class Libre_Compress_Settings {
         return (int) max( $min, min( $max, (float) $value ) );
     }
 
+    public static function normalize_speed( string $key, $value ): int {
+        return self::normalize_int( $key, $value, self::SPEED_SETTINGS );
+    }
+
     public static function tool_speed( string $key ): int {
         $settings = get_option( 'libre_compress_tools', array() );
         return self::normalize_speed( $key, $settings[ $key ] ?? null );
+    }
+
+    /**
+     * 读取值域由工具决定的数值参数
+     *
+     * @param string $key 设置键名
+     * @return int
+     */
+    public static function tool_limit( string $key ): int {
+        $settings = get_option( 'libre_compress_tools', array() );
+        return self::normalize_int( $key, $settings[ $key ] ?? null, self::LIMIT_SETTINGS );
+    }
+
+    /**
+     * 读取枚举型参数
+     *
+     * @param string $key 设置键名
+     * @return string 合法值之一
+     */
+    public static function tool_choice( string $key ): string {
+        $settings = get_option( 'libre_compress_tools', array() );
+        $value    = $settings[ $key ] ?? '';
+
+        return in_array( $value, self::CHOICE_SETTINGS[ $key ], true ) ? $value : self::CHOICE_SETTINGS[ $key ][0];
+    }
+
+    /**
+     * 读取开关型参数
+     *
+     * @param string $key 设置键名
+     * @return bool
+     */
+    public static function tool_flag( string $key ): bool {
+        $settings = get_option( 'libre_compress_tools', array() );
+
+        return isset( $settings[ $key ] ) ? ! empty( $settings[ $key ] ) : self::FLAG_SETTINGS[ $key ];
     }
 
     /**
@@ -290,6 +368,20 @@ class Libre_Compress_Settings {
 
         foreach ( self::SPEED_SETTINGS as $key => $range ) {
             $sanitized[ $key ] = self::normalize_speed( $key, $input[ $key ] ?? null );
+        }
+
+        foreach ( self::LIMIT_SETTINGS as $key => $range ) {
+            $sanitized[ $key ] = self::normalize_int( $key, $input[ $key ] ?? null, self::LIMIT_SETTINGS );
+        }
+
+        foreach ( self::CHOICE_SETTINGS as $key => $allowed ) {
+            $sanitized[ $key ] = isset( $input[ $key ] ) && in_array( $input[ $key ], $allowed, true )
+                ? $input[ $key ]
+                : $allowed[0];
+        }
+
+        foreach ( self::FLAG_SETTINGS as $key => $default ) {
+            $sanitized[ $key ] = ! empty( $input[ $key ] );
         }
 
         $sanitized['apng_lossless'] = ! empty( $input['apng_lossless'] );
@@ -776,7 +868,8 @@ class Libre_Compress_Settings {
             <h3><?php esc_html_e( 'GIF 同格式压缩', 'libre-compress' ); ?></h3>
             <table class="form-table">
                 <?php $this->render_mode_field( 'gif' ); ?>
-                <?php $this->render_quality_field( 'gif_quality', __( '有损质量', 'libre-compress' ), 60, __( '仅 gifsicle 有损压缩有效。', 'libre-compress' ) ); ?>
+                <?php $this->render_quality_field( 'gif_quality', __( '有损质量', 'libre-compress' ), 60, __( '仅 gifsicle 有损压缩有效：数值越低画质越差、文件越小。', 'libre-compress' ) ); ?>
+                <?php $this->render_limit_field( 'gif_colors', __( '调色板颜色数', 'libre-compress' ), __( 'gifsicle 的 --colors，GIF 最多 256 色；调低后体积更小但会掉色。', 'libre-compress' ) ); ?>
                 <?php $this->render_speed_field( 'gifsicle_level', __( 'gifsicle 优化级别', 'libre-compress' ), $options ); ?>
             </table>
 
@@ -785,15 +878,55 @@ class Libre_Compress_Settings {
                 <?php $this->render_mode_field( 'webp' ); ?>
                 <?php $this->render_quality_field( 'webp_quality', __( '有损质量', 'libre-compress' ), 80, __( '静图用 cwebp，动图用 FFmpeg。', 'libre-compress' ) ); ?>
                 <?php $this->render_speed_field( 'webp_method', __( 'cwebp / FFmpeg 有损方法', 'libre-compress' ), $options ); ?>
-                <?php $this->render_speed_field( 'webp_lossless_level', __( 'cwebp / FFmpeg 无损级别', 'libre-compress' ), $options ); ?>
+                <?php $this->render_speed_field( 'webp_lossless_level', __( 'cwebp / FFmpeg 无损级别', 'libre-compress' ), $options, __( '动图按比例换算成 FFmpeg 的 0-6 档。', 'libre-compress' ) ); ?>
             </table>
+            <details style="margin: -6px 0 18px;">
+                <summary style="cursor: pointer; color: #2271b1;"><?php esc_html_e( '高级参数（仅静图）', 'libre-compress' ); ?></summary>
+                <table class="form-table">
+                    <?php
+                    $this->render_choice_field(
+                        'webp_preset',
+                        __( '内容预设', 'libre-compress' ),
+                        array(
+                            'default' => __( '默认', 'libre-compress' ),
+                            'photo'   => __( '照片', 'libre-compress' ),
+                            'picture' => __( '图片（室内人像）', 'libre-compress' ),
+                            'drawing' => __( '绘图 / 线稿', 'libre-compress' ),
+                            'icon'    => __( '图标 / 小彩图', 'libre-compress' ),
+                            'text'    => __( '文字截图', 'libre-compress' ),
+                        ),
+                        __( 'cwebp -preset，按内容类型微调滤镜与分区参数。动图不走这里：FFmpeg 的 preset 会把无损与压缩方法一起覆盖掉。', 'libre-compress' )
+                    );
+                    ?>
+                    <?php $this->render_quality_field( 'webp_alpha_quality', __( '透明通道质量', 'libre-compress' ), 100, __( 'cwebp 的 -alpha_q，100 为透明通道无损。动图的 FFmpeg 编码器没有这个开关。', 'libre-compress' ) ); ?>
+                    <?php $this->render_flag_field( 'webp_exact', __( '透明区域颜色', 'libre-compress' ), __( '保留透明区域的 RGB 原值（cwebp -exact），会给透明图带来约 16% 的体积开销；动图不支持。', 'libre-compress' ) ); ?>
+                </table>
+            </details>
 
             <h3><?php esc_html_e( 'AVIF 同格式压缩（静图与动图）', 'libre-compress' ); ?></h3>
             <table class="form-table">
                 <?php $this->render_mode_field( 'avif' ); ?>
-                <?php $this->render_quality_field( 'avif_quality', __( '有损质量', 'libre-compress' ), 80 ); ?>
-                <?php $this->render_speed_field( 'avif_speed', __( 'avifenc / FFmpeg 速度', 'libre-compress' ), $options ); ?>
+                <?php $this->render_quality_field( 'avif_quality', __( '有损质量', 'libre-compress' ), 80, __( '静图用 avifenc，动图用 FFmpeg。', 'libre-compress' ) ); ?>
+                <?php $this->render_speed_field( 'avif_speed', __( 'avifenc / FFmpeg 速度', 'libre-compress' ), $options, __( '动图的 FFmpeg 最高只到 8，超过按 8 处理。', 'libre-compress' ) ); ?>
             </table>
+            <details style="margin: -6px 0 18px;">
+                <summary style="cursor: pointer; color: #2271b1;"><?php esc_html_e( '高级参数（仅静图）', 'libre-compress' ); ?></summary>
+                <table class="form-table">
+                    <?php $this->render_quality_field( 'avif_alpha_quality', __( '透明通道质量', 'libre-compress' ), 80, __( 'avifenc 的 --qalpha，100 为透明通道无损。以前不传时它直接跟随颜色质量，现在独立设置。', 'libre-compress' ) ); ?>
+                    <?php
+                    $this->render_choice_field(
+                        'avif_chroma',
+                        __( '色度抽样', 'libre-compress' ),
+                        array(
+                            'auto' => __( '自动（PNG 输出 4:4:4，JPEG 跟随原图）', 'libre-compress' ),
+                            '444'  => __( '4:4:4（最清晰，文件最大）', 'libre-compress' ),
+                            '420'  => __( '4:2:0 + sharpyuv（更小，边缘颜色略糊）', 'libre-compress' ),
+                        ),
+                        __( '只对有损有效。动图由 FFmpeg 编码，这一项不生效。', 'libre-compress' )
+                    );
+                    ?>
+                </table>
+            </details>
 
             <h3><?php esc_html_e( 'JPEG XL 同格式压缩（静图与动图）', 'libre-compress' ); ?></h3>
             <table class="form-table">
@@ -820,7 +953,7 @@ class Libre_Compress_Settings {
                 <?php $this->render_mode_field( 'convert_webp' ); ?>
                 <?php $this->render_quality_field( 'convert_webp_quality', __( '有损质量', 'libre-compress' ), 80, __( 'PNG / JPG 用 cwebp，GIF 用 gif2webp，APNG 用 FFmpeg。', 'libre-compress' ) ); ?>
                 <?php $this->render_speed_field( 'convert_webp_method', __( 'cwebp / FFmpeg 有损方法', 'libre-compress' ), $options ); ?>
-                <?php $this->render_speed_field( 'convert_webp_lossless_level', __( 'cwebp 无损级别', 'libre-compress' ), $options ); ?>
+                <?php $this->render_speed_field( 'convert_webp_lossless_level', __( 'cwebp / FFmpeg 无损级别', 'libre-compress' ), $options ); ?>
                 <?php $this->render_speed_field( 'convert_webp_gif_method', __( 'gif2webp 方法', 'libre-compress' ), $options ); ?>
             </table>
 
@@ -828,7 +961,7 @@ class Libre_Compress_Settings {
             <table class="form-table">
                 <?php $this->render_mode_field( 'convert_avif' ); ?>
                 <?php $this->render_quality_field( 'convert_avif_quality', __( '有损质量', 'libre-compress' ), 80, __( '静态图用 avifenc，动图用 FFmpeg。', 'libre-compress' ) ); ?>
-                <?php $this->render_speed_field( 'convert_avif_speed', __( 'avifenc / FFmpeg 速度', 'libre-compress' ), $options ); ?>
+                <?php $this->render_speed_field( 'convert_avif_speed', __( 'avifenc / FFmpeg 速度', 'libre-compress' ), $options, __( '动图的 FFmpeg 最高只到 8，超过按 8 处理。', 'libre-compress' ) ); ?>
             </table>
 
             <h3><?php esc_html_e( '格式转换：输出 JPEG XL', 'libre-compress' ); ?></h3>
@@ -870,6 +1003,79 @@ class Libre_Compress_Settings {
     }
 
     /**
+     * 渲染值域由工具决定的数值滑块
+     *
+     * @param string $key         设置键名
+     * @param string $label       显示名称
+     * @param string $description 补充说明
+     */
+    private function render_limit_field( string $key, string $label, string $description ): void {
+        list( $min, $max, $default ) = self::LIMIT_SETTINGS[ $key ];
+        $value = self::tool_limit( $key );
+        ?>
+        <tr>
+            <th scope="row"><label for="libre-compress-<?php echo esc_attr( $key ); ?>"><?php echo esc_html( $label ); ?></label></th>
+            <td>
+                <input type="range" id="libre-compress-<?php echo esc_attr( $key ); ?>" name="libre_compress_tools[<?php echo esc_attr( $key ); ?>]" value="<?php echo esc_attr( $value ); ?>" min="<?php echo esc_attr( $min ); ?>" max="<?php echo esc_attr( $max ); ?>" step="1" oninput="this.nextElementSibling.value = this.value">
+                <output><?php echo esc_html( $value ); ?></output>
+                <p class="description"><?php
+                    /* translators: 1: 最小取值，2: 最大取值，3: 默认值。 */
+                    echo esc_html( sprintf( __( '范围 %1$d-%2$d，默认 %3$d。', 'libre-compress' ), $min, $max, $default ) . $description );
+                ?></p>
+            </td>
+        </tr>
+        <?php
+    }
+
+    /**
+     * 渲染枚举下拉框
+     *
+     * @param string   $key         设置键名
+     * @param string   $label       显示名称
+     * @param string[] $choices     取值 => 显示名称
+     * @param string   $description 补充说明
+     */
+    private function render_choice_field( string $key, string $label, array $choices, string $description = '' ): void {
+        $value = self::tool_choice( $key );
+        ?>
+        <tr>
+            <th scope="row"><label for="libre-compress-<?php echo esc_attr( $key ); ?>"><?php echo esc_html( $label ); ?></label></th>
+            <td>
+                <select id="libre-compress-<?php echo esc_attr( $key ); ?>" name="libre_compress_tools[<?php echo esc_attr( $key ); ?>]">
+                    <?php foreach ( $choices as $choice => $text ) : ?>
+                        <option value="<?php echo esc_attr( $choice ); ?>" <?php selected( $value, $choice ); ?>><?php echo esc_html( $text ); ?></option>
+                    <?php endforeach; ?>
+                </select>
+                <?php if ( '' !== $description ) : ?>
+                    <p class="description"><?php echo esc_html( $description ); ?></p>
+                <?php endif; ?>
+            </td>
+        </tr>
+        <?php
+    }
+
+    /**
+     * 渲染开关
+     *
+     * @param string $key         设置键名
+     * @param string $label       显示名称
+     * @param string $description 补充说明
+     */
+    private function render_flag_field( string $key, string $label, string $description ): void {
+        ?>
+        <tr>
+            <th scope="row"><?php echo esc_html( $label ); ?></th>
+            <td>
+                <label>
+                    <input type="checkbox" name="libre_compress_tools[<?php echo esc_attr( $key ); ?>]" value="1" <?php checked( self::tool_flag( $key ) ); ?>>
+                    <?php echo esc_html( $description ); ?>
+                </label>
+            </td>
+        </tr>
+        <?php
+    }
+
+    /**
      * 渲染压缩质量滑块
      *
      * @param string $key         设置键名
@@ -891,7 +1097,7 @@ class Libre_Compress_Settings {
         <?php
     }
 
-    private function render_speed_field( string $key, string $label, array $options ): void {
+    private function render_speed_field( string $key, string $label, array $options, string $extra = '' ): void {
         list( $min, $max, $default ) = self::SPEED_SETTINGS[ $key ];
         $value = self::normalize_speed( $key, $options[ $key ] ?? null );
         $description = in_array( $key, array( 'pngquant_speed', 'avif_speed', 'convert_avif_speed' ), true )
@@ -905,7 +1111,7 @@ class Libre_Compress_Settings {
                 <output><?php echo esc_html( $value ); ?></output>
                 <p class="description"><?php
                     /* translators: 1: 最小档位，2: 最大档位，3: 默认档位。 */
-                    echo esc_html( sprintf( __( '范围 %1$d-%2$d，默认 %3$d。', 'libre-compress' ), $min, $max, $default ) . $description );
+                    echo esc_html( sprintf( __( '范围 %1$d-%2$d，默认 %3$d。', 'libre-compress' ), $min, $max, $default ) . $description . $extra );
                 ?></p>
             </td>
         </tr>

@@ -87,6 +87,14 @@ class Libre_Compress_Gifsicle extends Libre_Compress_Tool_Base {
             $command_parts[] = sprintf( '--lossy=%d', $lossiness );
         }
 
+        // 调色板上限：256 是 GIF 的上限，等于不缩色，所以只在用户调低时才传。
+        $colors = Libre_Compress_Settings::tool_limit( 'gif_colors' );
+
+        if ( $colors < 256 ) {
+            $command_parts[] = '--colors';
+            $command_parts[] = (string) $colors;
+        }
+
         // GIF 的注释扩展块里常是作者与制作工具信息
         if ( Libre_Compress_Settings::strips_metadata() ) {
             $command_parts[] = '--no-comments';

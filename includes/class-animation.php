@@ -784,13 +784,25 @@ class Libre_Compress_Animation {
         $level    = Libre_Compress_Settings::tool_speed( $same ? 'webp_lossless_level' : 'convert_webp_lossless_level' );
         $method   = Libre_Compress_Settings::tool_speed( $same ? 'webp_method' : 'convert_webp_method' );
 
+        // cwebp 的无损级别是 0-9（-z），FFmpeg 只认 0-6（libwebp 的 method），
+        // 而且刻度不一样：实测 cwebp -z 6 的输出与 FFmpeg 4 档一致。按比例换算，
+        // 让界面上的 0-9 在动图这条路上落到同样的强度，而不是整体退两档。
+        $level = (int) round( $level * 6 / 9 );
+
         $command = array( self::tool( 'ffmpeg' ), '-nostdin', '-v', 'error' );
 
         if ( ! $same ) {
             $command = array_merge( $command, array( '-f', 'apng', '-ignore_loop', '1' ) );
         }
 
-        $command = array_merge( $command, array( '-i', $source, '-c:v', 'libwebp_anim' ) );
+        $command = array_merge( $command, array(
+            '-i', $source,
+            '-c:v', 'libwebp_anim',
+        ) );
+
+        // 这里不能传 -preset：FFmpeg 会在初始化时用 WebPConfigPreset() 重置整份配置，
+        // 实测会把 -lossless 抹成有损、把 -compression_level 抹回默认，
+        // 只有 -quality 能留下。内容预设因此只对静图的 cwebp 生效。
 
         if ( $lossless ) {
             $command = array_merge( $command, array( '-lossless', '1', '-compression_level', (string) $level ) );

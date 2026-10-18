@@ -121,50 +121,85 @@ class Libre_Compress_Avif extends Libre_Compress_Tool_Base {
      */
     protected function build_command_chain( string $file_path, array $options ): array {
         $decoder = $this->get_decoder_path();
-        $encoder = $this->get_executable_path();
-
-        // 获取压缩设置
-        $settings = get_option( 'libre_compress_tools', array() );
-        $quality  = isset( $settings['avif_quality'] ) ? absint( $settings['avif_quality'] ) : 80;
-        $mode     = isset( $settings['avif_mode'] ) ? $settings['avif_mode'] : 'lossy';
-        $lossless = ( 'lossless' === $mode );
-
-        // 允许通过选项覆盖设置
-        if ( isset( $options['quality'] ) ) {
-            $quality = absint( $options['quality'] );
-        }
-        if ( isset( $options['lossless'] ) ) {
-            $lossless = (bool) $options['lossless'];
-        }
-
-        // 确保质量在有效范围内
-        $quality = max( 0, min( 100, $quality ) );
 
         // 中间 PNG 与编码结果都走确定性路径，由基类统一替换和兜底清理。
         $temp_png  = $file_path . '.lc-avif.png';
         $temp_avif = $this->get_temp_output_path( $file_path );
 
         $decode = array( $decoder, $file_path, $temp_png );
-
-        $encode = array( $encoder, '-j', '4', '-s', (string) Libre_Compress_Settings::tool_speed( 'avif_speed' ) );
-
-        // avifenc 默认会把输入 PNG 里的 EXIF/XMP 原样搬进 AVIF，而 AVIF 是对外公开访问的文件
-        if ( Libre_Compress_Settings::strips_metadata() ) {
-            $encode[] = '--ignore-exif';
-            $encode[] = '--ignore-xmp';
-        }
-
-        if ( $lossless ) {
-            $encode[] = '--lossless';
-        } else {
-            $encode[] = '-q';
-            $encode[] = (string) $quality;
-        }
-
-        $encode[] = $temp_png;
-        $encode[] = $temp_avif;
+        $encode = array_merge(
+            array( $this->get_executable_path() ),
+            self::build_encode_args( 'avif_', $temp_png, $temp_avif, $options )
+        );
 
         return array( $decode, $encode );
+    }
+
+    /**
+     * 构建 avifenc 的参数
+     *
+     * 同格式压缩与格式转换共用这一份参数拼装，避免两边各写一遍走样。
+     *
+     * @param string $prefix  设置前缀：同格式压缩用 avif_，格式转换用 convert_avif_
+     * @param string $source  源文件路径
+     * @param string $output  输出文件路径
+     * @param array  $options 调用方覆盖项（quality / lossless）
+     * @return array 参数数组（不含可执行文件）
+     */
+    public static function build_encode_args( string $prefix, string $source, string $output, array $options = array() ): array {
+        $settings = get_option( 'libre_compress_tools', array() );
+        $mode     = isset( $settings[ $prefix . 'mode' ] ) ? $settings[ $prefix . 'mode' ] : 'lossy';
+        $quality  = isset( $settings[ $prefix . 'quality' ] ) ? absint( $settings[ $prefix . 'quality' ] ) : 80;
+
+        if ( isset( $options['quality'] ) ) {
+            $quality = absint( $options['quality'] );
+        }
+        if ( isset( $options['lossless'] ) ) {
+            $mode = $options['lossless'] ? 'lossless' : 'lossy';
+        }
+
+        $quality = max( 0, min( 100, $quality ) );
+
+        $args = array(
+            '-j',
+            '4',
+            '-s',
+            (string) Libre_Compress_Settings::tool_speed( $prefix . 'speed' ),
+        );
+
+        // avifenc 默认会把输入里的 EXIF/XMP 原样搬进 AVIF，而产物是对外公开访问的文件
+        if ( Libre_Compress_Settings::strips_metadata() ) {
+            $args[] = '--ignore-exif';
+            $args[] = '--ignore-xmp';
+        }
+
+        if ( 'lossless' === $mode ) {
+            $args[] = '--lossless';
+        } else {
+            $args[] = '-q';
+            $args[] = (string) $quality;
+
+            // 透明通道单独编码；不传时 avifenc 直接套用颜色质量，半透明边缘会被一起压。
+            $args[] = '--qalpha';
+            $args[] = (string) Libre_Compress_Settings::tool_quality( 'avif_alpha_quality', 80 );
+
+            // 色度抽样只存在于有损 YUV：4:2:0 更小但边缘颜色会糊，无损模式下不传。
+            $chroma = Libre_Compress_Settings::tool_choice( 'avif_chroma' );
+
+            if ( '444' === $chroma ) {
+                $args[] = '-y';
+                $args[] = '444';
+            } elseif ( '420' === $chroma ) {
+                $args[] = '-y';
+                $args[] = '420';
+                $args[] = '--sharpyuv';
+            }
+        }
+
+        $args[] = $source;
+        $args[] = $output;
+
+        return $args;
     }
 
     /**

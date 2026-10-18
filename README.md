@@ -158,7 +158,7 @@ WebP / AVIF / JPEG XL 无论静图动图都只做同格式压缩；APNG 与动�
 
 JPEG 有损压缩会优先使用 `cjpegli`（jpegli），没装时自动回退 `jpegoptim`；JPEG 无损压缩始终由 `jpegoptim` 负责。jpegli 是可选增强，不装也能正常压缩。
 
-所有编码器都使用自己的默认色彩处理，插件不再强制 4:2:0 抽样，也不再做 CMYK 转 RGB。
+色彩处理交给各编码器自己的默认值，插件不强制抽样；只有 AVIF 静图额外提供了 4:4:4 / 4:2:0 的可选项（默认自动）。CMYK JPEG 不做转换，原样交给编码器。
 
 选 JPEG XL 作为目标格式时建议同时开启"兼容格式回退"：浏览器对动画 JXL 的支持远不如 AVIF/WebP，保留旧格式回退才能让前台正常显示。
 
@@ -189,16 +189,28 @@ JPEG 有损压缩会优先使用 `cjpegli`（jpegli），没装时自动回退 `
 | oxipng 无损 PNG / APNG 级别 | 0–6 | 越大越慢 | 4 |
 | cwebp / FFmpeg WebP 有损方法（静图与动图共用） | 0–6 | 越大越慢 | 4 |
 | cwebp / FFmpeg WebP 无损级别（静图与动图共用） | 0–9 | 越大越慢 | 6 |
+| WebP 透明通道质量（仅静图） | 0–100 | 越高质量越好 | 100 |
+| WebP 内容预设（仅静图） | 默认 / 照片 / 图片 / 绘图 / 图标 / 文字 | — | 默认 |
 | AVIF 速度（avifenc 与 FFmpeg 共用） | 0–10 | 越大越快 | 6 |
+| AVIF 透明通道质量（仅静图） | 0–100 | 越高质量越好 | 80 |
+| AVIF 色度抽样（仅静图） | 自动 / 4:4:4 / 4:2:0 | 4:2:0 更小 | 自动 |
 | gifsicle GIF 优化级别 | 1–3 | 越大越慢 | 2 |
-| cjxl JPEG XL 级别 | 1–9 | 越大越慢 | 7 |
+| GIF 调色板颜色数 | 2–256 | 越少越小 | 256 |
+| cjxl JPEG XL 级别 | 1–10 | 越大越慢 | 7 |
 | 转换 WebP：cwebp / FFmpeg 方法 | 0–6 | 越大越慢 | 4 |
-| 转换 WebP：cwebp 无损级别 | 0–9 | 越大越慢 | 6 |
+| 转换 WebP：cwebp / FFmpeg 无损级别 | 0–9 | 越大越慢 | 6 |
 | 转换 WebP：gif2webp 方法 | 0–6 | 越大越慢 | 4 |
 | 转换 AVIF 速度 | 0–10 | 越大越快 | 6 |
-| 转换 JPEG XL 级别 | 1–9 | 越大越慢 | 7 |
+| 转换 JPEG XL 级别 | 1–10 | 越大越慢 | 7 |
 
 oxvg 与 jpegoptim 没有独立的速度档位。速度设置只作用于后续处理，不会自动重新压缩已完成的图片。
+
+两处档位在动图链路上要换算，原因写在括号里：
+
+- **WebP 无损级别 0–9**：cwebp 的 `-z` 是 0–9，FFmpeg 的 `-compression_level` 只认 0–6，且刻度差两档（实测 `cwebp -z 6` 与 FFmpeg `4` 档输出一致）。动图按 `级别 × 6 / 9` 四舍五入换算，界面不用改。
+- **AVIF 速度 0–10**：avifenc 的 `-s` 是 0–10，FFmpeg 的 `-cpu-used` 只到 8。动图超过 8 的档位会被压到 8，不会报错。
+
+动图链路上没有的开关（静图才有）：WebP 的内容预设、透明通道质量、`-exact`，AVIF 的透明通道质量与色度抽样。FFmpeg 的 WebP 编码器只提供 `quality`、`compression_level`、`lossless`、`preset`、`cr_threshold`，其中 `preset` 一旦传入会把 `lossless` 和 `compression_level` 一起重置，所以动图不传它。
 
 ### 压缩结果规则
 

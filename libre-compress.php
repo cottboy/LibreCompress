@@ -316,8 +316,10 @@ function libre_compress_activate() {
         'gif_quality'           => 60,
         'webp_mode'             => 'lossy',
         'webp_quality'          => 80,
+        'webp_alpha_quality'    => 100,
         'avif_mode'             => 'lossy',
         'avif_quality'          => 80,
+        'avif_alpha_quality'    => 80,
         'jxl_mode'              => 'lossy',
         'jxl_quality'           => 80,
         'convert_webp_mode'     => 'lossy',
@@ -331,6 +333,18 @@ function libre_compress_activate() {
 
     foreach ( Libre_Compress_Settings::SPEED_SETTINGS as $key => $range ) {
         $default_tools[ $key ] = $range[2];
+    }
+
+    foreach ( Libre_Compress_Settings::LIMIT_SETTINGS as $key => $range ) {
+        $default_tools[ $key ] = $range[2];
+    }
+
+    foreach ( Libre_Compress_Settings::CHOICE_SETTINGS as $key => $allowed ) {
+        $default_tools[ $key ] = $allowed[0];
+    }
+
+    foreach ( Libre_Compress_Settings::FLAG_SETTINGS as $key => $default ) {
+        $default_tools[ $key ] = $default;
     }
 
     // 只在选项不存在时添加默认值
