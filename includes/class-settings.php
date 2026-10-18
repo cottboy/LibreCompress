@@ -462,24 +462,24 @@ class Libre_Compress_Settings {
                     ),
                 ),
             ),
-            'convert_webp'     => array(
-                'title'  => __( '格式转换：输出 WebP', 'libre-compress' ),
-                'note'   => __( 'PNG / JPG 用 cwebp，GIF 用 gif2webp，APNG 用 FFmpeg。三者的参数各自独立，互不影响。', 'libre-compress' ),
+            'convert_webp'      => array(
+                'title'  => __( '输出 WebP：PNG / JPG（cwebp）', 'libre-compress' ),
+                'note'   => __( 'PNG 与 JPG 转 WebP 由 cwebp 处理，下面每一项都直接对应 cwebp 自己的开关。GIF 与 APNG 各有独立的一组，见下面两节。', 'libre-compress' ),
                 'params' => array(
                     'convert_webp_mode'           => self::mode_param(),
                     'convert_webp_quality'        => array(
                         'type'    => 'int',
                         'label'   => __( '有损质量', 'libre-compress' ),
-                        'flag'    => 'cwebp -q / gif2webp -q / FFmpeg -quality',
+                        'flag'    => 'cwebp -q',
                         'min'     => 0,
                         'max'     => 100,
                         'default' => 80,
-                        'desc'    => __( '三条转换路线共用这一个质量，三个工具的质量都是 0-100，语义一致。', 'libre-compress' ),
+                        'desc'    => __( '只有有损模式有效，0 最省体积、100 最好。', 'libre-compress' ),
                     ),
                     'convert_webp_method'         => array(
                         'type'    => 'int',
-                        'label'   => __( 'cwebp / FFmpeg 有损方法', 'libre-compress' ),
-                        'flag'    => 'cwebp -m / FFmpeg -compression_level',
+                        'label'   => __( '有损压缩方法', 'libre-compress' ),
+                        'flag'    => 'cwebp -m',
                         'min'     => 0,
                         'max'     => 6,
                         'default' => 4,
@@ -492,16 +492,7 @@ class Libre_Compress_Settings {
                         'min'     => 0,
                         'max'     => 9,
                         'default' => 6,
-                        'desc'    => __( '只有无损模式有效，0 最快、9 最小。只有 PNG / JPG 走的 cwebp 有这个开关，GIF 与 APNG 不传。', 'libre-compress' ),
-                    ),
-                    'convert_webp_gif_method'     => array(
-                        'type'    => 'int',
-                        'label'   => __( 'gif2webp 方法', 'libre-compress' ),
-                        'flag'    => 'gif2webp -m',
-                        'min'     => 0,
-                        'max'     => 6,
-                        'default' => 4,
-                        'desc'    => __( 'GIF 转 WebP 单独用这一档，和上面的 cwebp 方法互不影响。', 'libre-compress' ),
+                        'desc'    => __( '只有无损模式有效，0 最快、9 最小。', 'libre-compress' ),
                     ),
                     'convert_webp_alpha_quality'  => array(
                         'type'    => 'int',
@@ -510,7 +501,7 @@ class Libre_Compress_Settings {
                         'min'     => 0,
                         'max'     => 100,
                         'default' => 100,
-                        'desc'    => __( '100 为透明通道无损。只对 PNG / JPG 走的 cwebp 生效。', 'libre-compress' ),
+                        'desc'    => __( '100 为透明通道无损。', 'libre-compress' ),
                     ),
                     'convert_webp_preset'         => array(
                         'type'    => 'choice',
@@ -525,7 +516,7 @@ class Libre_Compress_Settings {
                             'text'    => __( '文字截图', 'libre-compress' ),
                         ),
                         'default' => 'default',
-                        'desc'    => __( '只对 PNG / JPG 转 WebP 生效，GIF 与 APNG 不走 cwebp。', 'libre-compress' ),
+                        'desc'    => __( '按内容类型预调参数。预设会重置质量与方法，所以它永远排在命令行最前面。', 'libre-compress' ),
                     ),
                     'convert_webp_exact'          => array(
                         'type'    => 'bool',
@@ -536,9 +527,65 @@ class Libre_Compress_Settings {
                     ),
                 ),
             ),
-            'convert_avif'     => array(
-                'title'  => __( '格式转换：输出 AVIF', 'libre-compress' ),
-                'note'   => __( 'PNG / JPG 与静态 GIF 走 avifenc；动画 GIF 与 APNG 走 FFmpeg 的 libaom-av1，后者有自己的 CRF 与速度两项，见本组最后两行。', 'libre-compress' ),
+            'convert_webp_gif'  => array(
+                'title'  => __( '输出 WebP：GIF（gif2webp）', 'libre-compress' ),
+                'note'   => __( 'GIF 转 WebP 由 gif2webp 处理，静态与动画 GIF 都走这一组。gif2webp 默认保持无损，只有勾上“启用有损”才会带上 -lossy 并按质量重新量化。', 'libre-compress' ),
+                'params' => array(
+                    'convert_webp_gif_lossy'   => array(
+                        'type'    => 'bool',
+                        'label'   => __( '启用有损', 'libre-compress' ),
+                        'flag'    => 'gif2webp -lossy',
+                        'default' => true,
+                        'desc'    => __( '勾选时带上 -lossy 并按下面的质量重新量化；取消则只重排数据，画面不变、体积也降得少。', 'libre-compress' ),
+                    ),
+                    'convert_webp_gif_quality' => array(
+                        'type'    => 'int',
+                        'label'   => __( '有损质量', 'libre-compress' ),
+                        'flag'    => 'gif2webp -q',
+                        'min'     => 0,
+                        'max'     => 100,
+                        'default' => 80,
+                        'desc'    => __( '只有勾上“启用有损”才传，0 最省体积、100 最好。', 'libre-compress' ),
+                    ),
+                    'convert_webp_gif_method'  => array(
+                        'type'    => 'int',
+                        'label'   => __( '压缩方法', 'libre-compress' ),
+                        'flag'    => 'gif2webp -m',
+                        'min'     => 0,
+                        'max'     => 6,
+                        'default' => 4,
+                        'desc'    => __( '0 最快、6 最慢但最小。', 'libre-compress' ),
+                    ),
+                ),
+            ),
+            'convert_webp_anim' => array(
+                'title'  => __( '输出 WebP：APNG 动图（FFmpeg）', 'libre-compress' ),
+                'note'   => __( 'APNG 整只交给 FFmpeg 的 libwebp_anim，参数直接对应 FFmpeg 的 -quality 与 -compression_level，不做换算。', 'libre-compress' ),
+                'params' => array(
+                    'convert_webp_anim_mode'    => self::mode_param(),
+                    'convert_webp_anim_quality' => array(
+                        'type'    => 'int',
+                        'label'   => __( '有损质量', 'libre-compress' ),
+                        'flag'    => 'FFmpeg -quality',
+                        'min'     => 0,
+                        'max'     => 100,
+                        'default' => 80,
+                        'desc'    => __( '只有有损模式有效，0 最省体积、100 最好。', 'libre-compress' ),
+                    ),
+                    'convert_webp_anim_method'  => array(
+                        'type'    => 'int',
+                        'label'   => __( '压缩方法', 'libre-compress' ),
+                        'flag'    => 'FFmpeg -compression_level',
+                        'min'     => 0,
+                        'max'     => 6,
+                        'default' => 4,
+                        'desc'    => __( '0 最快、6 最慢但最小，有损与无损都生效。', 'libre-compress' ),
+                    ),
+                ),
+            ),
+            'convert_avif'      => array(
+                'title'  => __( '输出 AVIF：PNG / JPG / 静态 GIF（avifenc）', 'libre-compress' ),
+                'note'   => __( 'PNG、JPG 与静态 GIF 转 AVIF 由 avifenc 处理（静态 GIF 先解成 PNG），每一项都直接对应 avifenc 的开关。动画 GIF 与 APNG 有独立的一组，见下面一节。', 'libre-compress' ),
                 'params' => array(
                     'convert_avif_mode'          => self::mode_param(),
                     'convert_avif_quality'       => array(
@@ -548,7 +595,7 @@ class Libre_Compress_Settings {
                         'min'     => 0,
                         'max'     => 100,
                         'default' => 80,
-                        'desc'    => __( '100 为无损，0 最省体积。只对走 avifenc 的静态输入生效。', 'libre-compress' ),
+                        'desc'    => __( '100 为无损，0 最省体积。只有有损模式有效。', 'libre-compress' ),
                     ),
                     'convert_avif_alpha_quality' => array(
                         'type'    => 'int',
@@ -557,16 +604,16 @@ class Libre_Compress_Settings {
                         'min'     => 0,
                         'max'     => 100,
                         'default' => 80,
-                        'desc'    => __( '100 为透明通道无损。只对走 avifenc 的静态输入生效。', 'libre-compress' ),
+                        'desc'    => __( '100 为透明通道无损。', 'libre-compress' ),
                     ),
                     'convert_avif_speed'         => array(
                         'type'    => 'int',
-                        'label'   => __( 'avifenc 速度', 'libre-compress' ),
+                        'label'   => __( '速度', 'libre-compress' ),
                         'flag'    => 'avifenc -s',
                         'min'     => 0,
                         'max'     => 10,
                         'default' => 6,
-                        'desc'    => __( '0 最慢最小、10 最快最大。只对走 avifenc 的静态输入生效。', 'libre-compress' ),
+                        'desc'    => __( '0 最慢最小、10 最快最大。', 'libre-compress' ),
                     ),
                     'convert_avif_chroma'        => array(
                         'type'    => 'choice',
@@ -579,7 +626,7 @@ class Libre_Compress_Settings {
                             '420'  => __( '4:2:0 + sharpyuv（最小，边缘略糊）', 'libre-compress' ),
                         ),
                         'default' => 'auto',
-                        'desc'    => __( '只有有损有效。', 'libre-compress' ),
+                        'desc'    => __( '只有有损有效。选 4:2:0 会带上 avifenc 的 --sharpyuv。', 'libre-compress' ),
                     ),
                     'convert_avif_depth'         => array(
                         'type'    => 'choice',
@@ -588,10 +635,10 @@ class Libre_Compress_Settings {
                         'choices' => array(
                             '8'  => __( '8 位（默认，浏览器都能显示）', 'libre-compress' ),
                             '10' => __( '10 位（渐变更平滑，体积略大）', 'libre-compress' ),
-                            '12' => __( '12 位（几乎用不到）', 'libre-compress' ),
+                            '12'  => __( '12 位（几乎用不到）', 'libre-compress' ),
                         ),
                         'default' => '8',
-                        'desc'    => __( '位深越高渐变越平滑，但体积更大、老设备可能不支持。', 'libre-compress' ),
+                        'desc'    => __( '位深越高渐变越平滑，但体积更大、老设备可能不支持。8 位时不传这个参数。', 'libre-compress' ),
                     ),
                     'convert_avif_jobs'          => array(
                         'type'    => 'int',
@@ -602,38 +649,45 @@ class Libre_Compress_Settings {
                         'default' => 4,
                         'desc'    => __( '同时开几个编码线程，开太多会和网站抢 CPU。', 'libre-compress' ),
                     ),
-                    'convert_avif_anim_crf'      => array(
+                ),
+            ),
+            'convert_avif_anim' => array(
+                'title'  => __( '输出 AVIF：动画 GIF / APNG（FFmpeg）', 'libre-compress' ),
+                'note'   => __( '动画转 AVIF 整只交给 FFmpeg 的 libaom-av1：-crf 取 0-63、-cpu-used 取 0-8、-threads 按填写值，都是 FFmpeg 的原始参数，不做换算。', 'libre-compress' ),
+                'params' => array(
+                    'convert_avif_anim_mode'    => self::mode_param(),
+                    'convert_avif_anim_crf'     => array(
                         'type'    => 'int',
-                        'label'   => __( '动图 CRF（质量）', 'libre-compress' ),
+                        'label'   => __( 'CRF（质量）', 'libre-compress' ),
                         'flag'    => 'FFmpeg -crf',
                         'min'     => 0,
                         'max'     => 63,
                         'default' => 20,
-                        'desc'    => __( '直接对应 libaom 的 -crf，数值越小画质越好、体积越大。只有动画 GIF / APNG 转 AVIF 时使用。', 'libre-compress' ),
+                        'desc'    => __( '直接对应 libaom 的 -crf：越小画质越好、体积越大。只有有损模式有效。', 'libre-compress' ),
                     ),
-                    'convert_avif_anim_speed'    => array(
+                    'convert_avif_anim_speed'   => array(
                         'type'    => 'int',
-                        'label'   => __( '动图速度', 'libre-compress' ),
+                        'label'   => __( '速度', 'libre-compress' ),
                         'flag'    => 'FFmpeg -cpu-used',
                         'min'     => 0,
                         'max'     => 8,
                         'default' => 6,
-                        'desc'    => __( '直接对应 libaom 的 -cpu-used：0 最慢最小、8 最快最大。只有动画 GIF / APNG 转 AVIF 时使用。', 'libre-compress' ),
+                        'desc'    => __( '0 最慢最小、8 最快最大。', 'libre-compress' ),
                     ),
-                    'convert_avif_anim_threads'  => array(
+                    'convert_avif_anim_threads' => array(
                         'type'    => 'int',
-                        'label'   => __( '动图编码线程数', 'libre-compress' ),
+                        'label'   => __( '编码线程数', 'libre-compress' ),
                         'flag'    => 'FFmpeg -threads',
                         'min'     => 1,
                         'max'     => 16,
                         'default' => 4,
-                        'desc'    => __( '直接对应 FFmpeg 的 -threads。只有动画 GIF / APNG 转 AVIF 时使用。', 'libre-compress' ),
+                        'desc'    => __( '直接对应 FFmpeg 的 -threads。开太多会和网站抢 CPU。', 'libre-compress' ),
                     ),
                 ),
             ),
-            'convert_jxl'      => array(
-                'title'  => __( '格式转换：输出 JPEG XL', 'libre-compress' ),
-                'note'   => __( '静态 GIF、APNG 都由 cjxl 直读，图像与动画共用这一组参数。', 'libre-compress' ),
+            'convert_jxl'       => array(
+                'title'  => __( '输出 JPEG XL（cjxl）', 'libre-compress' ),
+                'note'   => __( '静态 JPG / PNG / GIF 与动画 GIF / APNG 都由 cjxl 直读，共用这一组参数。', 'libre-compress' ),
                 'params' => array(
                     'convert_jxl_mode'    => self::mode_param(),
                     'convert_jxl_quality' => array(
@@ -643,7 +697,7 @@ class Libre_Compress_Settings {
                         'min'     => 0,
                         'max'     => 100,
                         'default' => 80,
-                        'desc'    => __( '100 等于数学无损，90 已经是视觉无损。', 'libre-compress' ),
+                        'desc'    => __( '100 等于数学无损，90 已经是视觉无损。只有有损模式有效。', 'libre-compress' ),
                     ),
                     'convert_jxl_effort'  => array(
                         'type'    => 'int',
@@ -1442,8 +1496,23 @@ class Libre_Compress_Settings {
         <form method="post" action="options.php">
             <?php settings_fields( 'libre_compress_tools_group' ); ?>
 
-            <?php foreach ( self::param_groups() as $group ) : ?>
-                <h3 style="margin-top: 28px;"><?php echo esc_html( $group['title'] ); ?></h3>
+            <?php
+            // 分组按“同格式压缩”和“格式转换”两段呈现：转换组的键名都以 convert_ 开头。
+            $current_section = '';
+
+            foreach ( self::param_groups() as $group_id => $group ) :
+                $section = ( 0 === strpos( $group_id, 'convert_' ) ) ? 'convert' : 'same';
+
+                if ( $section !== $current_section ) :
+                    $current_section = $section;
+                    ?>
+                    <h3 style="margin: 34px 0 6px; font-size: 18px;">
+                        <?php echo esc_html( 'convert' === $section ? __( '格式转换参数', 'libre-compress' ) : __( '同格式压缩参数', 'libre-compress' ) ); ?>
+                    </h3>
+                    <?php
+                endif;
+                ?>
+                <h4 style="margin: 26px 0 4px; font-size: 15px;"><?php echo esc_html( $group['title'] ); ?></h4>
                 <?php if ( ! empty( $group['note'] ) ) : ?>
                     <p class="description" style="max-width: 900px;"><?php echo esc_html( $group['note'] ); ?></p>
                 <?php endif; ?>

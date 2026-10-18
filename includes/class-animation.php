@@ -765,7 +765,7 @@ class Libre_Compress_Animation {
      *
      * libwebp_anim 自己会推算帧间差异矩形与画布尺寸，所以画布大小、帧偏移、
      * 逐帧时长和循环次数都不用插件操心，帧数再多也只是一条命令。
-     * 同格式重压读 webp_* 设置，APNG 转 WebP 读 convert_webp_* 设置。
+     * 同格式重压读 webp_anim 组，APNG 转 WebP 读 convert_webp_anim 组。
      *
      * @param string $source 源路径
      * @param string $output 输出路径
@@ -775,7 +775,7 @@ class Libre_Compress_Animation {
     private static function build_webp_command( string $source, string $output, array $plan ): array {
         $same     = 'webp' === $plan['format'];
         // 同格式重压用动图自己的参数组，APNG 转 WebP 用转换组的参数，两边互不影响。
-        $group    = $same ? 'webp_anim' : 'convert_webp';
+        $group    = $same ? 'webp_anim' : 'convert_webp_anim';
         $lossless = 'lossless' === Libre_Compress_Settings::param_mode( $group );
         $quality  = Libre_Compress_Settings::param_int( $group . '_quality' );
         $method   = Libre_Compress_Settings::param_int( $group . '_method' );
@@ -891,12 +891,13 @@ class Libre_Compress_Animation {
             return false;
         }
 
-        $lossless = 'lossless' === Libre_Compress_Settings::param_mode( 'convert_webp' );
-        $quality  = Libre_Compress_Settings::param_int( 'convert_webp_quality' );
+        // gif2webp 默认保持无损，-lossy 是一个独立开关，不是“模式”。
+        $lossy   = Libre_Compress_Settings::param_flag( 'convert_webp_gif_lossy' );
+        $quality = Libre_Compress_Settings::param_int( 'convert_webp_gif_quality' );
 
         $command = array( $gif2webp, '-m', (string) Libre_Compress_Settings::param_int( 'convert_webp_gif_method' ) );
 
-        if ( ! $lossless ) {
+        if ( $lossy ) {
             $command = array_merge( $command, array( '-lossy', '-q', (string) $quality ) );
         }
 
@@ -1016,11 +1017,12 @@ class Libre_Compress_Animation {
      */
     private static function build_avif_command( string $source, string $output, array $plan ) {
         $same     = 'avif' === $plan['format'];
-        // 同格式重压用动图自己的参数组，GIF / APNG 转 AVIF 用转换组里那两项动图参数。
-        $lossless = 'lossless' === Libre_Compress_Settings::param_mode( $same ? 'avif_anim' : 'convert_avif' );
-        $crf      = Libre_Compress_Settings::param_int( $same ? 'avif_anim_crf' : 'convert_avif_anim_crf' );
-        $speed    = Libre_Compress_Settings::param_int( $same ? 'avif_anim_speed' : 'convert_avif_anim_speed' );
-        $threads  = Libre_Compress_Settings::param_int( $same ? 'avif_anim_threads' : 'convert_avif_anim_threads' );
+        // 同格式重压用 avif_anim 组，GIF / APNG 转 AVIF 用 convert_avif_anim 组，两组各自独立。
+        $group    = $same ? 'avif_anim' : 'convert_avif_anim';
+        $lossless = 'lossless' === Libre_Compress_Settings::param_mode( $group );
+        $crf      = Libre_Compress_Settings::param_int( $group . '_crf' );
+        $speed    = Libre_Compress_Settings::param_int( $group . '_speed' );
+        $threads  = Libre_Compress_Settings::param_int( $group . '_threads' );
         $command  = array( self::tool( 'ffmpeg' ), '-nostdin', '-v', 'error' );
 
         if ( 'gif' === $plan['format'] ) {
