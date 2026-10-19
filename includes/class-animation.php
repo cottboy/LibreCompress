@@ -740,20 +740,25 @@ class Libre_Compress_Animation {
      * 工具接收完整动画，不生成逐帧临时图片。
      */
     private static function build_native_command( string $source, string $target, string $output, array $plan ) {
+        $format = $plan['format'];
+
+        // 每条转换路径都有自己的参数分组：GIF 与 APNG 转同一个目标格式也互不影响。
         if ( 'jxl' === $target ) {
-            return Libre_Compress_Cjxl::build_command( $source, $output, 'convert_jxl' );
+            $group = 'gif' === $format ? 'convert_jxl_anim_gif' : 'convert_jxl_anim_apng';
+
+            return Libre_Compress_Cjxl::build_command( $source, $output, $group );
         }
 
         if ( 'avif' === $target ) {
             return self::build_avif_command( $source, $output, $plan );
         }
 
-        if ( 'gif' === $plan['format'] ) {
-            return self::gif2webp_command( $source, $output );
+        if ( 'gif' === $format ) {
+            return self::gif2webp_command( $source, $output, 'convert_webp_anim_gif' );
         }
 
         // 剩下的都是 WebP 目标：WebP 同格式重压与 APNG 转 WebP，都交给 FFmpeg 一次读写整只动图。
-        if ( ! in_array( $plan['format'], array( 'png', 'webp' ), true ) ) {
+        if ( ! in_array( $format, array( 'png', 'webp' ), true ) ) {
             return false;
         }
 
@@ -765,7 +770,7 @@ class Libre_Compress_Animation {
      *
      * libwebp_anim 自己会推算帧间差异矩形与画布尺寸，所以画布大小、帧偏移、
      * 逐帧时长和循环次数都不用插件操心，帧数再多也只是一条命令。
-     * 同格式重压读 webp_anim 组，APNG 转 WebP 读 convert_webp_anim 组。
+     * 同格式重压读 webp_anim 组，APNG 转 WebP 读 convert_webp_anim_apng 组。
      *
      * @param string $source 源路径
      * @param string $output 输出路径
@@ -774,8 +779,8 @@ class Libre_Compress_Animation {
      */
     private static function build_webp_command( string $source, string $output, array $plan ): array {
         $same     = 'webp' === $plan['format'];
-        // 同格式重压用动图自己的参数组，APNG 转 WebP 用转换组的参数，两边互不影响。
-        $group    = $same ? 'webp_anim' : 'convert_webp_anim';
+        // 同格式重压用动图自己的参数组，APNG 转 WebP 用 APNG 转换组的参数，两边互不影响。
+        $group    = $same ? 'webp_anim' : 'convert_webp_anim_apng';
         $lossless = 'lossless' === Libre_Compress_Settings::param_mode( $group );
         $quality  = Libre_Compress_Settings::param_int( $group . '_quality' );
         $method   = Libre_Compress_Settings::param_int( $group . '_method' );
@@ -884,7 +889,7 @@ class Libre_Compress_Animation {
      * @param string $output 输出路径
      * @return array|false 参数数组，工具不可用时返回 false
      */
-    public static function gif2webp_command( string $source, string $output ) {
+    public static function gif2webp_command( string $source, string $output, string $group = 'convert_webp_gif' ) {
         $gif2webp = self::tool( 'gif2webp' );
 
         if ( false === $gif2webp ) {
@@ -892,10 +897,10 @@ class Libre_Compress_Animation {
         }
 
         // gif2webp 默认保持无损，-lossy 是一个独立开关，不是“模式”。
-        $lossy   = Libre_Compress_Settings::param_flag( 'convert_webp_gif_lossy' );
-        $quality = Libre_Compress_Settings::param_int( 'convert_webp_gif_quality' );
+        $lossy   = Libre_Compress_Settings::param_flag( $group . '_lossy' );
+        $quality = Libre_Compress_Settings::param_int( $group . '_quality' );
 
-        $command = array( $gif2webp, '-m', (string) Libre_Compress_Settings::param_int( 'convert_webp_gif_method' ) );
+        $command = array( $gif2webp, '-m', (string) Libre_Compress_Settings::param_int( $group . '_method' ) );
 
         if ( $lossy ) {
             $command = array_merge( $command, array( '-lossy', '-q', (string) $quality ) );
@@ -1017,8 +1022,12 @@ class Libre_Compress_Animation {
      */
     private static function build_avif_command( string $source, string $output, array $plan ) {
         $same     = 'avif' === $plan['format'];
-        // 同格式重压用 avif_anim 组，GIF / APNG 转 AVIF 用 convert_avif_anim 组，两组各自独立。
-        $group    = $same ? 'avif_anim' : 'convert_avif_anim';
+        // 同格式重压用 avif_anim 组；GIF 与 APNG 转 AVIF 各有自己的分组，两边互不影响。
+        if ( $same ) {
+            $group = 'avif_anim';
+        } else {
+            $group = 'gif' === $plan['format'] ? 'convert_avif_anim_gif' : 'convert_avif_anim_apng';
+        }
         $lossless = 'lossless' === Libre_Compress_Settings::param_mode( $group );
         $crf      = Libre_Compress_Settings::param_int( $group . '_crf' );
         $speed    = Libre_Compress_Settings::param_int( $group . '_speed' );
@@ -1099,6 +1108,14 @@ class Libre_Compress_Animation {
         } else {
             // CRF 直接吃参数表里的 0-63，不做任何换算。
             $encoder = array_merge( $encoder, array( '-crf', (string) $crf ) );
+
+            // 色彩抽样只存在于有损 YUV：4:4:4 保色最准，4:2:0 体积最小。
+            // 只指定颜色轨道（第一条视频轨），透明轨道仍然按 gray 编码。
+            $chroma = Libre_Compress_Settings::param_choice( $group . '_chroma' );
+
+            if ( 'auto' !== $chroma ) {
+                $encoder = array_merge( $encoder, array( '-pix_fmt:v:0', 'yuv' . $chroma . 'p' ) );
+            }
         }
 
         $command = array_merge(

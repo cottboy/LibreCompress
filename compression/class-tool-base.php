@@ -111,6 +111,20 @@ abstract class Libre_Compress_Tool_Base {
     }
 
     /**
+     * 命令链执行成功、替换原文件之前的收尾钩子
+     *
+     * 用于工具本身没法一步到位处理的事情（例如 SVG 的元数据清理）。
+     * 返回 false 表示收尾失败，本次压缩按失败处理，原文件保持不动。
+     *
+     * @param string $temp_output 临时输出路径，原地覆盖时为空字符串
+     * @param string $file_path   被压缩的原文件路径
+     * @return bool 是否继续替换原文件
+     */
+    protected function finalize_temp_output( string $temp_output, string $file_path ): bool {
+        return true;
+    }
+
+    /**
      * 获取编码过程中产生的其他临时文件
      *
      * 只用于兜底清理，不参与替换。
@@ -491,6 +505,15 @@ abstract class Libre_Compress_Tool_Base {
                 return array(
                     'success'         => false,
                     'message'         => $result['output'],
+                    'original_size'   => $original_size,
+                    'compressed_size' => $original_size,
+                );
+            }
+
+            if ( ! $this->finalize_temp_output( $temp_output, $file_path ) ) {
+                return array(
+                    'success'         => false,
+                    'message'         => __( '压缩结果收尾处理失败，已保留原文件', 'libre-compress' ),
                     'original_size'   => $original_size,
                     'compressed_size' => $original_size,
                 );

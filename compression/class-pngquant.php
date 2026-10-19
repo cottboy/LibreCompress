@@ -128,8 +128,8 @@ class Libre_Compress_Pngquant extends Libre_Compress_Tool_Base {
 
         // pngquant 的质量本身就是「下限-上限」两段：低于下限就不保存、保留原图，
         // 上限用来决定最多保留多少颜色。界面直接对应这两个参数，不做二次换算。
-        $min_quality = Libre_Compress_Settings::param_int( 'png_quality_min' );
-        $max_quality = Libre_Compress_Settings::param_int( 'png_quality_max' );
+        $min_quality = Libre_Compress_Settings::param_int( 'png_lossy_quality_min' );
+        $max_quality = Libre_Compress_Settings::param_int( 'png_lossy_quality_max' );
 
         if ( $min_quality > $max_quality ) {
             $min_quality = $max_quality;
@@ -146,10 +146,10 @@ class Libre_Compress_Pngquant extends Libre_Compress_Tool_Base {
             '--skip-if-larger',
             sprintf( '--quality=%d-%d', $min_quality, $max_quality ),
             '--speed',
-            (string) Libre_Compress_Settings::param_int( 'pngquant_speed' ),
+            (string) Libre_Compress_Settings::param_int( 'png_lossy_speed' ),
         );
 
-        if ( ! Libre_Compress_Settings::param_flag( 'pngquant_dither' ) ) {
+        if ( ! Libre_Compress_Settings::param_flag( 'png_lossy_dither' ) ) {
             $command_parts[] = '--nofs';
         }
 

@@ -296,11 +296,14 @@ class Libre_Compress_Output {
         } elseif ( 'gif' === $format ) {
             // 静态 GIF 只有一条帧，不用拆帧：WebP 交给 gif2webp、JPEG XL 交给 cjxl 直接读原文件
             //（cwebp 读 GIF 会丢透明，实测过），只有 AVIF 必须先经 GD 解成 PNG —— avifenc 不认 GIF。
+            // 三条 GIF 转换路径各有独立参数，跟 PNG/JPG 的转换设置互不影响。
+            $gif_group = 'convert_' . $target . '_gif';
+
             if ( 'webp' === $target ) {
-                $gif2webp = Libre_Compress_Animation::gif2webp_command( $file_path, $temp_output );
+                $gif2webp = Libre_Compress_Animation::gif2webp_command( $file_path, $temp_output, $gif_group );
                 $command  = false === $gif2webp ? false : array( $gif2webp );
             } elseif ( 'jxl' === $target ) {
-                $cjxl    = Libre_Compress_Cjxl::build_command( $file_path, $temp_output, 'convert_jxl' );
+                $cjxl    = Libre_Compress_Cjxl::build_command( $file_path, $temp_output, $gif_group );
                 $command = false === $cjxl ? false : array( $cjxl );
             } else {
                 $temp_source = $file_path . '.lc-source-' . $temp_token . '.png';
@@ -317,10 +320,10 @@ class Libre_Compress_Output {
                     $result_template['message'] = __( 'GIF 压缩预处理失败', 'libre-compress' );
                     return $result_template;
                 }
-                $command = $this->build_encode_command( $temp_source, $temp_output, $target );
+                $command = $this->build_encode_command( $temp_source, $temp_output, $target, $gif_group );
             }
         } else {
-            $command = $this->build_encode_command( $file_path, $temp_output, $target );
+            $command = $this->build_encode_command( $file_path, $temp_output, $target, 'convert_' . $target );
         }
 
         if ( $animation_done ) {
@@ -2013,10 +2016,11 @@ class Libre_Compress_Output {
      *
      * @param string $source     编码输入文件路径
      * @param string $output     编码输出文件路径
-     * @param string $target     目标格式 webp|avif
+     * @param string $target     目标格式 webp|avif|jxl
+     * @param string $group      这条路径的参数分组
      * @return array|false 命令链（参数数组的数组）或 false
      */
-    private function build_encode_command( string $source, string $output, string $target ) {
+    private function build_encode_command( string $source, string $output, string $target, string $group ) {
         $tool_name = isset( $this->target_tools[ $target ] ) ? $this->target_tools[ $target ] : '';
         $tools     = libre_compress()->compressor->get_tools();
 
@@ -2036,16 +2040,16 @@ class Libre_Compress_Output {
 
         if ( 'webp' === $target ) {
             // 参数拼装与同格式压缩共用一份，避免两边走样。
-            return array( array_merge( array( $binary ), Libre_Compress_Cwebp::build_encode_args( 'convert_webp', $source, $output ) ) );
+            return array( array_merge( array( $binary ), Libre_Compress_Cwebp::build_encode_args( $group, $source, $output ) ) );
         }
 
         if ( 'jxl' === $target ) {
-            $command = Libre_Compress_Cjxl::build_command( $source, $output, 'convert_jxl' );
+            $command = Libre_Compress_Cjxl::build_command( $source, $output, $group );
 
             return false === $command ? false : array( $command );
         }
 
-        return array( array_merge( array( $binary ), Libre_Compress_Avif::build_encode_args( 'convert_avif', $source, $output ) ) );
+        return array( array_merge( array( $binary ), Libre_Compress_Avif::build_encode_args( $group, $source, $output ) ) );
     }
 
     /**

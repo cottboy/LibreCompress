@@ -74,8 +74,8 @@ class Libre_Compress_Compressor {
         $extension = strtolower( $extension );
 
         if ( 'png' === $extension ) {
-            // 模式只从参数总表读，缺失或非法时与设置页显示的一致
-            $tool_name = 'lossy' === Libre_Compress_Settings::param_mode( 'png' ) ? 'pngquant' : 'oxipng';
+            // PNG 走哪条路径只从参数总表读，缺失或非法时与设置页显示的一致
+            $tool_name = Libre_Compress_Settings::png_is_lossless() ? 'oxipng' : 'pngquant';
 
             if ( isset( $this->tools[ $tool_name ] ) && $this->tools[ $tool_name ]->is_tool_available() ) {
                 return $this->tools[ $tool_name ];

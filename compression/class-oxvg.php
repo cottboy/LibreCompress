@@ -72,6 +72,48 @@ class Libre_Compress_Oxvg extends Libre_Compress_Tool_Base {
     }
 
     /**
+     * 替换原文件前清掉 SVG 里的来源信息
+     *
+     * oxvg 的两种预设本身就会删掉 <metadata> 与注释，但预设的具体清单会随版本变化，
+     * 这里在开启“删除图片元数据”时再按文本清一遍，确保作者、软件、RDF 版权信息
+     * 与设计稿路径不会留在对外公开的文件里。只删 <metadata> 和注释，
+     * <title>/<desc> 属于可访问性内容，原样保留。
+     *
+     * @param string $temp_output 临时输出路径
+     * @param string $file_path   原文件路径
+     * @return bool 是否清理成功
+     */
+    protected function finalize_temp_output( string $temp_output, string $file_path ): bool {
+        if ( '' === $temp_output || ! Libre_Compress_Settings::strips_metadata() ) {
+            return true;
+        }
+
+        // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_get_contents
+        $content = file_get_contents( $temp_output );
+
+        if ( false === $content ) {
+            return false;
+        }
+
+        $cleaned = preg_replace(
+            array(
+                '#<!--.*?-->#s',
+                '#<metadata\b[^>]*>.*?</metadata\s*>#is',
+                '#<metadata\b[^>]*/>#is',
+            ),
+            '',
+            $content
+        );
+
+        if ( null === $cleaned ) {
+            return false;
+        }
+
+        // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents
+        return false !== file_put_contents( $temp_output, $cleaned );
+    }
+
+    /**
      * 获取编码结果的临时文件路径
      *
      * @param string $file_path 文件路径

@@ -35,7 +35,7 @@
 - **兼容格式回退**：开启后格式转换生成“源文件名.webp”“源文件名.avif”的双扩展名新文件，旧格式文件原地保留并同样经过压缩，前台用 `<picture>` 让不支持新格式的浏览器加载旧格式；回退地址由新格式名去掉最后一段扩展名确定性推导，不查询数据库。关闭后转换不再保留旧格式文件，提交成功后直接删除源文件，新格式完整替换旧格式，前台也只输出新格式。
 - **隐私保护**：压缩和格式转换时默认清除 EXIF、GPS 拍摄位置、设备与软件信息，对所有压缩路径生效，并尽量保留 ICC 色彩配置以免偏色。
 - **动图保护**：识别 APNG 的 `acTL` 块、WebP 的 `ANMF` 块，绝不让只认第一帧的工具把动图压成静图；APNG 只走 oxipng 的无损通道，由“压缩 APNG”开关控制，默认开启。
-- **按路径分组参数**：JPEG、PNG 静图、APNG 动图、GIF、WebP 静图、WebP 动图、AVIF 静图、AVIF 动图、JPEG XL、SVG，以及转换到 WebP/AVIF/JPEG XL 的六组路径（按目标格式与处理工具再细分），各自独立设置。
+- **按路径分组参数**：23 条压缩路径（11 条同格式压缩 + 12 条格式转换）每条一个独立设置区，共 23 个，参数互不共用。动画 GIF 转 WebP 与 APNG 转 WebP 虽然是同一个目标格式，也是两套完全独立的设置。
 - **参数与工具一一对应**：设置页每一项后面都标着它实际传给哪个工具的哪个参数，范围就是工具本身认可的范围（例如 pngquant 的 `--speed` 是 1-11、avifenc 的 `-s` 是 0-10、FFmpeg 的 `-crf` 是 0-63）。插件不做换算、不折算档位，没列出来的参数一律不传。
 - **JPEG 只用 jpegoptim**：有损与无损都交给 jpegoptim，不依赖 jpegli，省掉 PPM 中转也就不会丢元数据。
 - **附件级排他锁**：同一附件的压缩、恢复和缩略图操作不会并发互相覆盖。
@@ -149,10 +149,10 @@ WebP / AVIF / JPEG XL 无论静图动图都只做同格式压缩；APNG 与动�
 
 ### 压缩参数
 
-“压缩工具”页按压缩路径分组，每条路径的参数都在同一张表里，每一项后面都标出它**实际传给哪个工具的哪个参数**。
+“压缩工具”页按压缩路径分组：**23 条路径就是 23 个折叠块**，每条路径一块，标题里写着源格式 → 目标格式、实际干活的工具，以及当前环境是否支持。每一块只放这条路径自己的参数，改了不会连带改到别的路径。
 
-同格式压缩：JPEG、PNG 静图、APNG 动图、GIF、WebP 静图、WebP 动图、AVIF 静图、AVIF 动图、JPEG XL、SVG。
-格式转换：按目标格式与实际执行的工具分成六组（WebP 的 cwebp / gif2webp / FFmpeg，AVIF 的 avifenc / FFmpeg，以及 cjxl）。
+同格式压缩（11 条）：JPEG、PNG 有损、PNG 无损、APNG 动图、GIF、WebP 静图、WebP 动图、AVIF 静图、AVIF 动图、JPEG XL、SVG。
+格式转换（12 条）：PNG/JPG→WebP、PNG/JPG→AVIF、PNG/JPG→JPEG XL、静态 GIF→WebP、静态 GIF→AVIF、静态 GIF→JPEG XL、动画 GIF→WebP、动画 GIF→AVIF、动画 GIF→JPEG XL、APNG→WebP、APNG→AVIF、APNG→JPEG XL。
 
 规则只有一条：**一个输入框对应一个真实的命令行参数，插件不做任何换算**。界面上的范围就是工具自己 `--help` 里写的范围（例如 pngquant `--speed` 是 1–11、avifenc `-s` 是 0–10、FFmpeg `-crf` 是 0–63），你填多少就传多少，不会出现“界面填 0–9、实际折算成 0–6”这种事。
 
@@ -172,21 +172,31 @@ WebP / AVIF / JPEG XL 无论静图动图都只做同格式压缩；APNG 与动�
 
 无损模式下不传 `--max`，jpegoptim 只重排压缩数据，画面像素不变。
 
-#### PNG 静图同格式压缩
+#### PNG 有损压缩
 
-有损走 pngquant，无损走 oxipng。pngquant 的 `--quality` 本身就是“下限 上限”两段，所以界面直接给两个输入框：低于下限就不保存、保留原图，上限决定最多保留多少颜色。
+PNG 有两条路径：本节的有损（pngquant）与下一节的无损（oxipng），由本节最上面的“PNG 走哪条路径”二选一，两条不会同时执行。
+
+pngquant 的 `--quality` 本身就是“下限 上限”两段，所以界面直接给两个输入框：低于下限就不保存、保留原图，上限决定最多保留多少颜色。
 
 | 参数 | 传给工具 | 范围 | 默认 |
 | --- | --- | --- | --- |
+| PNG 走哪条路径 | pngquant / oxipng 二选一 | 有损 / 无损 | 有损 |
 | 有损质量下限 | pngquant `--quality` 下限 | 0–100 | 60 |
 | 有损质量上限 | pngquant `--quality` 上限 | 0–100 | 80 |
 | pngquant 速度 | pngquant `--speed` | 1–11 | 4 |
 | 抖动 | pngquant（关掉时加 `--nofs`） | 开 / 关 | 开 |
+
+下限填得比上限大时保存会自动对调。
+
+#### PNG 无损压缩
+
+只重排压缩数据，画面一个像素都不变。只有“PNG 走哪条路径”选了无损时才会用到本节参数。
+
+| 参数 | 传给工具 | 范围 | 默认 |
+| --- | --- | --- | --- |
 | oxipng 无损级别 | oxipng `-o` | 0–6 | 2 |
 | 优化透明通道 | oxipng `--alpha` | 开 / 关 | 关 |
 | Zopfli 极限压缩 | oxipng `--zopfli` | 开 / 关 | 关 |
-
-下限填得比上限大时保存会自动对调。这一组只作用于静态 PNG。
 
 #### APNG 动图压缩（独立一组）
 
@@ -246,7 +256,7 @@ APNG 只能无损，固定交给 oxipng 整只处理：它能保住帧结构与�
 | 速度 | avifenc `-s` | 0–10 | 6 |
 | 色度抽样 | avifenc `-y` | 自动 / 4:4:4 / 4:2:2 / 4:2:0 | 自动 |
 | 位深 | avifenc `-d` | 8 / 10 / 12 | 8 |
-| 并行线程数 | avifenc `-j` | 1–16 | 4 |
+| 并行线程数 | avifenc `-j` | 1–256 | 4 |
 
 选 4:2:0 时会带上 avifenc 自己的 `--sharpyuv`。位深选 8 位时不传 `-d`。
 
@@ -258,9 +268,12 @@ APNG 只能无损，固定交给 oxipng 整只处理：它能保住帧结构与�
 | --- | --- | --- | --- |
 | CRF（质量） | FFmpeg `-crf` | 0–63 | 20 |
 | 速度 | FFmpeg `-cpu-used` | 0–8 | 6 |
-| 编码线程数 | FFmpeg `-threads` | 1–16 | 4 |
+| 编码线程数 | FFmpeg `-threads` | 1–256 | 4 |
+| 色彩抽样 | FFmpeg `-pix_fmt:v:0` | 自动 / 4:4:4 / 4:2:2 / 4:2:0 | 自动 |
 
 CRF 是 libaom 自己的刻度：越小画质越好、体积越大，0 接近无损，63 最差，常用 20–30。无损模式下改传 `-lossless 1`，不再传 CRF。
+
+色彩抽样只在有损模式下传入，映射到 `yuv444p` / `yuv422p` / `yuv420p`，只作用于颜色轨道（`-pix_fmt:v:0`），透明轨道仍然按 gray 编码；选“自动”则完全不传，由编码器按输入决定。
 
 #### JPEG XL 同格式压缩（静图与动图）
 
@@ -279,18 +292,26 @@ CRF 是 libaom 自己的刻度：越小画质越好、体积越大，0 接近无
 
 #### 格式转换参数
 
-转换也按“目标格式 + 实际执行的工具”拆开，六组互不影响：**一个输入框只喂给一个工具的同一个参数**，改了其中一组不会连带改到别的路径。
+12 条转换路径各自独立成组，每组都有自己的完整一份参数：PNG/JPG 转 WebP 的 `-q` 和 PNG/JPG 转 AVIF 的 `-q` 只是长得像，改一个不会动另一个；动画 GIF 转 WebP 与 APNG 转 WebP 用的甚至不是同一个工具，参数也各自一套。
 
 | 分组 | 谁在处理 | 输入 |
 | --- | --- | --- |
-| 输出 WebP：PNG / JPG | cwebp | PNG、JPG |
-| 输出 WebP：GIF | gif2webp | 静态与动画 GIF |
-| 输出 WebP：APNG 动图 | FFmpeg `libwebp_anim` | APNG |
-| 输出 AVIF：PNG / JPG / 静态 GIF | avifenc | PNG、JPG、静态 GIF |
-| 输出 AVIF：动画 | FFmpeg `libaom-av1` | 动画 GIF、APNG |
-| 输出 JPEG XL | cjxl | JPG、PNG、GIF、APNG |
+| PNG / JPG 转 WebP | cwebp | PNG、JPG |
+| PNG / JPG 转 AVIF | avifenc | PNG、JPG |
+| PNG / JPG 转 JPEG XL | cjxl | PNG、JPG |
+| 静态 GIF 转 WebP | gif2webp | 静态 GIF |
+| 静态 GIF 转 AVIF | GD 解成 PNG，再走 avifenc | 静态 GIF |
+| 静态 GIF 转 JPEG XL | cjxl | 静态 GIF |
+| 动画 GIF 转 WebP | gif2webp | 动画 GIF |
+| 动画 GIF 转 AVIF | FFmpeg `libaom-av1` | 动画 GIF |
+| 动画 GIF 转 JPEG XL | cjxl | 动画 GIF |
+| APNG 转 WebP | FFmpeg `libwebp_anim` | APNG |
+| APNG 转 AVIF | FFmpeg `libaom-av1` | APNG |
+| APNG 转 JPEG XL | cjxl | APNG |
 
-**输出 WebP：PNG / JPG（cwebp）**
+下面按工具列参数，**每个分组都各自保存一份**，互不影响。
+
+**cwebp（PNG / JPG 转 WebP）**
 
 | 参数 | 传给工具 | 范围 | 默认 |
 | --- | --- | --- | --- |
@@ -301,7 +322,7 @@ CRF 是 libaom 自己的刻度：越小画质越好、体积越大，0 接近无
 | 内容预设 | cwebp `-preset` | 默认 / 照片 / 室内人像 / 绘图 / 图标 / 文字 | 默认 |
 | 保留透明区域颜色 | cwebp `-exact` | 开 / 关 | 关 |
 
-**输出 WebP：GIF（gif2webp）**
+**gif2webp（静态 GIF 转 WebP / 动画 GIF 转 WebP，两组各一份）**
 
 | 参数 | 传给工具 | 范围 | 默认 |
 | --- | --- | --- | --- |
@@ -311,40 +332,49 @@ CRF 是 libaom 自己的刻度：越小画质越好、体积越大，0 接近无
 
 gif2webp 默认就是无损的，`-lossy` 是它自己的一个开关，所以这里给的是勾选框而不是“有损/无损”二选一：不勾就只重排数据，勾了才按质量重新量化。
 
-**输出 WebP：APNG 动图（FFmpeg）**
+**FFmpeg `libwebp_anim`（APNG 转 WebP）**
 
 | 参数 | 传给工具 | 范围 | 默认 |
 | --- | --- | --- | --- |
 | 有损质量 | FFmpeg `-quality` | 0–100 | 80 |
 | 压缩方法 | FFmpeg `-compression_level` | 0–6 | 4 |
 
-**输出 AVIF：PNG / JPG / 静态 GIF（avifenc）**
+**avifenc（PNG / JPG 转 AVIF、静态 GIF 转 AVIF，两组各一份）**
 
 | 参数 | 传给工具 | 范围 | 默认 |
 | --- | --- | --- | --- |
 | 有损质量 | avifenc `-q` | 0–100 | 80 |
 | 透明通道质量 | avifenc `--qalpha` | 0–100 | 80 |
 | 速度 | avifenc `-s` | 0–10 | 6 |
-| 色度抽样 | avifenc `-y` | 自动 / 4:4:4 / 4:2:2 / 4:2:0 | 自动 |
+| 色彩抽样 | avifenc `-y` | 自动 / 4:4:4 / 4:2:2 / 4:2:0 | 自动 |
 | 位深 | avifenc `-d` | 8 / 10 / 12 | 8 |
-| 并行线程数 | avifenc `-j` | 1–16 | 4 |
+| 并行线程数 | avifenc `-j` | 1–256 | 4 |
 
-**输出 AVIF：动画（FFmpeg）**
+**FFmpeg `libaom-av1`（动画 GIF 转 AVIF、APNG 转 AVIF，两组各一份）**
 
 | 参数 | 传给工具 | 范围 | 默认 |
 | --- | --- | --- | --- |
 | CRF（质量） | FFmpeg `-crf` | 0–63 | 20 |
 | 速度 | FFmpeg `-cpu-used` | 0–8 | 6 |
-| 编码线程数 | FFmpeg `-threads` | 1–16 | 4 |
+| 编码线程数 | FFmpeg `-threads` | 1–256 | 4 |
+| 色彩抽样 | FFmpeg `-pix_fmt:v:0` | 自动 / 4:4:4 / 4:2:2 / 4:2:0 | 自动 |
 
-**输出 JPEG XL（cjxl）**
+**cjxl（PNG / JPG、静态 GIF、动画 GIF、APNG 转 JPEG XL，四组各一份）**
 
 | 参数 | 传给工具 | 范围 | 默认 |
 | --- | --- | --- | --- |
 | 有损质量 | cjxl `-q` | 0–100 | 80 |
 | 压缩级别 | cjxl `-e` | 1–10 | 7 |
 
-动图链路上没有的开关（静图才有）：WebP 的 `-z`、透明通道质量、内容预设、`-exact`，AVIF 的透明通道质量、色度抽样、位深。FFmpeg 的 `-preset` 一旦传入会把 `lossless` 和 `compression_level` 一起重置，所以动图不传它。
+各工具没有的开关不会硬塞：cwebp 的分区数、噪点整形、滤波强度/锐度、锐利色彩转换一律不传；FFmpeg 的 `-preset` 一旦传入会把 `lossless` 和 `compression_level` 一起重置，所以动图不传它。
+
+### 关于色彩抽样（4:4:4 / 4:2:0）
+
+只有真正存在这个开关的路径才会出现“色彩抽样”：
+
+- **三条 avifenc 路径**（AVIF 静图、PNG/JPG→AVIF、静态 GIF→AVIF）走 `avifenc -y`，可选 4:4:4 / 4:2:2 / 4:2:0，4:2:0 时额外带 `--sharpyuv`；
+- **三条动画 AVIF 路径**（AVIF 动图同格式、动画 GIF→AVIF、APNG→AVIF）走 FFmpeg 的 `-pix_fmt:v:0`，可选 yuv444p / yuv422p / yuv420p；
+- 其余路径（jpegoptim、pngquant、oxipng、gifsicle、cwebp、gif2webp、libwebp_anim、cjxl）本身就**没有**这个参数：jpegoptim 不重新编码，PNG/GIF 是调色板或无损格式，libwebp 只接受 4:2:0，cjxl 也没有色度抽样开关。插件不会为了“看起来能设”造一个假参数。
 
 选 JPEG XL 作为目标格式时建议同时开启"兼容格式回退"：浏览器对动画 JXL 的支持远不如 AVIF/WebP，保留旧格式回退才能让前台正常显示。
 
@@ -364,7 +394,7 @@ gif2webp 默认就是无损的，`-lossy` 是它自己的一个开关，所以�
 
 ### 元数据处理
 
-“压缩时删除图片元数据”默认开启，各格式的实际行为（已按本机工具版本实测）：
+“压缩时删除图片元数据”默认开启，对**全部 23 条压缩路径**逐一实测过：勾选后产物里都找不到写入素材的隐私标记（EXIF / XMP / 注释 / 文本块等），ICC 色彩配置在工具支持时尽量保留以免偏色。各格式的实际行为：
 
 | 格式 | 勾选删除（默认） | 取消勾选 |
 | --- | --- | --- |
@@ -374,8 +404,8 @@ gif2webp 默认就是无损的，`-lossy` 是它自己的一个开关，所以�
 | AVIF | `avifenc --ignore-exif --ignore-xmp`，ICC 保留 | avifenc 默认会把输入图的 EXIF/XMP 原样带进 AVIF |
 | 动画 WebP | 逐帧重压后由 webpmux 重新组装，EXIF/XMP 不进入结果；GIF 转 WebP 只复制 ICC；APNG 转 WebP 由 FFmpeg 按设置处理 | GIF 转换尽量保留工具支持的输入配置；APNG 转换按设置复制 |
 | 动画 AVIF | FFmpeg 使用 `-map_metadata -1` 清除元数据 | 尝试复制工具支持的元数据，不能保证保留 EXIF/XMP |
-| GIF | `gifsicle --no-comments` 清除注释扩展块 | 保留注释 |
-| SVG | oxvg 默认预设即删除 `<metadata>` 与注释 | 同样删除，oxvg 没有保留开关 |
+| GIF | `gifsicle --no-comments --no-names --no-extensions`，注释、帧名、XMP 等应用扩展块全部清除；循环扩展与透明索引保留 | 原样保留全部扩展块 |
+| SVG | oxvg 预设本身会删 `<metadata>` 与注释；勾选删除时插件再按文本清一遍 `<metadata>` 与注释，不依赖 oxvg 版本行为 | oxvg 预设的行为，插件不再额外清理 |
 
 智能备份只保存主图像（未缩放原图优先）这一份压缩前的逐字节副本，不再逐张备份缩略图，以此节省磁盘；备份只服务于“恢复原图”，恢复时会按当前设置重新生成缩略图，正文链接仍指向原来的尺寸（原来用缩略图还是缩略图，原来用原图还是原图）。目录已禁止直接访问，前台回退用的是媒体库里同样压缩过的旧格式文件，两者都不依赖备份目录对外提供图片。已经压缩过的图片改设置后不会自动重做，需要先清除对应的压缩记录。
 
