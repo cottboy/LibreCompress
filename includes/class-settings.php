@@ -1321,21 +1321,21 @@ class Libre_Compress_Settings {
 
         $proc_open_available = Libre_Compress_Tool_Base::is_command_execution_available();
 
-        // 全部压缩工具，按格式相邻排序
+        // 全部压缩工具，按格式相邻排序：同格式的排在一起，编码/解码工具也挨着放
         $all_tools = array(
             array( 'name' => 'jpegoptim', 'tool' => null, 'path' => $output_processor->find_local_tool( 'jpegoptim' ), 'url' => 'https://github.com/tjko/jpegoptim' ),
             array( 'name' => 'pngquant', 'tool' => $tools['pngquant'] ),
             array( 'name' => 'oxipng', 'tool' => $tools['oxipng'] ),
             array( 'name' => 'gifsicle', 'tool' => $tools['gifsicle'] ),
             array( 'name' => 'gif2webp', 'tool' => null, 'path' => $output_processor->find_local_tool( 'gif2webp' ), 'url' => 'https://developers.google.com/speed/webp/download' ),
-            array( 'name' => 'webpmux', 'tool' => null, 'path' => $output_processor->find_local_tool( 'webpmux' ), 'url' => 'https://developers.google.com/speed/webp/download' ),
-            array( 'name' => 'ffprobe', 'tool' => null, 'path' => $output_processor->find_local_tool( 'ffprobe' ), 'url' => 'https://ffmpeg.org/download.html' ),
-            array( 'name' => 'ffmpeg', 'tool' => null, 'path' => $output_processor->find_local_tool( 'ffmpeg' ), 'url' => 'https://ffmpeg.org/download.html' ),
             array( 'name' => 'cwebp', 'tool' => $tools['cwebp'] ),
+            array( 'name' => 'webpmux', 'tool' => null, 'path' => $output_processor->find_local_tool( 'webpmux' ), 'url' => 'https://developers.google.com/speed/webp/download' ),
             array( 'name' => 'avifenc', 'tool' => null, 'path' => $output_processor->find_local_tool( 'avifenc' ), 'url' => 'https://github.com/AOMediaCodec/libavif' ),
             array( 'name' => 'avifdec', 'tool' => null, 'path' => $output_processor->find_local_tool( 'avifdec' ), 'url' => 'https://github.com/AOMediaCodec/libavif' ),
             array( 'name' => 'cjxl', 'tool' => isset( $tools['cjxl'] ) ? $tools['cjxl'] : null, 'path' => $output_processor->find_local_tool( 'cjxl' ), 'url' => 'https://github.com/libjxl/libjxl/releases' ),
             array( 'name' => 'oxvg', 'tool' => $tools['oxvg'] ),
+            array( 'name' => 'ffprobe', 'tool' => null, 'path' => $output_processor->find_local_tool( 'ffprobe' ), 'url' => 'https://ffmpeg.org/download.html' ),
+            array( 'name' => 'ffmpeg', 'tool' => null, 'path' => $output_processor->find_local_tool( 'ffmpeg' ), 'url' => 'https://ffmpeg.org/download.html' ),
         );
 
         // 统一为渲染字段：available(bool)、path、url
@@ -1350,16 +1350,25 @@ class Libre_Compress_Settings {
         }
         ?>
         <h2><?php esc_html_e( '系统状态', 'libre-compress' ); ?></h2>
-        <table class="widefat" style="max-width: 900px;">
+        <table class="widefat" style="max-width: 900px; table-layout: fixed;">
+            <colgroup>
+                <col style="width: 170px;">
+                <col style="width: 90px;">
+                <col>
+                <col style="width: 50px;">
+            </colgroup>
             <tr>
-                <td style="width: 120px;"><strong>proc_open()</strong></td>
-                <td style="width: 150px;"></td>
+                <td><strong>proc_open()</strong></td>
                 <td>
                     <?php if ( $proc_open_available ) : ?>
                         <span style="color: #00a32a;">✓ <?php esc_html_e( '可用', 'libre-compress' ); ?></span>
                     <?php else : ?>
                         <span><?php esc_html_e( '不可用', 'libre-compress' ); ?></span>
-                        <p class="description"><?php esc_html_e( '插件的所有压缩都靠 proc_open() 直接启动命令行工具，请联系主机商启用', 'libre-compress' ); ?></p>
+                    <?php endif; ?>
+                </td>
+                <td>
+                    <?php if ( ! $proc_open_available ) : ?>
+                        <span class="description"><?php esc_html_e( '插件的所有压缩都靠 proc_open() 直接启动命令行工具，请联系主机商启用', 'libre-compress' ); ?></span>
                     <?php endif; ?>
                 </td>
                 <td></td>
@@ -1367,13 +1376,19 @@ class Libre_Compress_Settings {
         </table>
 
         <h2><?php esc_html_e( '工具状态', 'libre-compress' ); ?></h2>
-        <table class="widefat" style="max-width: 900px;">
+        <table class="widefat" style="max-width: 900px; table-layout: fixed;">
+            <colgroup>
+                <col style="width: 170px;">
+                <col style="width: 90px;">
+                <col>
+                <col style="width: 50px;">
+            </colgroup>
             <thead>
                 <tr>
-                    <th style="width: 170px;"><?php esc_html_e( '工具', 'libre-compress' ); ?></th>
-                    <th style="width: 90px;"><?php esc_html_e( '状态', 'libre-compress' ); ?></th>
+                    <th><?php esc_html_e( '工具', 'libre-compress' ); ?></th>
+                    <th><?php esc_html_e( '状态', 'libre-compress' ); ?></th>
                     <th><?php esc_html_e( '安装路径', 'libre-compress' ); ?></th>
-                    <th style="width: 50px;"><?php esc_html_e( '链接', 'libre-compress' ); ?></th>
+                    <th><?php esc_html_e( '链接', 'libre-compress' ); ?></th>
                 </tr>
             </thead>
             <tbody>
@@ -1594,7 +1609,7 @@ class Libre_Compress_Settings {
         );
 
         $rows_definition = array(
-            array( 'label' => __( 'JPEG 压缩（有损 / 无损）', 'libre-compress' ), 'groups' => array( array( 'jpegoptim' ) ) ),
+            array( 'label' => __( 'JPEG 压缩', 'libre-compress' ), 'groups' => array( array( 'jpegoptim' ) ) ),
             array( 'label' => __( 'PNG 有损压缩', 'libre-compress' ), 'groups' => array( array( 'pngquant' ) ) ),
             array( 'label' => __( 'PNG 无损压缩', 'libre-compress' ), 'groups' => array( array( 'oxipng' ) ) ),
             array( 'label' => __( 'APNG 动图压缩', 'libre-compress' ), 'groups' => array( array( 'oxipng' ) ) ),
