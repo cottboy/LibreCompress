@@ -1352,7 +1352,7 @@ class Libre_Compress_Settings {
         <h2><?php esc_html_e( '系统状态', 'libre-compress' ); ?></h2>
         <table class="widefat" style="max-width: 900px; table-layout: fixed;">
             <colgroup>
-                <col style="width: 170px;">
+                <col style="width: 130px;">
                 <col style="width: 90px;">
                 <col>
                 <col style="width: 50px;">
@@ -1378,7 +1378,7 @@ class Libre_Compress_Settings {
         <h2><?php esc_html_e( '工具状态', 'libre-compress' ); ?></h2>
         <table class="widefat" style="max-width: 900px; table-layout: fixed;">
             <colgroup>
-                <col style="width: 170px;">
+                <col style="width: 130px;">
                 <col style="width: 90px;">
                 <col>
                 <col style="width: 50px;">
