@@ -394,10 +394,7 @@ class Libre_Compress_Settings {
      * - bool   开关
      * - mode   有损 / 无损二选一
      *
-     * path 描述这条路径的走向与依赖，只用于设置页显示支持状态：
-     * - from / to 源格式与目标格式
-     * - tool      实际干活的工具
-     * - deps      组内为“与”、组间为“或”，任一组合部可用即视为支持
+     * 每条路径依赖哪些工具由设置页的“路径支持状态”表单独维护，参数表不掺这件事。
      *
      * @return array
      */
@@ -415,12 +412,6 @@ class Libre_Compress_Settings {
             'jpeg'             => array(
                 'title'  => __( 'JPEG 同格式压缩', 'libre-compress' ),
                 'note'   => __( '统一由 jpegoptim 处理。有损模式传 --max 设定质量上限，无损模式不传质量参数，只重排压缩数据。', 'libre-compress' ),
-                'path'   => array(
-                    'from' => 'JPG',
-                    'to'   => 'JPG',
-                    'tool' => 'jpegoptim',
-                    'deps' => array( array( 'jpegoptim' ) ),
-                ),
                 'params' => array(
                     'jpeg_mode'        => self::mode_param(),
                     'jpeg_quality'     => array(
@@ -449,12 +440,6 @@ class Libre_Compress_Settings {
             'png_lossy'        => array(
                 'title'  => __( 'PNG 有损压缩', 'libre-compress' ),
                 'note'   => __( '这一节是 pngquant 的全部参数。本节最上面的“PNG 走哪条路径”选无损时，本节参数不生效，改由下一节“PNG 无损压缩”负责。', 'libre-compress' ),
-                'path'   => array(
-                    'from' => 'PNG',
-                    'to'   => 'PNG',
-                    'tool' => 'pngquant',
-                    'deps' => array( array( 'pngquant' ) ),
-                ),
                 'params' => array(
                     'png_mode'             => array(
                         'type'    => 'mode',
@@ -502,23 +487,11 @@ class Libre_Compress_Settings {
             'png_lossless'     => array(
                 'title'  => __( 'PNG 无损压缩', 'libre-compress' ),
                 'note'   => __( '由 oxipng 处理，只重排压缩数据，画面一个像素都不变。只有“PNG 走哪条路径”选了无损时才会用到本节参数。', 'libre-compress' ),
-                'path'   => array(
-                    'from' => 'PNG',
-                    'to'   => 'PNG',
-                    'tool' => 'oxipng',
-                    'deps' => array( array( 'oxipng' ) ),
-                ),
                 'params' => self::oxipng_params( 'png_lossless' ),
             ),
             'apng'             => array(
                 'title'  => __( 'APNG 动图压缩', 'libre-compress' ),
                 'note'   => __( 'APNG 只能无损压缩，整只交给 oxipng：它能保住帧结构与每帧时长。pngquant 会逐帧各挑一套调色板，动图会闪，所以 APNG 不走有损。本节参数与 PNG 静图完全独立。', 'libre-compress' ),
-                'path'   => array(
-                    'from' => 'APNG',
-                    'to'   => 'APNG',
-                    'tool' => 'oxipng',
-                    'deps' => array( array( 'oxipng' ) ),
-                ),
                 'params' => array_merge(
                     array(
                         'apng_enabled' => array(
@@ -535,67 +508,31 @@ class Libre_Compress_Settings {
             'webp'             => array(
                 'title'  => __( 'WebP 静图同格式压缩', 'libre-compress' ),
                 'note'   => __( '静图由 cwebp 处理，每一项都直接对应 cwebp 自己的开关。动画 WebP 不在这一条路径上。', 'libre-compress' ),
-                'path'   => array(
-                    'from' => 'WebP',
-                    'to'   => 'WebP',
-                    'tool' => 'cwebp',
-                    'deps' => array( array( 'cwebp' ) ),
-                ),
                 'params' => self::cwebp_params( 'webp' ),
             ),
             'webp_anim'        => array(
                 'title'  => __( 'WebP 动图同格式压缩', 'libre-compress' ),
                 'note'   => __( '动画 WebP 整只交给 FFmpeg 的 libwebp_anim，参数直接对应 FFmpeg 的 -quality 与 -compression_level，不做任何换算。画布尺寸、帧时长与循环次数由 FFmpeg 从原图读取。', 'libre-compress' ),
-                'path'   => array(
-                    'from' => __( '动画 WebP', 'libre-compress' ),
-                    'to'   => __( '动画 WebP', 'libre-compress' ),
-                    'tool' => 'FFmpeg（libwebp_anim）+ webpmux',
-                    'deps' => array( array( 'ffmpeg', 'webpmux' ) ),
-                ),
                 'params' => self::ffmpeg_webp_params( 'webp_anim' ),
             ),
             'avif'             => array(
                 'title'  => __( 'AVIF 静图同格式压缩', 'libre-compress' ),
                 'note'   => __( '静图先由 avifdec 解成 PNG 再交给 avifenc 重压，每一项都直接对应 avifenc 自己的开关。动画 AVIF 不在这一条路径上。', 'libre-compress' ),
-                'path'   => array(
-                    'from' => 'AVIF',
-                    'to'   => 'AVIF',
-                    'tool' => 'avifdec + avifenc',
-                    'deps' => array( array( 'avifdec', 'avifenc' ) ),
-                ),
                 'params' => self::avifenc_params( 'avif' ),
             ),
             'avif_anim'        => array(
                 'title'  => __( 'AVIF 动图同格式压缩', 'libre-compress' ),
                 'note'   => __( '动画 AVIF 整只交给 FFmpeg 的 libaom-av1：-crf 取 0-63、-cpu-used 取 0-8、色彩抽样走 -pix_fmt，都是 FFmpeg 的原始参数，不做换算。', 'libre-compress' ),
-                'path'   => array(
-                    'from' => __( '动画 AVIF', 'libre-compress' ),
-                    'to'   => __( '动画 AVIF', 'libre-compress' ),
-                    'tool' => 'FFmpeg（libaom-av1）',
-                    'deps' => array( array( 'avifdec', 'ffprobe', 'ffmpeg' ) ),
-                ),
                 'params' => self::ffmpeg_avif_params( 'avif_anim' ),
             ),
             'jxl'              => array(
                 'title'  => __( 'JPEG XL 同格式压缩（静图与动图）', 'libre-compress' ),
                 'note'   => __( 'cjxl 能直接读写动画 JXL，一条命令重编码，不需要拆帧，静图与动图共用这一组参数。', 'libre-compress' ),
-                'path'   => array(
-                    'from' => 'JPEG XL',
-                    'to'   => 'JPEG XL',
-                    'tool' => 'cjxl',
-                    'deps' => array( array( 'cjxl' ) ),
-                ),
                 'params' => self::cjxl_params( 'jxl' ),
             ),
             'gif'              => array(
                 'title'  => __( 'GIF 同格式压缩', 'libre-compress' ),
                 'note'   => __( '整只 GIF（含动画）交给 gifsicle，插件不拆帧、不动透明像素。', 'libre-compress' ),
-                'path'   => array(
-                    'from' => 'GIF',
-                    'to'   => 'GIF',
-                    'tool' => 'gifsicle',
-                    'deps' => array( array( 'gifsicle' ) ),
-                ),
                 'params' => array(
                     'gif_mode'       => self::mode_param(),
                     'gif_lossy' => array(
@@ -630,12 +567,6 @@ class Libre_Compress_Settings {
             'svg'              => array(
                 'title'  => __( 'SVG 同格式压缩', 'libre-compress' ),
                 'note'   => __( '由 oxvg 处理，两种预设都会删掉 <metadata> 和注释；开启“删除图片元数据”时插件还会再清一遍 <metadata> 与注释，确保不留作者、软件等来源信息。', 'libre-compress' ),
-                'path'   => array(
-                    'from' => 'SVG',
-                    'to'   => 'SVG',
-                    'tool' => 'oxvg',
-                    'deps' => array( array( 'oxvg' ) ),
-                ),
                 'params' => array(
                     'svg_preset' => array(
                         'type'    => 'choice',
@@ -656,133 +587,61 @@ class Libre_Compress_Settings {
             'convert_webp'     => array(
                 'title'  => __( 'PNG / JPG 转 WebP', 'libre-compress' ),
                 'note'   => __( '由 cwebp 处理，每一项都直接对应 cwebp 自己的开关。静态 GIF 与 APNG 转 WebP 各有独立的一节。', 'libre-compress' ),
-                'path'   => array(
-                    'from' => 'PNG / JPG',
-                    'to'   => 'WebP',
-                    'tool' => 'cwebp',
-                    'deps' => array( array( 'cwebp' ) ),
-                ),
                 'params' => self::cwebp_params( 'convert_webp' ),
             ),
             'convert_avif'     => array(
                 'title'  => __( 'PNG / JPG 转 AVIF', 'libre-compress' ),
                 'note'   => __( '由 avifenc 直接读 PNG / JPG，每一项都直接对应 avifenc 的开关。静态 GIF 与动画 GIF / APNG 转 AVIF 各有独立的一节。', 'libre-compress' ),
-                'path'   => array(
-                    'from' => 'PNG / JPG',
-                    'to'   => 'AVIF',
-                    'tool' => 'avifenc',
-                    'deps' => array( array( 'avifenc' ) ),
-                ),
                 'params' => self::avifenc_params( 'convert_avif' ),
             ),
             'convert_jxl'      => array(
                 'title'  => __( 'PNG / JPG 转 JPEG XL', 'libre-compress' ),
                 'note'   => __( '由 cjxl 直读 PNG / JPG 重编码。GIF 与 APNG 转 JPEG XL 各有独立的一节。', 'libre-compress' ),
-                'path'   => array(
-                    'from' => 'PNG / JPG',
-                    'to'   => 'JPEG XL',
-                    'tool' => 'cjxl',
-                    'deps' => array( array( 'cjxl' ) ),
-                ),
                 'params' => self::cjxl_params( 'convert_jxl' ),
             ),
             'convert_webp_gif' => array(
                 'title'  => __( '静态 GIF 转 WebP', 'libre-compress' ),
                 'note'   => __( '由 gif2webp 处理。gif2webp 默认保持无损，只有勾上“启用有损”才会带上 -lossy 并按质量重新量化。', 'libre-compress' ),
-                'path'   => array(
-                    'from' => __( '静态 GIF', 'libre-compress' ),
-                    'to'   => 'WebP',
-                    'tool' => 'gif2webp',
-                    'deps' => array( array( 'gif2webp' ) ),
-                ),
                 'params' => self::gif2webp_params( 'convert_webp_gif' ),
             ),
             'convert_avif_gif' => array(
                 'title'  => __( '静态 GIF 转 AVIF', 'libre-compress' ),
                 'note'   => __( '静态 GIF 先由 GD 扩展解成 PNG，再交给 avifenc：avifenc 不认 GIF。参数与其它 avifenc 路径完全独立。', 'libre-compress' ),
-                'path'   => array(
-                    'from' => __( '静态 GIF', 'libre-compress' ),
-                    'to'   => 'AVIF',
-                    'tool' => 'GD + avifenc',
-                    'deps' => array( array( 'gd', 'avifenc' ) ),
-                ),
                 'params' => self::avifenc_params( 'convert_avif_gif' ),
             ),
             'convert_jxl_gif'  => array(
                 'title'  => __( '静态 GIF 转 JPEG XL', 'libre-compress' ),
                 'note'   => __( '由 cjxl 直读 GIF 重编码，不经过中间文件。', 'libre-compress' ),
-                'path'   => array(
-                    'from' => __( '静态 GIF', 'libre-compress' ),
-                    'to'   => 'JPEG XL',
-                    'tool' => 'cjxl',
-                    'deps' => array( array( 'cjxl' ) ),
-                ),
                 'params' => self::cjxl_params( 'convert_jxl_gif' ),
             ),
             'convert_webp_anim_gif' => array(
                 'title'  => __( '动画 GIF 转 WebP', 'libre-compress' ),
                 'note'   => __( '整只动画 GIF 交给 gif2webp，多帧出来仍是动画，不拆帧。参数与静态 GIF 转 WebP 分开设置。', 'libre-compress' ),
-                'path'   => array(
-                    'from' => __( '动画 GIF', 'libre-compress' ),
-                    'to'   => 'WebP',
-                    'tool' => 'gif2webp',
-                    'deps' => array( array( 'gif2webp' ) ),
-                ),
                 'params' => self::gif2webp_params( 'convert_webp_anim_gif' ),
             ),
             'convert_avif_anim_gif' => array(
                 'title'  => __( '动画 GIF 转 AVIF', 'libre-compress' ),
                 'note'   => __( '整只动画交给 FFmpeg 的 libaom-av1，-crf / -cpu-used / -pix_fmt 都是 FFmpeg 的原始参数。', 'libre-compress' ),
-                'path'   => array(
-                    'from' => __( '动画 GIF', 'libre-compress' ),
-                    'to'   => 'AVIF',
-                    'tool' => 'FFmpeg（libaom-av1）',
-                    'deps' => array( array( 'ffmpeg' ) ),
-                ),
                 'params' => self::ffmpeg_avif_params( 'convert_avif_anim_gif' ),
             ),
             'convert_jxl_anim_gif' => array(
                 'title'  => __( '动画 GIF 转 JPEG XL', 'libre-compress' ),
                 'note'   => __( '由 cjxl 直读动画 GIF 重编码，一条命令保住全部帧。', 'libre-compress' ),
-                'path'   => array(
-                    'from' => __( '动画 GIF', 'libre-compress' ),
-                    'to'   => 'JPEG XL',
-                    'tool' => 'cjxl',
-                    'deps' => array( array( 'cjxl' ) ),
-                ),
                 'params' => self::cjxl_params( 'convert_jxl_anim_gif' ),
             ),
             'convert_webp_anim_apng' => array(
                 'title'  => __( 'APNG 转 WebP', 'libre-compress' ),
                 'note'   => __( 'APNG 整只交给 FFmpeg 的 libwebp_anim，-quality 与 -compression_level 直接对应 FFmpeg 的原始参数。', 'libre-compress' ),
-                'path'   => array(
-                    'from' => 'APNG',
-                    'to'   => 'WebP',
-                    'tool' => 'FFmpeg（libwebp_anim）',
-                    'deps' => array( array( 'ffmpeg' ) ),
-                ),
                 'params' => self::ffmpeg_webp_params( 'convert_webp_anim_apng' ),
             ),
             'convert_avif_anim_apng' => array(
                 'title'  => __( 'APNG 转 AVIF', 'libre-compress' ),
                 'note'   => __( 'APNG 整只交给 FFmpeg 的 libaom-av1，-crf / -cpu-used / -pix_fmt 都是 FFmpeg 的原始参数。', 'libre-compress' ),
-                'path'   => array(
-                    'from' => 'APNG',
-                    'to'   => 'AVIF',
-                    'tool' => 'FFmpeg（libaom-av1）',
-                    'deps' => array( array( 'ffmpeg' ) ),
-                ),
                 'params' => self::ffmpeg_avif_params( 'convert_avif_anim_apng' ),
             ),
             'convert_jxl_anim_apng' => array(
                 'title'  => __( 'APNG 转 JPEG XL', 'libre-compress' ),
                 'note'   => __( '由 cjxl 直读 APNG 重编码，一条命令保住全部帧。', 'libre-compress' ),
-                'path'   => array(
-                    'from' => 'APNG',
-                    'to'   => 'JPEG XL',
-                    'tool' => 'cjxl',
-                    'deps' => array( array( 'cjxl' ) ),
-                ),
                 'params' => self::cjxl_params( 'convert_jxl_anim_apng' ),
             ),
         );
@@ -1549,24 +1408,41 @@ class Libre_Compress_Settings {
             <?php esc_html_e( '安装方式：① 把可执行文件直接放进 /wp-content/LibreCompress-bin 目录；② 把工具所在文件夹加入系统 Path 环境变量；③ 使用包管理器安装。', 'libre-compress' ); ?>
         </p>
 
-        <h2 style="margin-top: 30px;"><?php esc_html_e( '压缩参数', 'libre-compress' ); ?></h2>
+        <h2 style="margin-top: 30px;"><?php esc_html_e( '路径支持状态', 'libre-compress' ); ?></h2>
+        <table class="widefat" style="max-width: 900px;">
+            <thead>
+                <tr>
+                    <th style="width: 220px;"><?php esc_html_e( '路径', 'libre-compress' ); ?></th>
+                    <th><?php esc_html_e( '依赖', 'libre-compress' ); ?></th>
+                    <th style="width: 280px;"><?php esc_html_e( '状态', 'libre-compress' ); ?></th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php foreach ( $this->get_path_support_rows() as $row ) : ?>
+                    <tr>
+                        <td><?php echo esc_html( $row['label'] ); ?></td>
+                        <td><?php echo wp_kses_post( $row['deps_display'] ); ?></td>
+                        <td>
+                            <?php if ( $row['supported'] ) : ?>
+                                <span style="color: #00a32a;">✓ <?php esc_html_e( '支持', 'libre-compress' ); ?></span>
+                            <?php else : ?>
+                                <span><?php esc_html_e( '不支持', 'libre-compress' ); ?></span>
+                                <?php if ( ! empty( $row['missing'] ) ) : ?>
+                                    <span class="description">— <?php echo esc_html( sprintf( __( '缺少：%s', 'libre-compress' ), implode( '、', $row['missing'] ) ) ); ?></span>
+                                <?php endif; ?>
+                            <?php endif; ?>
+                        </td>
+                    </tr>
+                <?php endforeach; ?>
+            </tbody>
+        </table>
+
+        <hr>
+
+        <h2><?php esc_html_e( '压缩参数', 'libre-compress' ); ?></h2>
         <p class="description" style="max-width: 900px;">
-            <?php esc_html_e( '23 条压缩路径每条都有自己独立的一节，参数互不共用。每节标题里写着源格式 → 目标格式、实际干活的工具，以及当前环境是否支持。输入框后面标的就是它实际传给哪个工具的哪个参数，取值范围就是这个工具自己的取值范围：插件不按比例换算、不折算档位，你填多少就传多少，只有超出范围时保存后显示的是该参数的边界值，免得把非法数字塞给工具。没列出来的参数一律不传，由工具用自己内部的默认值。改动只影响之后的压缩，已经压好的图片不会自动重压。', 'libre-compress' ); ?>
+            <?php esc_html_e( '每条压缩路径的参数都在下面单独设置。输入框后面标的就是它实际传给哪个工具的哪个参数，取值也就是工具本身的取值范围，插件不做换算、不折算档位，你填多少就传多少；只有超出范围时保存时会收到该参数的边界值，免得把非法数字塞给工具。没列出来的参数一律不传，由工具用自己内部的默认值。改动只影响之后的压缩，已经压好的图片不会自动重压。', 'libre-compress' ); ?>
         </p>
-
-        <style>
-            .libre-compress-path { max-width: 900px; margin: 10px 0; padding: 0 14px 6px; background: #fff; border: 1px solid #c3c4c7; border-radius: 3px; }
-            .libre-compress-path > summary { cursor: pointer; padding: 10px 0; display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
-            .libre-compress-path > summary::-webkit-details-marker { margin-right: 4px; }
-            .libre-compress-path > summary code { font-size: 11px; }
-            .libre-compress-path-flow { color: #50575e; font-size: 12px; }
-            .libre-compress-path-ok { color: #00a32a; font-size: 12px; }
-            .libre-compress-path-missing { color: #b32d2e; font-size: 12px; }
-            .libre-compress-path .form-table { margin-top: 0; }
-            .libre-compress-path .form-table th { padding-left: 0; }
-            .libre-compress-path .description { max-width: 860px; }
-        </style>
-
         <form method="post" action="options.php">
             <?php settings_fields( 'libre_compress_tools_group' ); ?>
 
@@ -1585,41 +1461,18 @@ class Libre_Compress_Settings {
                     </h3>
                     <?php
                 endif;
-
-                $status = $this->get_path_status( $group );
                 ?>
-                <details class="libre-compress-path">
-                    <summary>
-                        <strong><?php echo esc_html( $group['title'] ); ?></strong>
-                        <span class="libre-compress-path-flow"><?php echo esc_html( $group['path']['from'] . ' → ' . $group['path']['to'] ); ?></span>
-                        <code><?php echo esc_html( $group['path']['tool'] ); ?></code>
-                        <?php if ( $status['supported'] ) : ?>
-                            <span class="libre-compress-path-ok">✓ <?php esc_html_e( '支持', 'libre-compress' ); ?></span>
-                        <?php else : ?>
-                            <span class="libre-compress-path-missing">
-                                <?php
-                                printf(
-                                    /* translators: %s: 缺少的工具名 */
-                                    esc_html__( '缺工具：%s', 'libre-compress' ),
-                                    esc_html( implode( '、', $status['missing'] ) )
-                                );
-                                ?>
-                            </span>
-                        <?php endif; ?>
-                    </summary>
-
-                    <?php if ( ! empty( $group['note'] ) ) : ?>
-                        <p class="description"><?php echo esc_html( $group['note'] ); ?></p>
-                    <?php endif; ?>
-
-                    <table class="form-table">
-                        <?php
-                        foreach ( $group['params'] as $key => $param ) {
-                            $this->render_param_row( $key, $param );
-                        }
-                        ?>
-                    </table>
-                </details>
+                <h4 style="margin: 26px 0 4px; font-size: 15px;"><?php echo esc_html( $group['title'] ); ?></h4>
+                <?php if ( ! empty( $group['note'] ) ) : ?>
+                    <p class="description" style="max-width: 900px;"><?php echo esc_html( $group['note'] ); ?></p>
+                <?php endif; ?>
+                <table class="form-table">
+                    <?php
+                    foreach ( $group['params'] as $key => $param ) {
+                        $this->render_param_row( $key, $param );
+                    }
+                    ?>
+                </table>
             <?php endforeach; ?>
 
             <?php submit_button(); ?>
@@ -1694,77 +1547,115 @@ class Libre_Compress_Settings {
     }
 
     /**
-     * 判断一条压缩路径在当前环境能否使用
+     * 构建压缩路径支持状态行
      *
-     * path.deps 组内为“与”、组间为“或”：任一组合部可用即视为支持。
+     * groups 为"或"关系：任一组内依赖全部可用即视为支持该路径，
+     * 组内为"与"关系，包含该路径实际调用的全部工具
      *
-     * @param array $group 分组定义
-     * @return array{supported:bool,missing:string[]}
+     * @return array[] 每行包含 label、deps_display、supported、missing
      */
-    private function get_path_status( array $group ): array {
-        static $available = null;
-
-        if ( null === $available ) {
-            $available = $this->get_tool_availability();
-        }
-
-        $missing_all = array();
-
-        foreach ( $group['path']['deps'] as $deps ) {
-            $missing = array();
-
-            foreach ( $deps as $dep ) {
-                if ( empty( $available[ $dep ] ) ) {
-                    $missing[] = $this->tool_label( $dep );
-                }
-            }
-
-            if ( empty( $missing ) ) {
-                return array( 'supported' => true, 'missing' => array() );
-            }
-
-            $missing_all = array_merge( $missing_all, $missing );
-        }
-
-        return array(
-            'supported' => false,
-            'missing'   => array_values( array_unique( $missing_all ) ),
-        );
-    }
-
-    /**
-     * 收集所有会参与压缩的可执行文件与扩展是否可用
-     *
-     * @return array<string,bool>
-     */
-    private function get_tool_availability(): array {
+    private function get_path_support_rows(): array {
         $tools            = libre_compress()->compressor->get_tools();
         $output_processor = libre_compress()->output_processor;
 
         $available = array();
-
         foreach ( $tools as $name => $tool ) {
             $available[ $name ] = $tool->is_tool_available();
         }
 
-        // 辅助工具按可执行文件独立判定：它们有的不在工具类注册表里。
-        foreach ( array( 'jpegoptim', 'avifenc', 'avifdec', 'gif2webp', 'ffmpeg', 'ffprobe', 'webpmux', 'cjxl' ) as $helper ) {
+        // avifenc/avifdec 按可执行文件独立判定（同格式 AVIF 需要两者，目标输出只需要 avifenc）
+        $available['jpegoptim'] = false !== $output_processor->find_local_tool( 'jpegoptim' );
+        $available['avifenc'] = false !== $output_processor->find_local_tool( 'avifenc' );
+        $available['avifdec'] = false !== $output_processor->find_local_tool( 'avifdec' );
+        $available['gif2webp'] = false !== $output_processor->find_local_tool( 'gif2webp' );
+        $available['ffmpeg']   = false !== $output_processor->find_local_tool( 'ffmpeg' );
+        $available['gd']       = function_exists( 'imagecreatefromgif' ) && function_exists( 'imagepng' );
+
+        // 动图处理用到的 libwebp 与 libavif 附带工具按可执行文件独立判定
+        foreach ( array( 'ffprobe', 'webpmux' ) as $helper ) {
             $available[ $helper ] = false !== $output_processor->find_local_tool( $helper );
         }
 
-        $available['gd'] = function_exists( 'imagecreatefromgif' ) && function_exists( 'imagepng' );
+        $dep_labels = array(
+            'jpegoptim' => 'jpegoptim',
+            'pngquant'  => 'pngquant',
+            'oxipng'    => 'oxipng',
+            'cwebp'     => 'cwebp',
+            'avifenc'   => 'avifenc',
+            'avifdec'   => 'avifdec',
+            'cjxl'      => 'cjxl',
+            'gifsicle'  => 'gifsicle',
+            'oxvg'      => 'oxvg',
+            'gif2webp'  => 'gif2webp',
+            'ffprobe'   => 'ffprobe',
+            'webpmux'   => 'webpmux',
+            'ffmpeg'    => 'ffmpeg',
+            'gd'        => __( 'GD 扩展', 'libre-compress' ),
+        );
 
-        return $available;
-    }
+        $rows_definition = array(
+            array( 'label' => __( 'JPEG 压缩（有损 / 无损）', 'libre-compress' ), 'groups' => array( array( 'jpegoptim' ) ) ),
+            array( 'label' => __( 'PNG 有损压缩', 'libre-compress' ), 'groups' => array( array( 'pngquant' ) ) ),
+            array( 'label' => __( 'PNG 无损压缩', 'libre-compress' ), 'groups' => array( array( 'oxipng' ) ) ),
+            array( 'label' => __( 'APNG 动图压缩', 'libre-compress' ), 'groups' => array( array( 'oxipng' ) ) ),
+            array( 'label' => __( 'WebP 静图压缩', 'libre-compress' ), 'groups' => array( array( 'cwebp' ) ) ),
+            array( 'label' => __( 'WebP 动图压缩', 'libre-compress' ), 'groups' => Libre_Compress_Animation::required_tool_groups( 'webp', '' ) ),
+            array( 'label' => __( 'AVIF 静图压缩', 'libre-compress' ), 'groups' => array( array( 'avifenc', 'avifdec' ) ) ),
+            array( 'label' => __( 'AVIF 动图压缩', 'libre-compress' ), 'groups' => Libre_Compress_Animation::required_tool_groups( 'avif', '' ) ),
+            array( 'label' => __( 'JPEG XL 压缩', 'libre-compress' ), 'groups' => array( array( 'cjxl' ) ) ),
+            array( 'label' => __( 'GIF 压缩', 'libre-compress' ), 'groups' => array( array( 'gifsicle' ) ) ),
+            array( 'label' => __( 'SVG 压缩', 'libre-compress' ), 'groups' => array( array( 'oxvg' ) ) ),
+            array( 'label' => __( 'PNG/JPG 压缩为 WebP', 'libre-compress' ), 'groups' => array( array( 'cwebp' ) ) ),
+            array( 'label' => __( 'PNG/JPG 压缩为 AVIF', 'libre-compress' ), 'groups' => array( array( 'avifenc' ) ) ),
+            array( 'label' => __( 'PNG/JPG 压缩为 JPEG XL', 'libre-compress' ), 'groups' => array( array( 'cjxl' ) ) ),
+            array( 'label' => __( '静态 GIF 压缩为 WebP', 'libre-compress' ), 'groups' => array( array( 'gif2webp' ) ) ),
+            array( 'label' => __( '静态 GIF 压缩为 AVIF', 'libre-compress' ), 'groups' => array( array( 'gd', 'avifenc' ) ) ),
+            array( 'label' => __( '静态 GIF 压缩为 JPEG XL', 'libre-compress' ), 'groups' => array( array( 'cjxl' ) ) ),
+            array( 'label' => __( '动画 GIF 压缩为 WebP', 'libre-compress' ), 'groups' => Libre_Compress_Animation::required_tool_groups( 'gif', 'webp' ) ),
+            array( 'label' => __( '动画 GIF 压缩为 AVIF', 'libre-compress' ), 'groups' => Libre_Compress_Animation::required_tool_groups( 'gif', 'avif' ) ),
+            array( 'label' => __( '动画 GIF 压缩为 JPEG XL', 'libre-compress' ), 'groups' => Libre_Compress_Animation::required_tool_groups( 'gif', 'jxl' ) ),
+            array( 'label' => __( 'APNG 压缩为 WebP', 'libre-compress' ), 'groups' => Libre_Compress_Animation::required_tool_groups( 'png', 'webp' ) ),
+            array( 'label' => __( 'APNG 压缩为 AVIF', 'libre-compress' ), 'groups' => Libre_Compress_Animation::required_tool_groups( 'png', 'avif' ) ),
+            array( 'label' => __( 'APNG 压缩为 JPEG XL', 'libre-compress' ), 'groups' => Libre_Compress_Animation::required_tool_groups( 'png', 'jxl' ) ),
+        );
 
-    /**
-     * 依赖项的显示名
-     *
-     * @param string $name 依赖键名
-     * @return string
-     */
-    private function tool_label( string $name ): string {
-        return 'gd' === $name ? __( 'GD 扩展', 'libre-compress' ) : $name;
+        $rows = array();
+
+        foreach ( $rows_definition as $definition ) {
+            $supported    = false;
+            $missing_all  = array();
+            $deps_display = array();
+
+            foreach ( $definition['groups'] as $group ) {
+                $group_missing = array();
+                $group_labels  = array();
+
+                foreach ( $group as $dep ) {
+                    $label          = isset( $dep_labels[ $dep ] ) ? $dep_labels[ $dep ] : $dep;
+                    $group_labels[] = '<code>' . esc_html( $label ) . '</code>';
+
+                    if ( empty( $available[ $dep ] ) ) {
+                        $group_missing[] = $label;
+                    }
+                }
+
+                if ( empty( $group_missing ) ) {
+                    $supported = true;
+                }
+
+                $missing_all    = array_merge( $missing_all, $group_missing );
+                $deps_display[] = implode( ' + ', $group_labels );
+            }
+
+            $rows[] = array(
+                'label'        => $definition['label'],
+                'deps_display' => implode( ' ' . __( '或', 'libre-compress' ) . ' ', $deps_display ),
+                'supported'    => $supported,
+                'missing'      => array_values( array_unique( $missing_all ) ),
+            );
+        }
+
+        return $rows;
     }
 
 }

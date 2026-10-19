@@ -149,7 +149,7 @@ WebP / AVIF / JPEG XL 无论静图动图都只做同格式压缩；APNG 与动�
 
 ### 压缩参数
 
-“压缩工具”页按压缩路径分组：**23 条路径就是 23 个折叠块**，每条路径一块，标题里写着源格式 → 目标格式、实际干活的工具，以及当前环境是否支持。每一块只放这条路径自己的参数，改了不会连带改到别的路径。
+“压缩工具”页按压缩路径分组：23 条路径各有独立的一节，参数互不共用，改了不会连带改到别的路径。每条路径依赖哪些工具、当前环境是否支持，仍由页面顶部单独的“路径支持状态”表列出，不和参数混在一起。
 
 同格式压缩（11 条）：JPEG、PNG 有损、PNG 无损、APNG 动图、GIF、WebP 静图、WebP 动图、AVIF 静图、AVIF 动图、JPEG XL、SVG。
 格式转换（12 条）：PNG/JPG→WebP、PNG/JPG→AVIF、PNG/JPG→JPEG XL、静态 GIF→WebP、静态 GIF→AVIF、静态 GIF→JPEG XL、动画 GIF→WebP、动画 GIF→AVIF、动画 GIF→JPEG XL、APNG→WebP、APNG→AVIF、APNG→JPEG XL。
