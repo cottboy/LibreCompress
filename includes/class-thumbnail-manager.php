@@ -41,9 +41,9 @@ class Libre_Compress_Thumbnail_Manager {
     /**
      * 调整图片尺寸时覆盖保存质量
      *
-     * 只影响 JPG / WebP / AVIF 这类有损编码：开启后一律用 100。
-     * PNG 在 GD 与 Imagick 里本来就是无损编码，质量参数在那边另有含义
-     *（GD 会把它换算成压缩级别），所以原样放行。
+     * 只放行 PNG：它在 GD 与 Imagick 里本来就是无损编码，质量参数会被换算成压缩级别，
+     * 改它只会让文件变大、并不会更清晰。其余格式（JPG / WebP / AVIF，以及以后
+     * WordPress 支持的任何格式）一律用 100，不必为将来新增格式再回来改这段代码。
      *
      * @param int    $quality   当前质量
      * @param string $mime_type 输出 MIME
@@ -54,7 +54,7 @@ class Libre_Compress_Thumbnail_Manager {
             return $quality;
         }
 
-        return in_array( $mime_type, array( 'image/jpeg', 'image/webp', 'image/avif' ), true ) ? 100 : $quality;
+        return 'image/png' === $mime_type ? $quality : 100;
     }
 
     /**

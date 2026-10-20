@@ -53,11 +53,12 @@ class Libre_Compress_Animation {
      * ------------------------------------------------------------------- */
 
     /**
-     * APNG 是否强制走无损通道
+     * APNG 是否自动走无损通道
      *
      * 有损 PNG 靠 pngquant 逐帧各自挑 256 色调色板，APNG 逐帧处理必然闪烁，
-     * 所以这一项决定的是"检测到 APNG 就改用 oxipng 无损压"还是"干脆不压"。
-     * 默认开启：只减体积不变画质，没有副作用。
+     * 所以 APNG 只在 PNG 走无损模式时由 oxipng 整只无损压缩；
+     * PNG 走有损模式时 APNG 一律不压缩，宁可不压也不压闪。
+     * 这个开关不控制 APNG 转格式，转格式由基本设置里的 APNG 勾选单独管。
      *
      * @return bool
      */
@@ -577,8 +578,8 @@ class Libre_Compress_Animation {
      * acTL/fcTL/fdAT 的帧结构与每帧时长（--strip=all 会把动图毁成一张静图，
      * 工具类本来就不用它），所以整只 APNG 直接优化即可，不必拆帧。
      * 有损 PNG 模式仍危险——pngquant 逐帧各自选调色板，动图会闪烁，
-     * 而 APNG 规范要求所有帧共用一张全局调色板，因此只有用户明确开启
-     * "APNG 自动无损压缩"时才在有损模式下走这里。
+     * 而 APNG 规范要求所有帧共用一张全局调色板，所以只有 PNG 走无损模式
+     * 并且用户勾选了"APNG 自动无损压缩"时才交给 oxipng。
      *
      * @param string $extension 扩展名
      * @return string 工具注册名，空字符串表示不交给单文件工具
@@ -592,8 +593,8 @@ class Libre_Compress_Animation {
             return '';
         }
 
-        // APNG 有自己的一组参数与开关，与静态 PNG 的有损/无损模式无关。
-        if ( ! self::apng_enabled() ) {
+        // PNG 走有损时不动 APNG：pngquant 会把动图压闪，换 oxipng 又违背用户的模式选择。
+        if ( ! Libre_Compress_Settings::png_is_lossless() || ! self::apng_enabled() ) {
             return '';
         }
 
@@ -1186,7 +1187,7 @@ class Libre_Compress_Animation {
      */
     public static function skip_reason( string $extension, string $target = '' ): string {
         if ( 'png' === $extension && '' === $target ) {
-            return __( 'APNG 动图压缩已关闭，或缺少 oxipng，已跳过；要压 APNG 请到“压缩工具”页勾选“压缩 APNG”', 'libre-compress' );
+            return __( 'APNG 已跳过：APNG 只在 PNG 走无损模式且勾选“APNG 自动无损压缩”时才压缩，也可到基本设置里勾选“APNG”让它转格式', 'libre-compress' );
         }
 
         return self::missing_tool_message( $extension, $target );

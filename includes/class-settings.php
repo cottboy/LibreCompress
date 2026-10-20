@@ -492,10 +492,10 @@ class Libre_Compress_Settings {
                     array(
                         'apng_enabled' => array(
                             'type'    => 'bool',
-                            'label'   => __( '压缩 APNG', 'libre-compress' ),
+                            'label'   => __( 'APNG 自动无损压缩', 'libre-compress' ),
                             'flag'    => 'APNG 走 oxipng',
                             'default' => true,
-                            'desc'    => __( '取消勾选则检测到 APNG 时原样跳过，不压缩。它也不影响基本设置里那个“APNG 转格式”的勾选。', 'libre-compress' ),
+                            'desc'    => __( '勾选后，PNG 走无损模式时 APNG 也整只做无损压缩；PNG 走有损模式时 APNG 一律不压缩（pngquant 逐帧各挑一套调色板会把动图压闪）。它不控制 APNG 转格式，那个在基本设置里单独勾。', 'libre-compress' ),
                         ),
                     ),
                     self::oxipng_params( 'png_lossless' )
@@ -1052,7 +1052,7 @@ class Libre_Compress_Settings {
                             <input type="checkbox" name="libre_compress_general[resize_lossless]" value="1" <?php checked( Libre_Compress_Settings::resize_is_lossless() ); ?>>
                             <?php esc_html_e( '调整图片尺寸时把保存质量拉满', 'libre-compress' ); ?>
                         </label>
-                        <p class="description"><?php esc_html_e( 'WordPress 生成缩略图和 -scaled 缩放图时，会用 GD / Imagick 把图片重新编码一遍，默认质量会把画质先损耗一次，压缩工具再怎么调也补不回来。勾选后保存 JPG / WebP / AVIF 时一律用质量 100，先保住画质再交给各格式的专精工具压缩。PNG 本身就是无损编码，不受影响。注意：JPG 是有损格式，质量 100 只是肉眼看不出差别，不是数学意义上的无损；代价是这一步的中间文件更大、生成缩略图稍慢。', 'libre-compress' ); ?></p>
+                        <p class="description"><?php esc_html_e( 'WordPress 生成缩略图和 -scaled 缩放图时，会用 GD / Imagick 把图片重新编码一遍，默认质量会把画质先损耗一次，压缩工具再怎么调也补不回来。勾选后，除 PNG 之外的所有格式（JPG、WebP、AVIF，以及以后 WordPress 支持的格式）保存质量一律用 100，先保住画质再交给各格式的专精工具压缩；PNG 本身就是无损编码，改它的质量参数只会让文件变大，所以不动。注意：JPG 是有损格式，质量 100 只是肉眼看不出差别，不是数学意义上的无损；代价是这一步的中间文件更大、生成缩略图稍慢。', 'libre-compress' ); ?></p>
                     </td>
                 </tr>
                 <tr>
@@ -1408,8 +1408,22 @@ class Libre_Compress_Settings {
                         <td><?php echo esc_html( $row['label'] ); ?></td>
                         <td><?php echo wp_kses_post( $row['deps_display'] ); ?></td>
                         <td>
-                            <?php if ( $row['supported'] ) : ?>
+                            <?php if ( 'all' === $row['status'] ) : ?>
                                 <span style="color: #00a32a;">✓ <?php esc_html_e( '支持', 'libre-compress' ); ?></span>
+                            <?php elseif ( 'partial' === $row['status'] ) : ?>
+                                <span style="color: #dba617;">
+                                    <?php
+                                    printf(
+                                        /* translators: 1: 可用子路径数, 2: 子路径总数 */
+                                        esc_html__( '部分支持 %1$d/%2$d', 'libre-compress' ),
+                                        (int) $row['ready_paths'],
+                                        (int) $row['total_paths']
+                                    );
+                                    ?>
+                                </span>
+                                <?php if ( ! empty( $row['missing'] ) ) : ?>
+                                    <br><span class="description"><?php echo esc_html( sprintf( __( '缺少：%s', 'libre-compress' ), implode( '、', $row['missing'] ) ) ); ?></span>
+                                <?php endif; ?>
                             <?php else : ?>
                                 <span><?php esc_html_e( '不支持', 'libre-compress' ); ?></span>
                                 <?php if ( ! empty( $row['missing'] ) ) : ?>
@@ -1538,15 +1552,18 @@ class Libre_Compress_Settings {
 
         // avifenc/avifdec 按可执行文件独立判定（同格式 AVIF 需要两者，目标输出只需要 avifenc）
         $available['jpegoptim'] = false !== $output_processor->find_local_tool( 'jpegoptim' );
-        $available['avifenc'] = false !== $output_processor->find_local_tool( 'avifenc' );
-        $available['avifdec'] = false !== $output_processor->find_local_tool( 'avifdec' );
-        $available['gif2webp'] = false !== $output_processor->find_local_tool( 'gif2webp' );
-        $available['ffmpeg']   = false !== $output_processor->find_local_tool( 'ffmpeg' );
+        $available['avifenc']   = false !== $output_processor->find_local_tool( 'avifenc' );
+        $available['avifdec']   = false !== $output_processor->find_local_tool( 'avifdec' );
+        $available['gif2webp']  = false !== $output_processor->find_local_tool( 'gif2webp' );
+        $available['ffmpeg']    = false !== $output_processor->find_local_tool( 'ffmpeg' );
 
         // 动图处理用到的 libwebp 与 libavif 附带工具按可执行文件独立判定
         foreach ( array( 'ffprobe', 'webpmux' ) as $helper ) {
             $available[ $helper ] = false !== $output_processor->find_local_tool( $helper );
         }
+
+        // 静态 GIF 转 AVIF 要先经 GD 解成 PNG
+        $available['gd'] = function_exists( 'imagecreatefromgif' ) && function_exists( 'imagepng' );
 
         $dep_labels = array(
             'jpegoptim' => 'jpegoptim',
@@ -1562,66 +1579,145 @@ class Libre_Compress_Settings {
             'ffprobe'   => 'ffprobe',
             'webpmux'   => 'webpmux',
             'ffmpeg'    => 'ffmpeg',
+            'gd'        => __( 'GD 扩展', 'libre-compress' ),
         );
 
-        // 一行一个工具，和参数区一一对应：同一行覆盖这个工具负责的全部路径。
+        // 一行一个工具，和参数区一一对应。row 里的 paths 是这个工具负责的每条子路径
+        // 以及它自己真正要用的工具：字路径依赖不同就分开写，一个都不能漏。
         $rows_definition = array(
-            array( 'label' => __( 'JPEG 压缩', 'libre-compress' ), 'groups' => array( array( 'jpegoptim' ) ) ),
-            array( 'label' => __( 'PNG 有损压缩', 'libre-compress' ), 'groups' => array( array( 'pngquant' ) ) ),
-            array( 'label' => __( 'PNG / APNG 无损压缩', 'libre-compress' ), 'groups' => array( array( 'oxipng' ) ) ),
-            array( 'label' => __( 'GIF 压缩', 'libre-compress' ), 'groups' => array( array( 'gifsicle' ) ) ),
-            array( 'label' => __( 'GIF 转 WebP', 'libre-compress' ), 'groups' => array( array( 'gif2webp' ) ) ),
-            array( 'label' => __( 'WebP 编码（WebP 压缩、PNG/JPG 转 WebP）', 'libre-compress' ), 'groups' => array( array( 'cwebp' ) ) ),
             array(
-                'label'  => __( '动画 WebP 编码（动画 WebP 压缩、APNG 转 WebP）', 'libre-compress' ),
-                'groups' => array( array( 'ffmpeg', 'webpmux' ) ),
+                'label' => __( 'JPEG 压缩', 'libre-compress' ),
+                'paths' => array(
+                    array( 'name' => '', 'deps' => array( 'jpegoptim' ) ),
+                ),
             ),
             array(
-                'label'  => __( 'AVIF 编码（AVIF 压缩、PNG/JPG/静态 GIF 转 AVIF）', 'libre-compress' ),
-                'groups' => array( array( 'avifenc', 'avifdec' ) ),
-                'hint'   => __( '静态 GIF 转 AVIF 另需 GD 扩展；只做格式转换时不需要 avifdec。', 'libre-compress' ),
+                'label' => __( 'PNG 有损压缩', 'libre-compress' ),
+                'paths' => array(
+                    array( 'name' => '', 'deps' => array( 'pngquant' ) ),
+                ),
             ),
             array(
-                'label'  => __( '动画 AVIF 编码（动画 AVIF 压缩、动画 GIF/APNG 转 AVIF）', 'libre-compress' ),
-                'groups' => array( array( 'ffmpeg' ) ),
-                'hint'   => __( '动画 AVIF 的同格式压缩另需 avifdec 与 ffprobe 读原动画信息。', 'libre-compress' ),
+                'label' => __( 'PNG / APNG 无损压缩', 'libre-compress' ),
+                'paths' => array(
+                    array( 'name' => '', 'deps' => array( 'oxipng' ) ),
+                ),
             ),
             array(
-                'label'  => __( 'JPEG XL 编码（JXL 压缩与全部转 JPEG XL）', 'libre-compress' ),
-                'groups' => array( array( 'cjxl' ) ),
+                'label' => __( 'GIF 压缩', 'libre-compress' ),
+                'paths' => array(
+                    array( 'name' => '', 'deps' => array( 'gifsicle' ) ),
+                ),
             ),
-            array( 'label' => __( 'SVG 压缩', 'libre-compress' ), 'groups' => array( array( 'oxvg' ) ) ),
+            array(
+                'label' => __( 'GIF 转 WebP', 'libre-compress' ),
+                'paths' => array(
+                    array( 'name' => __( '静态 GIF', 'libre-compress' ), 'deps' => array( 'gif2webp' ) ),
+                    array( 'name' => __( '动画 GIF', 'libre-compress' ), 'deps' => Libre_Compress_Animation::required_tool_groups( 'gif', 'webp' ) ),
+                ),
+            ),
+            array(
+                'label' => __( 'SVG 压缩', 'libre-compress' ),
+                'paths' => array(
+                    array( 'name' => '', 'deps' => array( 'oxvg' ) ),
+                ),
+            ),
+            array(
+                'label' => __( 'WebP 编码（WebP 压缩、PNG/JPG 转 WebP）', 'libre-compress' ),
+                'paths' => array(
+                    array( 'name' => '', 'deps' => array( 'cwebp' ) ),
+                ),
+            ),
+            array(
+                'label' => __( '动画 WebP 编码（动画 WebP 压缩、APNG 转 WebP）', 'libre-compress' ),
+                'paths' => array(
+                    array( 'name' => '', 'deps' => Libre_Compress_Animation::required_tool_groups( 'webp', '' ) ),
+                ),
+            ),
+            array(
+                'label' => __( 'AVIF 编码（AVIF 压缩、PNG/JPG/静态 GIF 转 AVIF）', 'libre-compress' ),
+                'paths' => array(
+                    array( 'name' => __( 'AVIF 同格式压缩', 'libre-compress' ), 'deps' => array( 'avifdec', 'avifenc' ) ),
+                    array( 'name' => __( 'PNG/JPG 转 AVIF', 'libre-compress' ), 'deps' => array( 'avifenc' ) ),
+                    array( 'name' => __( '静态 GIF 转 AVIF', 'libre-compress' ), 'deps' => array( 'gd', 'avifenc' ) ),
+                ),
+            ),
+            array(
+                'label' => __( '动画 AVIF 编码（动画 AVIF 压缩、动画 GIF/APNG 转 AVIF）', 'libre-compress' ),
+                'paths' => array(
+                    array( 'name' => __( '动画 AVIF 同格式压缩', 'libre-compress' ), 'deps' => Libre_Compress_Animation::required_tool_groups( 'avif', '' ) ),
+                    array( 'name' => __( '动画 GIF/APNG 转 AVIF', 'libre-compress' ), 'deps' => Libre_Compress_Animation::required_tool_groups( 'gif', 'avif' ) ),
+                ),
+            ),
+            array(
+                'label' => __( 'JPEG XL 编码（JXL 压缩与全部转 JPEG XL）', 'libre-compress' ),
+                'paths' => array(
+                    array( 'name' => __( 'JXL 同格式压缩', 'libre-compress' ), 'deps' => Libre_Compress_Animation::required_tool_groups( 'jxl', '' ) ),
+                    array( 'name' => __( 'PNG/JPG/GIF/APNG 转 JXL', 'libre-compress' ), 'deps' => Libre_Compress_Animation::required_tool_groups( 'png', 'jxl' ) ),
+                ),
+            ),
         );
 
         $rows = array();
 
         foreach ( $rows_definition as $definition ) {
-            $supported    = false;
-            $missing_all  = array();
-            $deps_display = array();
+            $paths         = isset( $definition['paths'] ) ? $definition['paths'] : array();
+            $ready_paths   = 0;
+            $missing_all   = array();
+            $deps_lines    = array();
 
-            foreach ( $definition['groups'] as $group ) {
-                $group_missing = array();
-                $group_labels  = array();
+            foreach ( $paths as $path ) {
+                // deps 可写成扁平的「与」列表，也可写成「或」的多组；扁平列表先包成一组
+                $groups = $path['deps'];
 
-                foreach ( $group as $dep ) {
-                    $label          = isset( $dep_labels[ $dep ] ) ? $dep_labels[ $dep ] : $dep;
-                    $group_labels[] = '<code>' . esc_html( $label ) . '</code>';
+                if ( ! empty( $groups ) && ! is_array( reset( $groups ) ) ) {
+                    $groups = array( $groups );
+                }
 
-                    if ( empty( $available[ $dep ] ) ) {
-                        $group_missing[] = $label;
+                $path_missing    = array();
+                $path_labels     = array();
+                $path_ok         = false;
+
+                foreach ( $groups as $group ) {
+                    $group_missing = array();
+                    $group_labels  = array();
+
+                    foreach ( $group as $dep ) {
+                        $label          = isset( $dep_labels[ $dep ] ) ? $dep_labels[ $dep ] : $dep;
+                        $group_labels[] = '<code>' . esc_html( $label ) . '</code>';
+
+                        if ( empty( $available[ $dep ] ) ) {
+                            $group_missing[] = $label;
+                        }
                     }
+
+                    if ( empty( $group_missing ) ) {
+                        $path_ok = true;
+                    }
+
+                    $path_missing  = array_merge( $path_missing, $group_missing );
+                    $path_labels[] = implode( ' + ', $group_labels );
                 }
 
-                if ( empty( $group_missing ) ) {
-                    $supported = true;
+                if ( $path_ok ) {
+                    $ready_paths++;
+                } else {
+                    $missing_all = array_merge( $missing_all, $path_missing );
                 }
 
-                $missing_all    = array_merge( $missing_all, $group_missing );
-                $deps_display[] = implode( ' + ', $group_labels );
+                $line = implode( ' ' . __( '或', 'libre-compress' ) . ' ', $path_labels );
+
+                if ( '' !== $path['name'] ) {
+                    $line = esc_html( $path['name'] ) . '：' . $line;
+                }
+
+                $deps_lines[] = $line;
             }
 
-            $deps = implode( ' ' . __( '或', 'libre-compress' ) . ' ', $deps_display );
+            // 全部子路径都齐才算支持，部分齐算部分支持，一条都跑不起来才算不支持
+            $total      = count( $paths );
+            $status     = $ready_paths === $total ? 'all' : ( $ready_paths > 0 ? 'partial' : 'none' );
+            $deps       = implode( '<br>', $deps_lines );
 
             if ( ! empty( $definition['hint'] ) ) {
                 $deps .= '<br><span class="description">' . esc_html( $definition['hint'] ) . '</span>';
@@ -1630,7 +1726,9 @@ class Libre_Compress_Settings {
             $rows[] = array(
                 'label'        => $definition['label'],
                 'deps_display' => $deps,
-                'supported'    => $supported,
+                'status'       => $status,
+                'ready_paths'  => $ready_paths,
+                'total_paths'  => $total,
                 'missing'      => array_values( array_unique( $missing_all ) ),
             );
         }
