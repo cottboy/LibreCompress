@@ -1072,7 +1072,7 @@ class Libre_Compress_Settings {
                             <input type="checkbox" name="libre_compress_general[resize_lossless]" value="1" <?php checked( Libre_Compress_Settings::resize_is_lossless() ); ?>>
                             <?php esc_html_e( '调整图片尺寸时把保存质量拉满', 'libre-compress' ); ?>
                         </label>
-                        <p class="description"><?php esc_html_e( 'WordPress 生成缩略图和 -scaled 缩放图时，会用 GD / Imagick 把图片重新编码一遍，默认质量会把画质先损耗一次，压缩工具再怎么调也补不回来。勾选后，除 PNG 之外的所有格式（JPG、WebP、AVIF，以及以后 WordPress 支持的格式）保存质量一律用 100，先保住画质再交给各格式的专精工具压缩；PNG 本身就是无损编码，改它的质量参数只会让文件变大，所以不动。注意：JPG 是有损格式，质量 100 只是肉眼看不出差别，不是数学意义上的无损；代价是这一步的中间文件更大、生成缩略图稍慢。', 'libre-compress' ); ?></p>
+                        <p class="description"><?php esc_html_e( 'WordPress 生成缩略图和 -scaled 缩放图时，会用 GD / Imagick 把图片重新编码一遍，默认质量会把画质先损耗一次，压缩工具再怎么调也补不回来。勾选后，JPG、WebP、AVIF、JPEG XL 保存时一律用质量 100，先保住画质再交给各格式的专精工具压缩；PNG、GIF 这类本来就是无损编码，质量参数在它们身上会被换算成压缩级别，改它只会让文件变大，所以不碰。注意：JPG 是有损格式，质量 100 只是肉眼看不出差别，不是数学意义上的无损；代价是这一步的中间文件更大、生成缩略图稍慢。', 'libre-compress' ); ?></p>
                     </td>
                 </tr>
                 <tr>
