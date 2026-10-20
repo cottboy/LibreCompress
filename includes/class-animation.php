@@ -593,8 +593,9 @@ class Libre_Compress_Animation {
             return '';
         }
 
-        // PNG 走有损时不动 APNG：pngquant 会把动图压闪，换 oxipng 又违背用户的模式选择。
-        if ( ! Libre_Compress_Settings::png_is_lossless() || ! self::apng_enabled() ) {
+        // PNG 走无损时 APNG 自然跟着无损；PNG 走有损时，只有勾了“APNG 自动无损压缩”
+        // 才绕开 pngquant 单独交给 oxipng，否则宁可不压——pngquant 逐帧挑调色板会把动图压闪。
+        if ( ! Libre_Compress_Settings::png_is_lossless() && ! self::apng_enabled() ) {
             return '';
         }
 
@@ -1187,7 +1188,7 @@ class Libre_Compress_Animation {
      */
     public static function skip_reason( string $extension, string $target = '' ): string {
         if ( 'png' === $extension && '' === $target ) {
-            return __( 'APNG 已跳过：APNG 只在 PNG 走无损模式且勾选“APNG 自动无损压缩”时才压缩，也可到基本设置里勾选“APNG”让它转格式', 'libre-compress' );
+            return __( 'APNG 已跳过：PNG 走的是有损模式，且没有勾选“APNG 自动无损压缩”，可在“压缩工具”页勾选，或在基本设置里勾选“APNG”让它转格式', 'libre-compress' );
         }
 
         return self::missing_tool_message( $extension, $target );

@@ -495,7 +495,7 @@ class Libre_Compress_Settings {
                             'label'   => __( 'APNG 自动无损压缩', 'libre-compress' ),
                             'flag'    => 'APNG 走 oxipng',
                             'default' => true,
-                            'desc'    => __( '勾选后，PNG 走无损模式时 APNG 也整只做无损压缩；PNG 走有损模式时 APNG 一律不压缩（pngquant 逐帧各挑一套调色板会把动图压闪）。它不控制 APNG 转格式，那个在基本设置里单独勾。', 'libre-compress' ),
+                            'desc'    => __( 'PNG 走有损模式时，勾上这一项会让 APNG 绕开 pngquant、单独用 oxipng 整只无损压缩；不勾则 PNG 有损时不压 APNG。PNG 本身选的就是无损时，APNG 总是走无损压缩。它不控制 APNG 转格式，那个在基本设置里单独勾。', 'libre-compress' ),
                         ),
                     ),
                     self::oxipng_params( 'png_lossless' )
