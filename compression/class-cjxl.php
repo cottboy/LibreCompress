@@ -48,7 +48,7 @@ class Libre_Compress_Cjxl extends Libre_Compress_Tool_Base {
      *
      * @param string $source 输入文件路径
      * @param string $output 输出文件路径
-     * @param string $group  设置分组：jxl 或 convert_jxl
+     * @param string $group  设置分组，固定为 jxl
      * @return array|false 参数数组，工具不可用时返回 false
      */
     public static function build_command( string $source, string $output, string $group = 'jxl' ) {

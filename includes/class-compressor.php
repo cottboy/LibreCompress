@@ -442,11 +442,6 @@ class Libre_Compress_Compressor {
             if ( '' !== $native && isset( $this->tools[ $native ] ) ) {
                 // APNG 整只交给 oxipng：实测它能保住帧结构与每帧时长，不必拆帧
                 $tool = $this->tools[ $native ];
-
-                if ( 'png' === $extension ) {
-                    // 用 APNG 自己那一组 oxipng 参数，不沿用静态 PNG 的设置
-                    $options['png_group'] = 'apng';
-                }
             } elseif ( Libre_Compress_Animation::same_format_supported( $extension ) ) {
                 $tool = new Libre_Compress_Animated_Handler( $extension );
             } else {

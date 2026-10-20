@@ -509,12 +509,11 @@ class Libre_Compress_Animation {
             $group[] = $readers[ $source ];
         }
 
-        if ( 'gif' === $source && 'webp' === $target ) {
-            $group[] = 'gif2webp';
-        } elseif ( 'webp' === $target && 'png' === $source ) {
-            $group[] = 'ffmpeg';
-        } elseif ( 'webp' === $target && 'webp' === $source ) {
-            $group[] = 'ffmpeg';
+        if ( 'webp' === $target ) {
+            // GIF 交给 gif2webp，其余动图交给 FFmpeg 的 libwebp_anim；
+            // 两条路都要用 webpmux 回写末帧时长与背景色，缺了它就出不了正确播放参数。
+            $group[] = 'gif' === $source ? 'gif2webp' : 'ffmpeg';
+            $group[] = 'webpmux';
         } elseif ( 'avif' === $target && in_array( $source, array( 'gif', 'png', 'avif' ), true ) ) {
             $group[] = 'ffmpeg';
             if ( 'avif' === $source ) {
@@ -742,11 +741,9 @@ class Libre_Compress_Animation {
     private static function build_native_command( string $source, string $target, string $output, array $plan ) {
         $format = $plan['format'];
 
-        // 每条转换路径都有自己的参数分组：GIF 与 APNG 转同一个目标格式也互不影响。
+        // 参数按工具取：同一个工具只有一组参数，GIF 与 APNG 转同一个目标格式共用这套设置。
         if ( 'jxl' === $target ) {
-            $group = 'gif' === $format ? 'convert_jxl_anim_gif' : 'convert_jxl_anim_apng';
-
-            return Libre_Compress_Cjxl::build_command( $source, $output, $group );
+            return Libre_Compress_Cjxl::build_command( $source, $output, 'jxl' );
         }
 
         if ( 'avif' === $target ) {
@@ -754,7 +751,7 @@ class Libre_Compress_Animation {
         }
 
         if ( 'gif' === $format ) {
-            return self::gif2webp_command( $source, $output, 'convert_webp_anim_gif' );
+            return self::gif2webp_command( $source, $output, 'gif_to_webp' );
         }
 
         // 剩下的都是 WebP 目标：WebP 同格式重压与 APNG 转 WebP，都交给 FFmpeg 一次读写整只动图。
@@ -770,7 +767,7 @@ class Libre_Compress_Animation {
      *
      * libwebp_anim 自己会推算帧间差异矩形与画布尺寸，所以画布大小、帧偏移、
      * 逐帧时长和循环次数都不用插件操心，帧数再多也只是一条命令。
-     * 同格式重压读 webp_anim 组，APNG 转 WebP 读 convert_webp_anim_apng 组。
+     * 动画 WebP 同格式重压与 APNG 转 WebP 共用 webp_anim 一组参数。
      *
      * @param string $source 源路径
      * @param string $output 输出路径
@@ -779,8 +776,7 @@ class Libre_Compress_Animation {
      */
     private static function build_webp_command( string $source, string $output, array $plan ): array {
         $same     = 'webp' === $plan['format'];
-        // 同格式重压用动图自己的参数组，APNG 转 WebP 用 APNG 转换组的参数，两边互不影响。
-        $group    = $same ? 'webp_anim' : 'convert_webp_anim_apng';
+        $group    = 'webp_anim';
         $lossless = 'lossless' === Libre_Compress_Settings::param_mode( $group );
         $quality  = Libre_Compress_Settings::param_int( $group . '_quality' );
         $method   = Libre_Compress_Settings::param_int( $group . '_method' );
@@ -889,7 +885,7 @@ class Libre_Compress_Animation {
      * @param string $output 输出路径
      * @return array|false 参数数组，工具不可用时返回 false
      */
-    public static function gif2webp_command( string $source, string $output, string $group = 'convert_webp_gif' ) {
+    public static function gif2webp_command( string $source, string $output, string $group = 'gif_to_webp' ) {
         $gif2webp = self::tool( 'gif2webp' );
 
         if ( false === $gif2webp ) {
@@ -1021,13 +1017,9 @@ class Libre_Compress_Animation {
      * FFmpeg 内部处理颜色和透明背景，全程不把动画帧交给 PHP。
      */
     private static function build_avif_command( string $source, string $output, array $plan ) {
-        $same     = 'avif' === $plan['format'];
-        // 同格式重压用 avif_anim 组；GIF 与 APNG 转 AVIF 各有自己的分组，两边互不影响。
-        if ( $same ) {
-            $group = 'avif_anim';
-        } else {
-            $group = 'gif' === $plan['format'] ? 'convert_avif_anim_gif' : 'convert_avif_anim_apng';
-        }
+        $same = 'avif' === $plan['format'];
+        // 动画 AVIF 同格式压缩、动画 GIF 与 APNG 转 AVIF 都走 FFmpeg 的 libaom-av1，共用 avif_anim 一组参数。
+        $group    = 'avif_anim';
         $lossless = 'lossless' === Libre_Compress_Settings::param_mode( $group );
         $crf      = Libre_Compress_Settings::param_int( $group . '_crf' );
         $speed    = Libre_Compress_Settings::param_int( $group . '_speed' );

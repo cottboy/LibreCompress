@@ -140,7 +140,7 @@ class Libre_Compress_Avif extends Libre_Compress_Tool_Base {
      *
      * 同格式压缩与格式转换共用这一份参数拼装，两份设置各自独立。
      *
-     * @param string $group  设置分组：avif 或 convert_avif
+     * @param string $group  设置分组，固定为 avif
      * @param string $source 源文件路径
      * @param string $output 输出文件路径
      * @return array 参数数组（不含可执行文件）

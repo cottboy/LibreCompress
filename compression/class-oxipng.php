@@ -54,9 +54,8 @@ class Libre_Compress_Oxipng extends Libre_Compress_Tool_Base {
     protected function build_command_chain( string $file_path, array $options ): array {
         $executable = $this->get_executable_path();
 
-        // 静态 PNG 与 APNG 是两条独立的压缩路径，各有自己的一组参数：
-        // 调用方通过 png_group 指定用哪一组，默认走 PNG 无损路径。
-        $prefix = ( isset( $options['png_group'] ) && 'apng' === $options['png_group'] ) ? 'apng' : 'png_lossless';
+        // 静态 PNG 与 APNG 动图共用同一组 oxipng 参数，都走 png_lossless 分组。
+        $prefix = 'png_lossless';
         $level  = Libre_Compress_Settings::param_int( $prefix . '_oxipng_level' );
 
         // 构建命令：-o 无损级别，--strip 元数据取舍，--alpha 优化透明通道，--quiet 静默

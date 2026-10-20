@@ -60,12 +60,12 @@ class Libre_Compress_Cwebp extends Libre_Compress_Tool_Base {
     /**
      * 构建 cwebp 的参数
      *
-     * 同格式压缩与格式转换共用这一份参数拼装，两份设置各自独立（webp_* 与 convert_webp_*），
-     * 不会出现改了转换路径却把同格式路径一起带跑的情况。
+     * 同格式压缩（WebP → WebP）与格式转换（PNG / JPG → WebP）共用这一份参数拼装，
+     * 也共用同一组设置：两者都是 cwebp 在编码，参数本身没有区别。
      *
      * -preset 必须排在最前面：它会重置质量、方法等参数，后面的显式值才生效。
      *
-     * @param string $group  设置分组：webp 或 convert_webp
+     * @param string $group  设置分组，固定为 webp
      * @param string $source 源文件路径
      * @param string $output 输出文件路径
      * @return array 参数数组（不含可执行文件）

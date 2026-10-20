@@ -95,7 +95,7 @@ class Libre_Compress_Output {
     /**
      * 获取目标格式输出设置
      *
-     * @return array target: webp|avif|jxl, formats: 已勾选的源格式列表
+     * @return array target: webp|avif|jxl, formats: 已勾选的源格式列表, apng: 是否转换 APNG
      */
     public function get_output_settings(): array {
         $general = get_option( 'libre_compress_general', array() );
@@ -115,15 +115,16 @@ class Libre_Compress_Output {
         return array(
             'target'  => $target,
             'formats' => $formats,
+            'apng'    => ! empty( $general['output_apng'] ),
         );
     }
 
     /**
      * 判断文件是否应按设置输出为目标格式
      *
-     * 只有 PNG（含 APNG）、JPG、GIF（含动图）三种源参与转换，是否转换由各自的勾选决定；
-     * WebP / AVIF / JXL 无论静图动图都只做同格式压缩。动图还要求动画层确认工具齐备，
-     * 否则宁可保持原格式，也不能产出丢帧的静图。
+     * 只有 PNG（含 APNG）、JPG、GIF（含动图）三种源参与转换，是否转换由各自的勾选决定，
+     * 其中 APNG 有自己的勾选框，不看 PNG 那个；WebP / AVIF / JXL 无论静图动图都只做同格式压缩。
+     * 动图还要求动画层确认工具齐备，否则宁可保持原格式，也不能产出丢帧的静图。
      *
      * @param string $file_path 文件路径
      * @return bool
@@ -132,12 +133,17 @@ class Libre_Compress_Output {
         $settings = $this->get_output_settings();
         $format   = $this->format_of( $file_path );
 
-        if ( ! in_array( $format, $settings['formats'], true ) ) {
-            return false;
+        if ( 'png' === $format && Libre_Compress_Animation::is_animated( $file_path ) ) {
+            return ! empty( $settings['apng'] ) && Libre_Compress_Animation::convert_supported( 'png', $settings['target'] );
         }
 
-        if ( in_array( $format, array( 'png', 'gif' ), true ) && Libre_Compress_Animation::is_animated( $file_path ) ) {
-            return Libre_Compress_Animation::convert_supported( $format, $settings['target'] );
+        if ( 'gif' === $format && Libre_Compress_Animation::is_animated( $file_path ) ) {
+            return in_array( 'gif', $settings['formats'], true )
+                && Libre_Compress_Animation::convert_supported( 'gif', $settings['target'] );
+        }
+
+        if ( ! in_array( $format, $settings['formats'], true ) ) {
+            return false;
         }
 
         return true;
@@ -215,7 +221,12 @@ class Libre_Compress_Output {
             return $result_template;
         }
 
-        if ( ! in_array( $format, $settings['formats'], true ) ) {
+        // APNG 有自己的勾选框，不看 PNG 那个；其余源格式看各自的勾选。
+        $format_enabled = ( $is_animation && 'png' === $format )
+            ? ! empty( $settings['apng'] )
+            : in_array( $format, $settings['formats'], true );
+
+        if ( ! $format_enabled ) {
             $result_template['status']  = 'skipped';
             $result_template['message'] = __( '该格式未配置格式转换', 'libre-compress' );
             return $result_template;
@@ -296,14 +307,12 @@ class Libre_Compress_Output {
         } elseif ( 'gif' === $format ) {
             // 静态 GIF 只有一条帧，不用拆帧：WebP 交给 gif2webp、JPEG XL 交给 cjxl 直接读原文件
             //（cwebp 读 GIF 会丢透明，实测过），只有 AVIF 必须先经 GD 解成 PNG —— avifenc 不认 GIF。
-            // 三条 GIF 转换路径各有独立参数，跟 PNG/JPG 的转换设置互不影响。
-            $gif_group = 'convert_' . $target . '_gif';
-
+            // 参数按工具取：WebP 走 gif2webp 那一组，AVIF 与 JPG/PNG 转 AVIF 共用 avifenc 那一组。
             if ( 'webp' === $target ) {
-                $gif2webp = Libre_Compress_Animation::gif2webp_command( $file_path, $temp_output, $gif_group );
+                $gif2webp = Libre_Compress_Animation::gif2webp_command( $file_path, $temp_output, 'gif_to_webp' );
                 $command  = false === $gif2webp ? false : array( $gif2webp );
             } elseif ( 'jxl' === $target ) {
-                $cjxl    = Libre_Compress_Cjxl::build_command( $file_path, $temp_output, $gif_group );
+                $cjxl    = Libre_Compress_Cjxl::build_command( $file_path, $temp_output, 'jxl' );
                 $command = false === $cjxl ? false : array( $cjxl );
             } else {
                 $temp_source = $file_path . '.lc-source-' . $temp_token . '.png';
@@ -320,10 +329,10 @@ class Libre_Compress_Output {
                     $result_template['message'] = __( 'GIF 压缩预处理失败', 'libre-compress' );
                     return $result_template;
                 }
-                $command = $this->build_encode_command( $temp_source, $temp_output, $target, $gif_group );
+                $command = $this->build_encode_command( $temp_source, $temp_output, $target, $target );
             }
         } else {
-            $command = $this->build_encode_command( $file_path, $temp_output, $target, 'convert_' . $target );
+            $command = $this->build_encode_command( $file_path, $temp_output, $target, $target );
         }
 
         if ( $animation_done ) {

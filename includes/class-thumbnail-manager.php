@@ -33,6 +33,28 @@ class Libre_Compress_Thumbnail_Manager {
 
         // 按设置调整大图缩放阈值
         add_filter( 'big_image_size_threshold', array( $this, 'filter_big_image_size_threshold' ) );
+
+        // 按设置把缩放保存质量拉满，避免 GD / Imagick 先压一遍再交给专精工具
+        add_filter( 'wp_editor_set_quality', array( $this, 'filter_editor_quality' ), 10, 2 );
+    }
+
+    /**
+     * 调整图片尺寸时覆盖保存质量
+     *
+     * 只影响 JPG / WebP / AVIF 这类有损编码：开启后一律用 100。
+     * PNG 在 GD 与 Imagick 里本来就是无损编码，质量参数在那边另有含义
+     *（GD 会把它换算成压缩级别），所以原样放行。
+     *
+     * @param int    $quality   当前质量
+     * @param string $mime_type 输出 MIME
+     * @return int
+     */
+    public function filter_editor_quality( $quality, $mime_type = '' ) {
+        if ( ! Libre_Compress_Settings::resize_is_lossless() ) {
+            return $quality;
+        }
+
+        return in_array( $mime_type, array( 'image/jpeg', 'image/webp', 'image/avif' ), true ) ? 100 : $quality;
     }
 
     /**
