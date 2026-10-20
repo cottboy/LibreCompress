@@ -307,7 +307,7 @@ class Libre_Compress_Output {
         } elseif ( 'gif' === $format ) {
             // 静态 GIF 只有一条帧，不用拆帧：WebP 交给 gif2webp、JPEG XL 交给 cjxl 直接读原文件
             //（cwebp 读 GIF 会丢透明，实测过），只有 AVIF 必须先经 GD 解成 PNG —— avifenc 不认 GIF。
-            // 参数按工具取：WebP 走 gif2webp 那一组，AVIF 与 JPG/PNG 转 AVIF 共用 avifenc 那一组。
+            // 静态 GIF 的三条转换各用自己那一组参数：它们的工具链和别的路径都不一样。
             if ( 'webp' === $target ) {
                 $gif2webp = Libre_Compress_Animation::gif2webp_command( $file_path, $temp_output, 'gif_to_webp' );
                 $command  = false === $gif2webp ? false : array( $gif2webp );
@@ -329,10 +329,12 @@ class Libre_Compress_Output {
                     $result_template['message'] = __( 'GIF 压缩预处理失败', 'libre-compress' );
                     return $result_template;
                 }
-                $command = $this->build_encode_command( $temp_source, $temp_output, $target, $target );
+                $command = $this->build_encode_command( $temp_source, $temp_output, $target, 'avif_convert_gif' );
             }
         } else {
-            $command = $this->build_encode_command( $file_path, $temp_output, $target, $target );
+            // WebP 与 JXL 与同格式压缩共用一组；AVIF 转格式只调 avifenc，与同格式压缩分开。
+            $group   = 'avif' === $target ? 'avif_convert' : $target;
+            $command = $this->build_encode_command( $file_path, $temp_output, $target, $group );
         }
 
         if ( $animation_done ) {

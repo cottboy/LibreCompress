@@ -35,7 +35,7 @@
 - **兼容格式回退**：开启后格式转换生成“源文件名.webp”“源文件名.avif”的双扩展名新文件，旧格式文件原地保留并同样经过压缩，前台用 `<picture>` 让不支持新格式的浏览器加载旧格式；回退地址由新格式名去掉最后一段扩展名确定性推导，不查询数据库。关闭后转换不再保留旧格式文件，提交成功后直接删除源文件，新格式完整替换旧格式，前台也只输出新格式。
 - **隐私保护**：压缩和格式转换时默认清除 EXIF、GPS 拍摄位置、设备与软件信息，对所有压缩路径生效，并尽量保留 ICC 色彩配置以免偏色。
 - **动图保护**：识别 APNG 的 `acTL` 块、WebP 的 `ANMF` 块，绝不让只认第一帧的工具把动图压成静图；APNG 由 oxipng 整只无损优化：PNG 走无损时直接跟着无损压；PNG 走有损时，勾了“APNG 自动无损压缩”才绕开 pngquant 单独无损压，不勾则不压。
-- **按工具分组参数**：一个压缩工具一组参数，共 11 组。同一个工具的静图、动图、同格式压缩与格式转换共用这一组设置——PNG 与 APNG 都用 oxipng，所以只有一组；GIF 转 WebP 的静态与动画都由 gif2webp 处理，也只有一组。
+- **按路径分组参数**：只有整条工具链完全一致的路径才合并成一节，共 15 节（10 条同格式压缩 + 5 条格式转换）。PNG 与 APNG 都只有 oxipng，共用一组；WebP 与 PNG/JPG 转 WebP 都只有 cwebp，共用一组；而多了解码或播放参数回写步骤的路径（AVIF 同格式、静态 GIF 转 AVIF、动画 GIF 转 WebP 等）各自独立。
 - **APNG 独立控制**：APNG 是否转格式由“格式转换”里单独的 APNG 勾选框决定，与 PNG 勾选无关。
 - **缩放画质可拉满**：勾选后 WordPress 生成缩略图与缩放图时，除 PNG 外所有格式一律按质量 100 保存，不让 GD / Imagick 先损耗一遍；以后 WordPress 支持新格式也自动覆盖，不用再改插件。
 - **参数与工具一一对应**：设置页每一项后面都标着它实际传给哪个工具的哪个参数，范围就是工具本身认可的范围（例如 pngquant 的 `--speed` 是 1-11、avifenc 的 `-s` 是 0-10、FFmpeg 的 `-crf` 是 0-63）。插件不做换算、不折算档位，没列出来的参数一律不传。
@@ -153,23 +153,27 @@ WebP / AVIF / JPEG XL 无论静图动图都只做同格式压缩；APNG 是否�
 
 ### 压缩参数
 
-“压缩工具”页按工具分组：一个工具一节，共 11 节，同一个工具的参数只出现一次。哪些路径在用这一组参数写在每节标题和说明里。每个工具依赖哪些可执行文件、当前环境是否支持，仍由页面顶部单独的“路径支持状态”表列出（同样是一个工具一行），不和参数混在一起。
+“压缩工具”页按压缩路径分组：**只有整条工具链完全一致的路径才合并成一节**，共 15 节（10 条同格式压缩 + 5 条格式转换）。同一个编码器但前后还多了解码（`avifdec`、GD）或播放参数回写（`webpmux`、`ffprobe`）的路径各算一条，参数各自独立——所以“AVIF 同格式压缩”“PNG/JPG 转 AVIF”“静态 GIF 转 AVIF”是三节，不是一节。
 
-支持状态表里，一行是一个工具，但依赖是按这个工具负责的每条子路径分行写的——比如“AVIF 编码”这行会分别列出 AVIF 同格式压缩要 `avifdec + avifenc`、PNG/JPG 转 AVIF 只要 `avifenc`、静态 GIF 转 AVIF 还要 GD 扩展；状态列显示“支持 / 部分支持 x/y / 不支持”，只有全部子路径都齐才显示“支持”。
+页面顶部的“路径支持状态”表与参数区一一对应：同样 15 行，一行一条路径，依赖列写的就是那条命令真实调用的全部工具，不多也不少，缺哪个工具会在状态列点名。
 
-| 分组 | 工具 | 覆盖的路径 |
+| 分组 | 完整工具链 | 覆盖的路径 |
 | --- | --- | --- |
 | `jpeg` | jpegoptim | JPEG 同格式压缩 |
 | `png_lossy` | pngquant | PNG 有损压缩（`png_mode` 决定 PNG 走有损还是无损） |
-| `png_lossless` | oxipng | PNG 无损压缩、APNG 动图压缩（`apng_enabled` 决定 APNG 压不压） |
+| `png_lossless` | oxipng | PNG 无损压缩、APNG 动图压缩（`apng_enabled` 决定 PNG 有损模式时 APNG 压不压） |
 | `gif` | gifsicle | GIF 同格式压缩（含动画） |
-| `gif_to_webp` | gif2webp | 静态 GIF 转 WebP、动画 GIF 转 WebP |
 | `svg` | oxvg | SVG 同格式压缩 |
 | `webp` | cwebp | WebP 静图同格式压缩、PNG/JPG 转 WebP |
-| `webp_anim` | FFmpeg libwebp_anim | 动画 WebP 同格式压缩、APNG 转 WebP |
-| `avif` | avifenc | AVIF 静图同格式压缩、PNG/JPG 转 AVIF、静态 GIF 转 AVIF |
-| `avif_anim` | FFmpeg libaom-av1 | 动画 AVIF 同格式压缩、动画 GIF 转 AVIF、APNG 转 AVIF |
+| `webp_anim` | FFmpeg + webpmux | 动画 WebP 同格式压缩、APNG 转 WebP |
+| `avif` | avifdec + avifenc | AVIF 静图同格式压缩 |
+| `avif_anim` | avifdec + FFmpeg + ffprobe | 动画 AVIF 同格式压缩 |
 | `jxl` | cjxl | JPEG XL 同格式压缩（含动画）、PNG/JPG/GIF/APNG 转 JPEG XL |
+| `gif_to_webp` | gif2webp | 静态 GIF 转 WebP |
+| `gif_to_webp_anim` | gif2webp + webpmux | 动画 GIF 转 WebP |
+| `avif_convert` | avifenc | PNG/JPG 转 AVIF |
+| `avif_convert_gif` | GD + avifenc | 静态 GIF 转 AVIF |
+| `avif_convert_anim` | FFmpeg | 动画 GIF/APNG 转 AVIF |
 
 规则只有一条：**一个输入框对应一个真实的命令行参数，插件不做任何换算**。界面上的范围就是工具自己 `--help` 里写的范围（例如 pngquant `--speed` 是 1–11、avifenc `-s` 是 0–10、FFmpeg `-crf` 是 0–63），你填多少就传多少，不会出现“界面填 0–9、实际折算成 0–6”这种事。
 

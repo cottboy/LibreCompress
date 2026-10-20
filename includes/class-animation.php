@@ -743,7 +743,7 @@ class Libre_Compress_Animation {
     private static function build_native_command( string $source, string $target, string $output, array $plan ) {
         $format = $plan['format'];
 
-        // 参数按工具取：同一个工具只有一组参数，GIF 与 APNG 转同一个目标格式共用这套设置。
+        // 参数按“整条工具链”取：只有工具完全一样的路径才共用一组。
         if ( 'jxl' === $target ) {
             return Libre_Compress_Cjxl::build_command( $source, $output, 'jxl' );
         }
@@ -753,7 +753,8 @@ class Libre_Compress_Animation {
         }
 
         if ( 'gif' === $format ) {
-            return self::gif2webp_command( $source, $output, 'gif_to_webp' );
+            // 动画 GIF 走 gif2webp 之后还要 webpmux 回写播放参数，与静态 GIF 那组不同。
+            return self::gif2webp_command( $source, $output, 'gif_to_webp_anim' );
         }
 
         // 剩下的都是 WebP 目标：WebP 同格式重压与 APNG 转 WebP，都交给 FFmpeg 一次读写整只动图。
@@ -769,7 +770,7 @@ class Libre_Compress_Animation {
      *
      * libwebp_anim 自己会推算帧间差异矩形与画布尺寸，所以画布大小、帧偏移、
      * 逐帧时长和循环次数都不用插件操心，帧数再多也只是一条命令。
-     * 动画 WebP 同格式重压与 APNG 转 WebP 共用 webp_anim 一组参数。
+     * 动画 WebP 同格式重压与 APNG 转 WebP 都是 ffmpeg + webpmux，共用 webp_anim 一组参数。
      *
      * @param string $source 源路径
      * @param string $output 输出路径
@@ -1019,9 +1020,9 @@ class Libre_Compress_Animation {
      * FFmpeg 内部处理颜色和透明背景，全程不把动画帧交给 PHP。
      */
     private static function build_avif_command( string $source, string $output, array $plan ) {
-        $same = 'avif' === $plan['format'];
-        // 动画 AVIF 同格式压缩、动画 GIF 与 APNG 转 AVIF 都走 FFmpeg 的 libaom-av1，共用 avif_anim 一组参数。
-        $group    = 'avif_anim';
+        $same     = 'avif' === $plan['format'];
+        // 同格式比转格式多 avifdec / ffprobe 两步，工具链不同，参数各用一组。
+        $group    = $same ? 'avif_anim' : 'avif_convert_anim';
         $lossless = 'lossless' === Libre_Compress_Settings::param_mode( $group );
         $crf      = Libre_Compress_Settings::param_int( $group . '_crf' );
         $speed    = Libre_Compress_Settings::param_int( $group . '_speed' );
