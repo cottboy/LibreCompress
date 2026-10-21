@@ -414,6 +414,14 @@ class Local_Crush_Compressor {
 
         $extension      = strtolower( pathinfo( $file_path, PATHINFO_EXTENSION ) );
 
+        // 后缀不是 png 但内容其实是 APNG：不能按后缀交给 jpegoptim/pngquant 之类工具。
+        if ( 'png' !== $extension && self::is_apng( $file_path ) ) {
+            $message = __( '文件后缀与内容不符（内容是 APNG 动画），已跳过以保护动画内容', 'local-crush' );
+            $this->record_skipped_file( $attachment_id, $file_path, $size_type, $message );
+
+            return array( 'success' => false, 'message' => $message, 'status' => 'skipped' );
+        }
+
         // 动图不能交给只认第一帧的单文件工具：pngquant、cwebp、avifenc 都会把动图压成静图。
         // APNG 由 oxipng 整只无损优化（见 APNG 自动无损压缩开关），其余动图直接交给支持完整动画的工具。
         $plan   = in_array( $extension, array( 'gif', 'png', 'webp', 'avif' ), true )

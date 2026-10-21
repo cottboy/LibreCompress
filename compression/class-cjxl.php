@@ -15,6 +15,13 @@ if ( ! defined( 'ABSPATH' ) ) {
 class Local_Crush_Cjxl extends Local_Crush_Tool_Base {
 
     /**
+     * 只含方向的最小 EXIF 临时文件（JXL 要 TIFF 本体，不要 Exif\0\0 头）
+     *
+     * @var string
+     */
+    private $temp_exif = '';
+
+    /**
      * 获取工具名称
      *
      * @return string 渠道名称
@@ -46,12 +53,13 @@ class Local_Crush_Cjxl extends Local_Crush_Tool_Base {
      *
      * 动画层与转换层共用这一个参数出口，避免同一个工具的参数在两处各写一遍。
      *
-     * @param string $source 输入文件路径
-     * @param string $output 输出文件路径
-     * @param string $group  设置分组，固定为 jxl
+     * @param string $source           输入文件路径
+     * @param string $output           输出文件路径
+     * @param string $group            设置分组，固定为 jxl
+     * @param string $orientation_exif 只含方向的 TIFF 临时文件；空字符串表示不写方向
      * @return array|false 参数数组，工具不可用时返回 false
      */
-    public static function build_command( string $source, string $output, string $group = 'jxl' ) {
+    public static function build_command( string $source, string $output, string $group = 'jxl', string $orientation_exif = '' ) {
         $cjxl = Local_Crush_Output::find_local_tool( 'cjxl' );
 
         if ( false === $cjxl ) {
@@ -86,6 +94,12 @@ class Local_Crush_Cjxl extends Local_Crush_Tool_Base {
             $command[] = 'strip=xmp';
             $command[] = '-x';
             $command[] = 'strip=jumbf';
+
+            // strip 之后再写入只含方向的最小 EXIF；JXL 要 TIFF 本体，不带 Exif\0\0 头。
+            if ( '' !== $orientation_exif ) {
+                $command[] = '-x';
+                $command[] = 'exif=' . $orientation_exif;
+            }
         }
 
         $command[] = $source;
@@ -102,9 +116,31 @@ class Local_Crush_Cjxl extends Local_Crush_Tool_Base {
      * @return array[] 命令链
      */
     protected function build_command_chain( string $file_path, array $options ): array {
-        $command = self::build_command( $file_path, $this->get_temp_output_path( $file_path ) );
+        $command = self::build_command( $file_path, $this->get_temp_output_path( $file_path ), 'jxl', $this->temp_exif );
 
         return false === $command ? array() : array( $command );
+    }
+
+    /**
+     * 同格式压缩时创建方向临时文件
+     *
+     * @param string $file_path 文件路径
+     * @return string[]
+     */
+    protected function get_extra_temp_paths( string $file_path ): array {
+        if ( ! Local_Crush_Settings::strips_metadata() ) {
+            return array();
+        }
+
+        $orientation = Local_Crush_Orientation::from_file( $file_path );
+
+        if ( $orientation <= 1 ) {
+            return array();
+        }
+
+        $this->temp_exif = Local_Crush_Orientation::write_exif_temp( $orientation, false );
+
+        return '' === $this->temp_exif ? array() : array( $this->temp_exif );
     }
 
     /**

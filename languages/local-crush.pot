@@ -820,6 +820,10 @@ msgstr ""
 msgid "无法读取 APNG 动画信息，已跳过以保护动画内容"
 msgstr ""
 
+#: includes/class-compressor.php:419 includes/class-converter.php:218
+msgid "文件后缀与内容不符（内容是 APNG 动画），已跳过以保护动画内容"
+msgstr ""
+
 #: includes/class-converter.php:208
 msgid "无法读取 GIF 动画信息，已跳过以保护动画内容"
 msgstr ""
@@ -1464,7 +1468,7 @@ msgid "填 -1 表示永久保留；填天数则备份到期后自动删除，届
 msgstr ""
 
 #: includes/class-settings.php:1090
-msgid "删除 EXIF、GPS 拍摄位置、设备型号、作者与软件信息等隐私数据，对同格式压缩与格式转换的所有路径都生效。ICC 色彩配置会尽量保留以免偏色；取消勾选则尽量保留元数据；经过解码再编码的路径（如 AVIF、动画 WebP）仍可能留不住全部元数据。"
+msgid "删除 EXIF、GPS 拍摄位置、设备型号、作者与软件信息等隐私数据，对同格式压缩与格式转换的所有路径都生效。为了不让手机竖拍照片变横，会单独保留照片方向；ICC 色彩配置会尽量保留以免偏色；取消勾选则尽量保留元数据；经过解码再编码的路径（如 AVIF、动画 WebP）仍可能留不住全部元数据。"
 msgstr ""
 
 #: includes/class-settings.php:1120

@@ -205,7 +205,18 @@ function local_crush_sanitize_svg_upload( $file ) {
         return $file;
     }
 
-    if ( empty( $file['type'] ) || 'image/svg+xml' !== $file['type'] || empty( $file['tmp_name'] ) || ! file_exists( $file['tmp_name'] ) ) {
+    if ( empty( $file['tmp_name'] ) || ! file_exists( $file['tmp_name'] ) ) {
+        return $file;
+    }
+
+    // 不能只信客户端报的 MIME：把 .svg 报成 image/png 就能绕过清理。
+    // 后缀是 svg，或类型声明是 svg，都按 SVG 处理；真正内容不合法会被下面的解析拒绝。
+    $name      = isset( $file['name'] ) ? (string) $file['name'] : '';
+    $extension = strtolower( (string) pathinfo( $name, PATHINFO_EXTENSION ) );
+    $is_svg    = ( 'svg' === $extension )
+        || ( ! empty( $file['type'] ) && 'image/svg+xml' === $file['type'] );
+
+    if ( ! $is_svg ) {
         return $file;
     }
 
@@ -244,6 +255,9 @@ add_filter( 'wp_handle_upload_prefilter', 'local_crush_sanitize_svg_upload' );
  * 加载依赖文件
  */
 function local_crush_load_dependencies() {
+    // 加载方向元数据辅助类（工具类会用到）
+    require_once LOCAL_CRUSH_PATH . 'includes/class-orientation.php';
+
     // 加载压缩工具基类和实现
     require_once LOCAL_CRUSH_PATH . 'compression/class-tool-base.php';
     require_once LOCAL_CRUSH_PATH . 'compression/class-jpeg.php';

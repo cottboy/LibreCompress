@@ -21,6 +21,13 @@ if ( ! defined( 'ABSPATH' ) ) {
 class Local_Crush_Jpeg extends Local_Crush_Tool_Base {
 
     /**
+     * 原图方向，1 表示不需要处理
+     *
+     * @var int
+     */
+    private $orientation = 1;
+
+    /**
      * 获取渠道名称
      *
      * @return string 渠道名称
@@ -64,6 +71,11 @@ class Local_Crush_Jpeg extends Local_Crush_Tool_Base {
         $lossless = 'lossless' === Local_Crush_Settings::param_mode( 'jpeg' );
         $command  = array( $executable, '--quiet' );
 
+        // 删除 EXIF 会连方向一起删掉；先记下方向，命令执行完再补回去。
+        $this->orientation = Local_Crush_Settings::strips_metadata()
+            ? Local_Crush_Orientation::from_file( $file_path )
+            : 1;
+
         // 渐进式、顺序式与自动挑选直接对应 jpegoptim 的三个开关。
         $progressive = Local_Crush_Settings::param_choice( 'jpeg_progressive' );
 
@@ -93,6 +105,24 @@ class Local_Crush_Jpeg extends Local_Crush_Tool_Base {
         $command[] = $file_path;
 
         return array( $command );
+    }
+
+    /**
+     * 命令执行完、替换原文件前，把方向写回去
+     *
+     * jpegoptim 已删除原 EXIF，这里只补一个最小 EXIF（只含 Orientation），
+     * 不会把 GPS、设备型号等隐私信息带回来。
+     *
+     * @param string $temp_output 临时输出路径（JPEG 是原地覆盖，为空）
+     * @param string $file_path   被压缩的文件
+     * @return bool
+     */
+    protected function finalize_temp_output( string $temp_output, string $file_path ): bool {
+        if ( Local_Crush_Settings::strips_metadata() && $this->orientation > 1 ) {
+            return Local_Crush_Orientation::inject_jpeg( $file_path, $this->orientation );
+        }
+
+        return true;
     }
 
     /**

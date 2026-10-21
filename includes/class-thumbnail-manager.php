@@ -511,141 +511,155 @@ class Local_Crush_Thumbnail_Manager {
                 return 0 === $scaled_count ? 'nothing' : $scaled_count;
             }
 
-            // 旧原图可能超过 WordPress 的大图阈值；这里只生成尺寸，不能顺手生成 -scaled。
-            $disable_scaling = static function () {
-                return 0;
-            };
-
-            $processor = local_crush()->processor;
-            $was       = $processor->is_auto_compress_suppressed();
-            $processor->set_auto_compress_suppressed( true );
-
-            $generate_sizes = function ( string $source, array $wanted ) use ( $attachment_id, $disable_scaling ) {
-                if ( empty( $wanted ) ) {
-                    return array();
-                }
-
-                $filter = function ( $sizes ) use ( $wanted ) {
-                    return array_intersect_key( is_array( $sizes ) ? $sizes : array(), array_flip( $wanted ) );
-                };
-
-                add_filter( 'intermediate_image_sizes_advanced', $filter, 20 );
-                add_filter( 'big_image_size_threshold', $disable_scaling, 20 );
-
-                $fresh = array();
-
-                try {
-                    $fresh = wp_generate_attachment_metadata( $attachment_id, $source );
-                } finally {
-                    remove_filter( 'intermediate_image_sizes_advanced', $filter, 20 );
-                    remove_filter( 'big_image_size_threshold', $disable_scaling, 20 );
-                }
-
-                return is_array( $fresh ) && ! empty( $fresh['sizes'] ) && is_array( $fresh['sizes'] ) ? $fresh['sizes'] : array();
-            };
-
-            $new_source = $file;
-            if ( ! empty( $metadata['original_image'] ) ) {
-                $original_rel  = ( '.' === $file_dir ? '' : $file_dir . '/' ) . wp_basename( (string) $metadata['original_image'] );
-                $original_path = $base_dir . '/' . $original_rel;
-
-                if ( is_file( $original_path ) && $this->is_safe_upload_path( $original_path ) ) {
-                    $new_source = $original_path;
-                }
-            }
+            // 生成缩略图时 WordPress 会先覆盖附件元数据；任何失败都必须把原记录写回去，
+            // 否则已有尺寸会从元数据里消失，磁盘文件却还在。
+            $metadata_before_generation = $metadata;
+            $metadata_committed         = false;
 
             try {
-                $new_sizes    = $generate_sizes( $new_source, $missing_new );
-                $legacy_sizes = null !== $legacy_source ? $generate_sizes( $legacy_source['path'], $missing_legacy ) : array();
-            } finally {
-                $processor->set_auto_compress_suppressed( $was );
-            }
 
-            $merged          = $metadata;
-            $merged['sizes'] = isset( $metadata['sizes'] ) && is_array( $metadata['sizes'] ) ? $metadata['sizes'] : array();
-            $generated       = count( $legacy_sizes );
+                // 旧原图可能超过 WordPress 的大图阈值；这里只生成尺寸，不能顺手生成 -scaled。
+                $disable_scaling = static function () {
+                    return 0;
+                };
 
-            // 两套缩略图都由 WordPress 独立生成，但新文件名要沿用旧文件的主体，
-            // 这样前台按“双扩展名”规则才能找到对应的旧格式文件。
-            $legacy_names = array();
-            foreach ( $legacy_entries as $size_name => $entry ) {
-                $legacy_names[ $size_name ] = wp_basename( $entry['from'] );
-            }
-            foreach ( $legacy_sizes as $size_name => $size_data ) {
-                if ( ! empty( $size_data['file'] ) ) {
-                    $legacy_names[ $size_name ] = (string) $size_data['file'];
-                }
-            }
+                $processor = local_crush()->processor;
+                $was       = $processor->is_auto_compress_suppressed();
+                $processor->set_auto_compress_suppressed( true );
 
-            foreach ( $new_sizes as $size_name => $size_data ) {
-                if ( ! in_array( $size_name, $missing_new, true ) ) {
-                    continue;
-                }
+                $generate_sizes = function ( string $source, array $wanted ) use ( $attachment_id, $disable_scaling ) {
+                    if ( empty( $wanted ) ) {
+                        return array();
+                    }
 
-                if ( ! empty( $size_data['file'] ) && isset( $legacy_names[ $size_name ] ) ) {
-                    $new_path     = $base_dir . '/' . $file_dir . '/' . $size_data['file'];
-                    $new_extension = pathinfo( $size_data['file'], PATHINFO_EXTENSION );
-                    $desired_name = $legacy_names[ $size_name ] . '.' . $new_extension;
-                    $desired_path = $base_dir . '/' . $file_dir . '/' . $desired_name;
+                    $filter = function ( $sizes ) use ( $wanted ) {
+                        return array_intersect_key( is_array( $sizes ) ? $sizes : array(), array_flip( $wanted ) );
+                    };
 
-                    if ( $new_path !== $desired_path && is_file( $new_path ) ) {
-                        if ( is_file( $desired_path ) ) {
-                            if ( is_link( $desired_path ) ) {
-                                return null;
-                            }
+                    add_filter( 'intermediate_image_sizes_advanced', $filter, 20 );
+                    add_filter( 'big_image_size_threshold', $disable_scaling, 20 );
 
-                            if ( $this->is_safe_upload_path( $new_path ) && ! is_link( $new_path ) ) {
-                                // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
-                                unlink( $new_path );
-                            }
+                    $fresh = array();
 
-                            if ( is_file( $desired_path ) ) {
-                                $size_data['file'] = $desired_name;
-                            }
-                        } else {
-                            if ( ! $this->is_safe_upload_path( $desired_path )
-                                || ! rename( $new_path, $desired_path ) ) {
-                                return null;
-                            }
+                    // wp_generate_attachment_metadata 定义在后台文件里；wp-cron / WP-CLI 不会自动加载。
+                    require_once ABSPATH . 'wp-admin/includes/image.php';
 
-                            $size_data['file'] = $desired_name;
-                        }
+                    try {
+                        $fresh = wp_generate_attachment_metadata( $attachment_id, $source );
+                    } finally {
+                        remove_filter( 'intermediate_image_sizes_advanced', $filter, 20 );
+                        remove_filter( 'big_image_size_threshold', $disable_scaling, 20 );
+                    }
+
+                    return is_array( $fresh ) && ! empty( $fresh['sizes'] ) && is_array( $fresh['sizes'] ) ? $fresh['sizes'] : array();
+                };
+
+                $new_source = $file;
+                if ( ! empty( $metadata['original_image'] ) ) {
+                    $original_rel  = ( '.' === $file_dir ? '' : $file_dir . '/' ) . wp_basename( (string) $metadata['original_image'] );
+                    $original_path = $base_dir . '/' . $original_rel;
+
+                    if ( is_file( $original_path ) && $this->is_safe_upload_path( $original_path ) ) {
+                        $new_source = $original_path;
                     }
                 }
 
-                $merged['sizes'][ $size_name ] = $size_data;
-                $generated++;
-            }
-
-            if ( empty( $new_sizes ) && ! empty( $missing_new ) ) {
-                return null;
-            }
-
-            if ( 0 === $generated && empty( $new_sizes ) ) {
-                return 0 === $scaled_count ? 'nothing' : $scaled_count;
-            }
-
-            if ( ! $this->write_metadata( $attachment_id, $merged ) ) {
-                // 核心已把元数据覆盖成只含新尺寸，写回失败时先还原，别让已有尺寸的记录丢失
-                $this->write_metadata( $attachment_id, $metadata );
-
-                return null;
-            }
-
-            foreach ( $legacy_names as $size_name => $legacy_name ) {
-                if ( empty( $merged['sizes'][ $size_name ]['file'] ) ) {
-                    continue;
+                try {
+                    $new_sizes    = $generate_sizes( $new_source, $missing_new );
+                    $legacy_sizes = null !== $legacy_source ? $generate_sizes( $legacy_source['path'], $missing_legacy ) : array();
+                } finally {
+                    $processor->set_auto_compress_suppressed( $was );
                 }
 
-                $legacy_path = $base_dir . '/' . $file_dir . '/' . $legacy_name;
-                $new_path    = $base_dir . '/' . $file_dir . '/' . $merged['sizes'][ $size_name ]['file'];
+                $merged          = $metadata;
+                $merged['sizes'] = isset( $metadata['sizes'] ) && is_array( $metadata['sizes'] ) ? $metadata['sizes'] : array();
+                $generated       = count( $legacy_sizes );
 
-                if ( is_file( $legacy_path ) && is_file( $new_path ) ) {
-                    local_crush()->output_processor->save_output_mapping( $attachment_id, $size_name, $legacy_path, $new_path );
+                // 两套缩略图都由 WordPress 独立生成，但新文件名要沿用旧文件的主体，
+                // 这样前台按“双扩展名”规则才能找到对应的旧格式文件。
+                $legacy_names = array();
+                foreach ( $legacy_entries as $size_name => $entry ) {
+                    $legacy_names[ $size_name ] = wp_basename( $entry['from'] );
+                }
+                foreach ( $legacy_sizes as $size_name => $size_data ) {
+                    if ( ! empty( $size_data['file'] ) ) {
+                        $legacy_names[ $size_name ] = (string) $size_data['file'];
+                    }
+                }
+
+                foreach ( $new_sizes as $size_name => $size_data ) {
+                    if ( ! in_array( $size_name, $missing_new, true ) ) {
+                        continue;
+                    }
+
+                    if ( ! empty( $size_data['file'] ) && isset( $legacy_names[ $size_name ] ) ) {
+                        $new_path     = $base_dir . '/' . $file_dir . '/' . $size_data['file'];
+                        $new_extension = pathinfo( $size_data['file'], PATHINFO_EXTENSION );
+                        $desired_name = $legacy_names[ $size_name ] . '.' . $new_extension;
+                        $desired_path = $base_dir . '/' . $file_dir . '/' . $desired_name;
+
+                        if ( $new_path !== $desired_path && is_file( $new_path ) ) {
+                            if ( is_file( $desired_path ) ) {
+                                if ( is_link( $desired_path ) ) {
+                                    return null;
+                                }
+
+                                if ( $this->is_safe_upload_path( $new_path ) && ! is_link( $new_path ) ) {
+                                    // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
+                                    unlink( $new_path );
+                                }
+
+                                if ( is_file( $desired_path ) ) {
+                                    $size_data['file'] = $desired_name;
+                                }
+                            } else {
+                                if ( ! $this->is_safe_upload_path( $desired_path )
+                                    || ! rename( $new_path, $desired_path ) ) {
+                                    return null;
+                                }
+
+                                $size_data['file'] = $desired_name;
+                            }
+                        }
+                    }
+
+                    $merged['sizes'][ $size_name ] = $size_data;
+                    $generated++;
+                }
+
+                if ( empty( $new_sizes ) && ! empty( $missing_new ) ) {
+                    return null;
+                }
+
+                if ( 0 === $generated && empty( $new_sizes ) ) {
+                    return 0 === $scaled_count ? 'nothing' : $scaled_count;
+                }
+
+                if ( ! $this->write_metadata( $attachment_id, $merged ) ) {
+                    return null;
+                }
+
+                $metadata_committed = true;
+
+                foreach ( $legacy_names as $size_name => $legacy_name ) {
+                    if ( empty( $merged['sizes'][ $size_name ]['file'] ) ) {
+                        continue;
+                    }
+
+                    $legacy_path = $base_dir . '/' . $file_dir . '/' . $legacy_name;
+                    $new_path    = $base_dir . '/' . $file_dir . '/' . $merged['sizes'][ $size_name ]['file'];
+
+                    if ( is_file( $legacy_path ) && is_file( $new_path ) ) {
+                        local_crush()->output_processor->save_output_mapping( $attachment_id, $size_name, $legacy_path, $new_path );
+                    }
+                }
+
+                return $generated + $scaled_count;
+            } finally {
+                if ( ! $metadata_committed ) {
+                    $this->write_metadata( $attachment_id, $metadata_before_generation );
                 }
             }
-
-            return $generated + $scaled_count;
         } finally {
             local_crush()->processor->release_attachment_lock( $global_lock );
             local_crush()->processor->release_attachment_lock( $lock );

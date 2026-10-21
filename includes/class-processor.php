@@ -1074,6 +1074,9 @@ class Local_Crush_Processor {
             return true;
         }
 
+        // wp_generate_attachment_metadata 定义在后台文件里；wp-cron / WP-CLI 不会自动加载。
+        require_once ABSPATH . 'wp-admin/includes/image.php';
+
         $fresh = wp_generate_attachment_metadata( $attachment_id, $file );
 
         if ( ! is_array( $fresh ) || empty( $fresh['file'] ) ) {

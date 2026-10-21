@@ -948,6 +948,7 @@ class Local_Crush_Settings {
         $sanitized['output_png'] = ! empty( $input['output_png'] );
         $sanitized['output_jpg'] = ! empty( $input['output_jpg'] );
         $sanitized['output_gif'] = ! empty( $input['output_gif'] );
+        $sanitized['output_apng'] = ! empty( $input['output_apng'] );
         $sanitized['output_format'] = ( isset( $input['output_format'] ) && in_array( $input['output_format'], array( 'webp', 'avif', 'jxl' ), true ) ) ? $input['output_format'] : 'avif';
 
         // 兼容格式回退开关
@@ -1062,7 +1063,7 @@ class Local_Crush_Settings {
                             <input type="checkbox" name="local_crush_general[strip_metadata]" value="1" <?php checked( $options['strip_metadata'] ?? true ); ?>>
                             <?php esc_html_e( '压缩时删除图片元数据', 'local-crush' ); ?>
                         </label>
-                        <p class="description"><?php esc_html_e( '删除 EXIF、GPS 拍摄位置、设备型号、作者与软件信息等隐私数据，对同格式压缩与格式转换的所有路径都生效。ICC 色彩配置会尽量保留以免偏色；取消勾选则尽量保留元数据；经过解码再编码的路径（如 AVIF、动画 WebP）仍可能留不住全部元数据。', 'local-crush' ); ?></p>
+                        <p class="description"><?php esc_html_e( '删除 EXIF、GPS 拍摄位置、设备型号、作者与软件信息等隐私数据，对同格式压缩与格式转换的所有路径都生效。为了不让手机竖拍照片变横，会单独保留照片方向；ICC 色彩配置会尽量保留以免偏色；取消勾选则尽量保留元数据；经过解码再编码的路径（如 AVIF、动画 WebP）仍可能留不住全部元数据。', 'local-crush' ); ?></p>
                     </td>
                 </tr>
                 <tr>

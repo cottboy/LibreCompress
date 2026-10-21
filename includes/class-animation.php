@@ -154,21 +154,34 @@ class Local_Crush_Animation {
      * @return array|null
      */
     private static function analyze_gif( string $file_path ): ?array {
-        // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
-        $data = file_get_contents( $file_path );
+        $handle = @fopen( $file_path, 'rb' );
 
-        if ( false === $data || strlen( $data ) < 14 || 'GIF' !== substr( $data, 0, 3 ) ) {
+        if ( false === $handle ) {
             return null;
         }
 
-        $width  = (int) unpack( 'v', substr( $data, 6, 2 ) )[1];
-        $height = (int) unpack( 'v', substr( $data, 8, 2 ) )[1];
-        $flags  = ord( $data[10] );
+        $file_size = (int) filesize( $file_path );
+        $header    = fread( $handle, 13 );
+
+        if ( $file_size < 14 || strlen( $header ) < 13 || 'GIF' !== substr( $header, 0, 3 ) ) {
+            fclose( $handle );
+            return null;
+        }
+
+        $width  = (int) unpack( 'v', substr( $header, 6, 2 ) )[1];
+        $height = (int) unpack( 'v', substr( $header, 8, 2 ) )[1];
+        $flags  = ord( $header[10] );
         $pos    = 13;
-        $length = strlen( $data );
 
         if ( $flags & 0x80 ) {
-            $pos += 3 * ( 2 << ( $flags & 0x07 ) );
+            $skip = 3 * ( 2 << ( $flags & 0x07 ) );
+
+            if ( 0 !== fseek( $handle, $skip, SEEK_CUR ) ) {
+                fclose( $handle );
+                return null;
+            }
+
+            $pos += $skip;
         }
 
         $frames        = 0;
@@ -179,91 +192,163 @@ class Local_Crush_Animation {
         $pending_delay = 0;
         $pending_alpha = false;
 
-        while ( $pos < $length ) {
-            $block = ord( $data[ $pos ] );
+        while ( $pos < $file_size ) {
+            $block_byte = fread( $handle, 1 );
+
+            if ( '' === $block_byte ) {
+                break;
+            }
+
+            $block = ord( $block_byte );
+            $pos++;
 
             if ( 0x3B === $block ) {
                 break;
             }
 
             if ( 0x21 === $block ) {
-                if ( $pos + 2 > $length ) {
+                $label_byte = fread( $handle, 1 );
+
+                if ( '' === $label_byte ) {
+                    fclose( $handle );
                     return null;
                 }
 
-                $label = ord( $data[ $pos + 1 ] );
-                $pos  += 2;
+                $label = ord( $label_byte );
+                $pos++;
 
                 if ( 0xF9 === $label ) {
                     // 图形控制扩展：块大小 4，打包字段、延时、透明色索引、结束符。
-                    if ( $pos + 6 > $length || 4 !== ord( $data[ $pos ] ) ) {
+                    $size_byte = fread( $handle, 1 );
+
+                    if ( '' === $size_byte || 4 !== ord( $size_byte ) ) {
+                        fclose( $handle );
                         return null;
                     }
 
-                    $packed  = ord( $data[ $pos + 1 ] );
-                    $pending_delay = (int) unpack( 'v', substr( $data, $pos + 2, 2 ) )[1] * 10;
-                    $pending_alpha = (bool) ( $packed & 0x01 );
-                    $pos += 6;
+                    $data = fread( $handle, 4 );
+
+                    if ( strlen( $data ) < 4 ) {
+                        fclose( $handle );
+                        return null;
+                    }
+
+                    $pos += 5;
+                    $packed         = ord( $data[0] );
+                    $pending_delay  = (int) unpack( 'v', substr( $data, 1, 2 ) )[1] * 10;
+                    $pending_alpha  = (bool) ( $packed & 0x01 );
+                    $terminator     = fread( $handle, 1 );
+                    $pos++;
+
+                    if ( '' === $terminator || 0 !== ord( $terminator ) ) {
+                        fclose( $handle );
+                        return null;
+                    }
+
                     continue;
                 }
 
-                if ( 0xFF === $label && $pos + 12 <= $length && 11 === ord( $data[ $pos ] ) ) {
-                    $identifier = substr( $data, $pos + 1, 11 );
+                if ( 0xFF === $label ) {
+                    $size_byte = fread( $handle, 1 );
 
-                    if ( 'NETSCAPE2.0' === $identifier || 'ANIMEXTS1.0' === $identifier ) {
-                        $sub = $pos + 12;
-
-                        if ( $sub + 3 <= $length && 3 === ord( $data[ $sub ] ) && 1 === ord( $data[ $sub + 1 ] ) ) {
-                            $count         = (int) unpack( 'v', substr( $data, $sub + 2, 2 ) )[1];
-                            $loop          = $count;
-                            $loop_infinite = 0 === $count;
-                        }
+                    if ( '' === $size_byte ) {
+                        fclose( $handle );
+                        return null;
                     }
-                }
 
-                // 跳过扩展的剩余子块。
-                while ( $pos < $length ) {
-                    $size = ord( $data[ $pos ] );
+                    $size = ord( $size_byte );
                     $pos++;
 
-                    if ( 0 === $size ) {
-                        break;
+                    if ( $size > 0 ) {
+                        $identifier = fread( $handle, $size );
+
+                        if ( strlen( $identifier ) !== $size ) {
+                            fclose( $handle );
+                            return null;
+                        }
+
+                        $pos += $size;
+
+                        if ( 11 === $size && ( 'NETSCAPE2.0' === $identifier || 'ANIMEXTS1.0' === $identifier ) ) {
+                            $sub_size_byte = fread( $handle, 1 );
+
+                            if ( '' !== $sub_size_byte ) {
+                                $sub_size = ord( $sub_size_byte );
+                                $pos++;
+
+                                if ( $sub_size > 0 ) {
+                                    $sub = fread( $handle, $sub_size );
+
+                                    if ( strlen( $sub ) === $sub_size ) {
+                                        $pos += $sub_size;
+
+                                        if ( $sub_size >= 3 && "\x01" === $sub[0] ) {
+                                            $count         = (int) unpack( 'v', substr( $sub, 1, 2 ) )[1];
+                                            $loop          = $count;
+                                            $loop_infinite = 0 === $count;
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
 
-                    $pos += $size;
+                    // 应用扩展的剩余子块（循环信息已经读完）。
+                    if ( ! self::skip_gif_sub_blocks( $handle, $pos, $file_size ) ) {
+                        fclose( $handle );
+                        return null;
+                    }
+
+                    continue;
+                }
+
+                // 注释、纯文本等扩展：跳过全部子块。
+                if ( ! self::skip_gif_sub_blocks( $handle, $pos, $file_size ) ) {
+                    fclose( $handle );
+                    return null;
                 }
 
                 continue;
             }
 
             if ( 0x2C !== $block ) {
+                fclose( $handle );
                 return null;
             }
 
             // 图像描述符：块标记 1 字节 + 位置/尺寸 8 字节 + 打包字段 1 字节。
-            if ( $pos + 10 > $length ) {
+            $descriptor = fread( $handle, 9 );
+
+            if ( strlen( $descriptor ) < 9 ) {
+                fclose( $handle );
                 return null;
             }
 
-            $pos += 10;
-            $packed = ord( $data[ $pos - 1 ] );
+            $pos += 9;
+            $packed = ord( $descriptor[8] );
 
             if ( $packed & 0x80 ) {
-                $pos += 3 * ( 2 << ( $packed & 0x07 ) );
+                $skip = 3 * ( 2 << ( $packed & 0x07 ) );
+
+                if ( 0 !== fseek( $handle, $skip, SEEK_CUR ) ) {
+                    fclose( $handle );
+                    return null;
+                }
+
+                $pos += $skip;
             }
 
             // LZW 最小码长 + 数据子块。
+            if ( 0 !== fseek( $handle, 1, SEEK_CUR ) ) {
+                fclose( $handle );
+                return null;
+            }
+
             $pos++;
 
-            while ( $pos < $length ) {
-                $size = ord( $data[ $pos ] );
-                $pos++;
-
-                if ( 0 === $size ) {
-                    break;
-                }
-
-                $pos += $size;
+            if ( ! self::skip_gif_sub_blocks( $handle, $pos, $file_size ) ) {
+                fclose( $handle );
+                return null;
             }
 
             $frames++;
@@ -272,6 +357,8 @@ class Local_Crush_Animation {
             $pending_delay = 0;
             $pending_alpha = false;
         }
+
+        fclose( $handle );
 
         if ( $frames < 1 || count( $delays ) !== $frames ) {
             return null;
@@ -286,6 +373,39 @@ class Local_Crush_Animation {
             'width'         => $width,
             'height'        => $height,
         );
+    }
+
+    /**
+     * 跳过 GIF 的子块序列，直到长度为 0 的结束块
+     *
+     * @param resource $handle    文件句柄
+     * @param int      $pos       当前文件偏移（按引用更新）
+     * @param int      $file_size 文件大小
+     * @return bool 是否读到结束块
+     */
+    private static function skip_gif_sub_blocks( $handle, int &$pos, int $file_size ): bool {
+        while ( $pos < $file_size ) {
+            $size_byte = fread( $handle, 1 );
+
+            if ( '' === $size_byte ) {
+                return false;
+            }
+
+            $pos++;
+            $size = ord( $size_byte );
+
+            if ( 0 === $size ) {
+                return true;
+            }
+
+            if ( 0 !== fseek( $handle, $size, SEEK_CUR ) ) {
+                return false;
+            }
+
+            $pos += $size;
+        }
+
+        return false;
     }
 
     /**
@@ -1141,37 +1261,82 @@ class Local_Crush_Animation {
      * @return array PNG 头、动画控制信息及颜色配置声明
      */
     private static function png_chunks( string $path ): array {
-        $data = file_get_contents( $path ); // phpcs:ignore WordPress.WP.AlternativeFunctions
+        $empty  = array( 'IHDR' => '', 'fcTL' => array() );
+        $handle = @fopen( $path, 'rb' );
 
-        if ( false === $data || "\x89PNG\r\n\x1a\n" !== substr( $data, 0, 8 ) ) {
-            return array( 'IHDR' => '', 'fcTL' => array() );
+        if ( false === $handle ) {
+            return $empty;
         }
 
-        $offset = 8;
-        $chunks = array(
-            'IHDR'   => '',
-            'fcTL'   => array(),
-        );
+        $signature = fread( $handle, 8 );
 
-        while ( $offset + 12 <= strlen( $data ) ) {
-            $length = unpack( 'N', substr( $data, $offset, 4 ) );
-            $length = (int) $length[1];
-            $type   = substr( $data, $offset + 4, 4 );
-            if ( $length > strlen( $data ) - $offset - 12 ) {
-                return array( 'IHDR' => '', 'fcTL' => array() );
+        if ( "\x89PNG\r\n\x1a\n" !== $signature ) {
+            fclose( $handle );
+            return $empty;
+        }
+
+        $file_size = (int) filesize( $path );
+        $offset    = 8;
+        $chunks    = $empty;
+
+        while ( $offset + 12 <= $file_size ) {
+            $header = fread( $handle, 8 );
+
+            if ( strlen( $header ) < 8 ) {
+                fclose( $handle );
+                return $empty;
             }
-            $body   = substr( $data, $offset + 8, $length );
 
-            if ( in_array( $type, array( 'IHDR', 'acTL', 'tRNS', 'iCCP' ), true ) ) {
+            $length = (int) unpack( 'N', substr( $header, 0, 4 ) )[1];
+            $type   = substr( $header, 4, 4 );
+            $offset += 8;
+
+            if ( $length > $file_size - $offset - 4 ) {
+                fclose( $handle );
+                return $empty;
+            }
+
+            if ( in_array( $type, array( 'IHDR', 'acTL', 'tRNS' ), true ) ) {
+                $body = fread( $handle, $length );
+
+                if ( strlen( $body ) !== $length ) {
+                    fclose( $handle );
+                    return $empty;
+                }
+
                 $chunks[ $type ] = $body;
             } elseif ( 'fcTL' === $type ) {
+                $body = fread( $handle, $length );
+
+                if ( strlen( $body ) !== $length ) {
+                    fclose( $handle );
+                    return $empty;
+                }
+
                 $chunks['fcTL'][] = $body;
-            } elseif ( 'IEND' === $type ) {
-                break;
+            } else {
+                if ( 0 !== fseek( $handle, $length, SEEK_CUR ) ) {
+                    fclose( $handle );
+                    return $empty;
+                }
             }
 
-            $offset += 12 + $length;
+            $offset += $length;
+
+            // 跳过 4 字节 CRC
+            if ( 0 !== fseek( $handle, 4, SEEK_CUR ) ) {
+                fclose( $handle );
+                return $empty;
+            }
+
+            $offset += 4;
+
+            if ( 'IEND' === $type ) {
+                break;
+            }
         }
+
+        fclose( $handle );
 
         return $chunks;
     }

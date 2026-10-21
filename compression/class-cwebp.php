@@ -18,6 +18,13 @@ if ( ! defined( 'ABSPATH' ) ) {
 class Local_Crush_Cwebp extends Local_Crush_Tool_Base {
 
     /**
+     * 原图方向，1 表示不需要处理
+     *
+     * @var int
+     */
+    private $orientation = 1;
+
+    /**
      * 获取渠道名称
      *
      * @return string 渠道名称
@@ -52,9 +59,33 @@ class Local_Crush_Cwebp extends Local_Crush_Tool_Base {
      * @return array[] 命令链
      */
     protected function build_command_chain( string $file_path, array $options ): array {
-        $args = self::build_encode_args( 'webp', $file_path, $this->get_temp_output_path( $file_path ) );
+        $executable = $this->get_executable_path();
+        $final      = $this->get_temp_output_path( $file_path );
 
-        return array( array_merge( array( $this->get_executable_path() ), $args ) );
+        // 不管保留还是删除元数据，都先记下原图方向；编码完成后再决定是否补写。
+        $this->orientation = Local_Crush_Orientation::from_file( $file_path );
+
+        $args = self::build_encode_args( 'webp', $file_path, $final );
+
+        return array( array_merge( array( $executable ), $args ) );
+    }
+
+    /**
+     * 编码完成、替换原文件前，确保 WebP 里保留方向
+     *
+     * cwebp 在不同平台对 EXIF 的保留能力不一样：已经带方向就不动，
+     * 没带才用 webpmux 只补一个 Orientation，不会把其他 EXIF 带回来。
+     *
+     * @param string $temp_output 编码后的临时文件
+     * @param string $file_path   原文件
+     * @return bool
+     */
+    protected function finalize_temp_output( string $temp_output, string $file_path ): bool {
+        if ( '' === $temp_output || $this->orientation <= 1 ) {
+            return true;
+        }
+
+        return Local_Crush_Orientation::ensure_webp( $temp_output, $this->orientation );
     }
 
     /**

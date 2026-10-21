@@ -140,12 +140,13 @@ class Local_Crush_Avif extends Local_Crush_Tool_Base {
      *
      * 同格式压缩与格式转换共用这一份参数拼装，两份设置各自独立。
      *
-     * @param string $group  设置分组，固定为 avif
-     * @param string $source 源文件路径
-     * @param string $output 输出文件路径
+     * @param string $group            设置分组，固定为 avif
+     * @param string $source           源文件路径
+     * @param string $output           输出文件路径
+     * @param string $orientation_exif 只含方向的 EXIF 临时文件；空字符串表示不写方向
      * @return array 参数数组（不含可执行文件）
      */
-    public static function build_encode_args( string $group, string $source, string $output ): array {
+    public static function build_encode_args( string $group, string $source, string $output, string $orientation_exif = '' ): array {
         $lossless = 'lossless' === Local_Crush_Settings::param_mode( $group );
         $quality  = Local_Crush_Settings::param_int( $group . '_quality' );
 
@@ -167,6 +168,12 @@ class Local_Crush_Avif extends Local_Crush_Tool_Base {
         if ( Local_Crush_Settings::strips_metadata() ) {
             $args[] = '--ignore-exif';
             $args[] = '--ignore-xmp';
+
+            // 只补回方向，其他 EXIF（GPS、设备信息）仍然不进入产物。
+            if ( '' !== $orientation_exif ) {
+                $args[] = '--exif';
+                $args[] = $orientation_exif;
+            }
         }
 
         if ( $lossless ) {

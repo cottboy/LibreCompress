@@ -93,6 +93,13 @@ class Local_Crush_Output {
     );
 
     /**
+     * 转换链路产生的方向临时文件
+     *
+     * @var string[]
+     */
+    private $encode_temp_paths = array();
+
+    /**
      * 获取目标格式输出设置
      *
      * @return array target: webp|avif|jxl, formats: 已勾选的源格式列表, apng: 是否转换 APNG
@@ -205,6 +212,13 @@ class Local_Crush_Output {
         $target   = in_array( $target, array( 'webp', 'avif', 'jxl' ), true ) ? $target : $settings['target'];
         $format   = $this->format_of( $file_path );
 
+        // 后缀不是 png 但内容其实是 APNG：不能按单帧静图转换，否则会丢动画。
+        if ( 'png' !== $format && Local_Crush_Compressor::is_apng( $file_path ) ) {
+            $result_template['status']  = 'skipped';
+            $result_template['message'] = __( '文件后缀与内容不符（内容是 APNG 动画），已跳过以保护动画内容', 'local-crush' );
+            return $result_template;
+        }
+
         // 动图判定：APNG 与 GIF 的多帧情况由动画层处理，其余源一律静图路径
         $animation_plan = in_array( $format, array( 'png', 'gif' ), true ) ? Local_Crush_Animation::analyze( $file_path ) : null;
         $is_animation   = null !== $animation_plan && $animation_plan['frames'] > 1;
@@ -298,6 +312,9 @@ class Local_Crush_Output {
         $command        = false;
         $animation_done = false;
 
+        // 编码器可能删掉方向；先记下原图方向，输出后再按格式补回。
+        $orientation = Local_Crush_Orientation::from_file( $file_path );
+
         if ( $is_animation ) {
             $animation = Local_Crush_Animation::convert( $file_path, $target, $temp_output );
             $animation_done = true;
@@ -334,7 +351,7 @@ class Local_Crush_Output {
         } else {
             // WebP 与 JXL 与同格式压缩共用一组；AVIF 转格式只调 avifenc，与同格式压缩分开。
             $group   = 'avif' === $target ? 'avif_convert' : $target;
-            $command = $this->build_encode_command( $file_path, $temp_output, $target, $group );
+            $command = $this->build_encode_command( $file_path, $temp_output, $target, $group, $orientation );
         }
 
         if ( $animation_done ) {
@@ -344,6 +361,7 @@ class Local_Crush_Output {
             }
         } elseif ( false === $command ) {
             // 缺编码工具（cwebp/avifenc/cjxl）：环境未配齐，不写入压缩记录，保留为待处理。
+            $this->cleanup_encode_temp_paths();
             $error_msg                 = __( '没有可用的压缩工具', 'local-crush' );
             $result_template['status'] = 'skipped';
         } else {
@@ -358,12 +376,23 @@ class Local_Crush_Output {
                 }
             }
 
+            // 方向临时文件只服务于本次编码，命令跑完立刻清理。
+            $this->cleanup_encode_temp_paths();
+
             clearstatcache( true, $temp_output );
 
             if ( ! $exec_result['success'] || ! file_exists( $temp_output ) || filesize( $temp_output ) <= 0 ) {
                 $error_msg = __( '压缩失败', 'local-crush' );
 
                 // 编码失败时清理可能残留的部分输出文件
+                if ( file_exists( $temp_output ) ) {
+                    // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
+                    unlink( $temp_output );
+                }
+            } elseif ( 'webp' === $target && $orientation > 1 && ! Local_Crush_Orientation::ensure_webp( $temp_output, $orientation ) ) {
+                // WebP 编码成功但方向写不回去：按失败处理，避免产出横着的图。
+                $error_msg = __( '压缩失败', 'local-crush' );
+
                 if ( file_exists( $temp_output ) ) {
                     // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
                     unlink( $temp_output );
@@ -2025,13 +2054,16 @@ class Local_Crush_Output {
      *
      * 复用压缩工具的二进制查找与质量设置
      *
-     * @param string $source     编码输入文件路径
-     * @param string $output     编码输出文件路径
-     * @param string $target     目标格式 webp|avif|jxl
-     * @param string $group      这条路径的参数分组
+     * @param string $source      编码输入文件路径
+     * @param string $output      编码输出文件路径
+     * @param string $target      目标格式 webp|avif|jxl
+     * @param string $group       这条路径的参数分组
+     * @param int    $orientation 原图方向，1 表示不需要处理
      * @return array|false 命令链（参数数组的数组）或 false
      */
-    private function build_encode_command( string $source, string $output, string $target, string $group ) {
+    private function build_encode_command( string $source, string $output, string $target, string $group, int $orientation = 1 ) {
+        $this->encode_temp_paths = array();
+
         $tool_name = isset( $this->target_tools[ $target ] ) ? $this->target_tools[ $target ] : '';
         $tools     = local_crush()->compressor->get_tools();
 
@@ -2055,12 +2087,55 @@ class Local_Crush_Output {
         }
 
         if ( 'jxl' === $target ) {
-            $command = Local_Crush_Cjxl::build_command( $source, $output, $group );
+            $orientation_exif = '';
 
-            return false === $command ? false : array( $command );
+            if ( $orientation > 1 && Local_Crush_Settings::strips_metadata() ) {
+                $orientation_exif = Local_Crush_Orientation::write_exif_temp( $orientation, false );
+
+                if ( '' === $orientation_exif ) {
+                    return false;
+                }
+
+                $this->encode_temp_paths[] = $orientation_exif;
+            }
+
+            $command = Local_Crush_Cjxl::build_command( $source, $output, $group, $orientation_exif );
+
+            if ( false === $command ) {
+                $this->cleanup_encode_temp_paths();
+                return false;
+            }
+
+            return array( $command );
         }
 
-        return array( array_merge( array( $binary ), Local_Crush_Avif::build_encode_args( $group, $source, $output ) ) );
+        $orientation_exif = '';
+
+        if ( $orientation > 1 && Local_Crush_Settings::strips_metadata() ) {
+            $orientation_exif = Local_Crush_Orientation::write_exif_temp( $orientation, true );
+
+            if ( '' === $orientation_exif ) {
+                return false;
+            }
+
+            $this->encode_temp_paths[] = $orientation_exif;
+        }
+
+        return array( array_merge( array( $binary ), Local_Crush_Avif::build_encode_args( $group, $source, $output, $orientation_exif ) ) );
+    }
+
+    /**
+     * 清理转换链路产生的方向临时文件
+     */
+    private function cleanup_encode_temp_paths(): void {
+        foreach ( $this->encode_temp_paths as $path ) {
+            if ( is_string( $path ) && '' !== $path && file_exists( $path ) ) {
+                // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
+                unlink( $path );
+            }
+        }
+
+        $this->encode_temp_paths = array();
     }
 
     /**

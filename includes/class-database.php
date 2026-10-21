@@ -134,10 +134,16 @@ class Local_Crush_Database {
             return false;
         }
 
+        $file_path = self::sanitize_stored_path( (string) $data['file_path'] );
+
+        if ( '' === $file_path ) {
+            return false;
+        }
+
         // 清理和验证数据
         $insert_data = array(
             'attachment_id'     => absint( $data['attachment_id'] ),
-            'file_path'         => sanitize_text_field( $data['file_path'] ),
+            'file_path'         => $file_path,
             'size_type'         => isset( $data['size_type'] ) ? sanitize_text_field( $data['size_type'] ) : 'full',
             'original_size'     => isset( $data['original_size'] ) ? absint( $data['original_size'] ) : 0,
             'compressed_size'   => isset( $data['compressed_size'] ) ? absint( $data['compressed_size'] ) : 0,
@@ -208,7 +214,13 @@ class Local_Crush_Database {
         $format      = array();
 
         if ( isset( $data['file_path'] ) ) {
-            $update_data['file_path'] = sanitize_text_field( $data['file_path'] );
+            $file_path = self::sanitize_stored_path( (string) $data['file_path'] );
+
+            if ( '' === $file_path ) {
+                return false;
+            }
+
+            $update_data['file_path'] = $file_path;
             $format[]                  = '%s';
         }
 
@@ -370,6 +382,32 @@ class Local_Crush_Database {
     }
 
     /**
+     * 清理 uploads 内的相对路径
+     *
+     * 不能用 sanitize_text_field()：它会把文件名里的 %20 等百分号编码整段删掉，
+     * 导致记录与磁盘上的真实文件名对不上。这里只做路径安全处理，保留百分号。
+     *
+     * @param string $path 相对路径
+     * @return string 非法时返回空字符串
+     */
+    private static function sanitize_stored_path( string $path ): string {
+        $path = wp_normalize_path( $path );
+        $path = preg_replace( '/[\x00-\x1F\x7F]/', '', $path );
+
+        if ( ! is_string( $path ) ) {
+            return '';
+        }
+
+        $path = ltrim( $path, '/' );
+
+        if ( '' === $path || false !== strpos( $path, '..' ) ) {
+            return '';
+        }
+
+        return $path;
+    }
+
+    /**
      * 添加备份记录
      *
      * @param array $data 备份数据
@@ -382,10 +420,17 @@ class Local_Crush_Database {
             return false;
         }
 
+        $original_path = self::sanitize_stored_path( (string) $data['original_path'] );
+        $backup_path   = self::sanitize_stored_path( (string) $data['backup_path'] );
+
+        if ( '' === $original_path || '' === $backup_path ) {
+            return false;
+        }
+
         $insert_data = array(
             'attachment_id' => absint( $data['attachment_id'] ),
-            'original_path' => sanitize_text_field( $data['original_path'] ),
-            'backup_path'   => sanitize_text_field( $data['backup_path'] ),
+            'original_path' => $original_path,
+            'backup_path'   => $backup_path,
         );
 
         $format = array( '%d', '%s', '%s' );
@@ -433,7 +478,11 @@ class Local_Crush_Database {
         global $wpdb;
 
         $attachment_id = absint( $attachment_id );
-        $original_path = sanitize_text_field( $original_path );
+        $original_path = self::sanitize_stored_path( (string) $original_path );
+
+        if ( '' === $original_path ) {
+            return null;
+        }
 
         // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
         return $wpdb->get_row(
