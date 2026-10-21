@@ -465,8 +465,9 @@ class Local_Crush_Processor {
 
         $state = $this->get_attachment_state( $attachment_id );
 
-        // 只把真正还需要动作的文件算作待处理：跳过是最终结果，不再每轮批量重试。
-        return $state['pending_count'] > 0 || $state['failed_count'] > 0;
+        // 跳过也纳入批量：用户装好工具/改完设置后，点一次批量就能重试，
+        // 不必逐张手点。批量任务本身每个附件只处理一次，不会在单个任务里死循环。
+        return $state['pending_count'] > 0 || $state['failed_count'] > 0 || $state['skipped_count'] > 0;
     }
 
     /**
@@ -475,7 +476,7 @@ class Local_Crush_Processor {
      * @param int $attachment_id 附件 ID
      * @return array
      */
-    public function compress_attachment( int $attachment_id, bool $retry_skipped = true ): array {
+    public function compress_attachment( int $attachment_id ): array {
         if ( ! $this->is_valid_attachment( $attachment_id ) ) {
             return $this->empty_result( __( '无效的图片附件', 'local-crush' ), 'failed' );
         }
@@ -498,7 +499,7 @@ class Local_Crush_Processor {
                 return $this->empty_result( __( '未找到可压缩的图片文件', 'local-crush' ), 'failed' );
             }
 
-            $pending = $this->collect_pending_files( $attachment_id, $files, $retry_skipped );
+            $pending = $this->collect_pending_files( $attachment_id, $files );
 
             // 只对待压缩的图片生效：已全部压缩的附件在这里直接返回，
             // 不会对同一张图反复处理，也不会动已压缩文件的大小。
@@ -635,19 +636,14 @@ class Local_Crush_Processor {
      *
      * @param int   $attachment_id 附件 ID
      * @param array $files         候选文件列表
-     * @param bool  $retry_skipped 是否重新尝试已跳过的文件（批量任务传 false）
      * @return array 待压缩文件列表
      */
-    private function collect_pending_files( int $attachment_id, array $files, bool $retry_skipped = true ): array {
+    private function collect_pending_files( int $attachment_id, array $files ): array {
         $pending = array();
 
         foreach ( $files as $file ) {
             $record_size_type = isset( $file['record_size_type'] ) ? $file['record_size_type'] : $file['size_type'];
             $record            = local_crush()->database->get_record( $attachment_id, $record_size_type );
-
-            if ( ! $retry_skipped && is_array( $record ) && 'skipped' === (string) $record['status'] ) {
-                continue;
-            }
 
             if ( ! $this->is_complete_record( $file['file_path'], $record ) ) {
                 $pending[] = $file;

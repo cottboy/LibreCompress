@@ -652,8 +652,8 @@ class Local_Crush_Task {
             return $outcome;
         }
 
-        // 批量任务不重新尝试已主动跳过的文件；用户手动点压缩时才会重试。
-        $result = $processor->compress_attachment( $attachment_id, false );
+        // 跳过文件也重新尝试：用户装好工具或改完设置后，点一次批量即可。
+        $result = $processor->compress_attachment( $attachment_id );
         $status = isset( $result['status'] ) ? (string) $result['status'] : 'failed';
 
         if ( 'success' === $status ) {
