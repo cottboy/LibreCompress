@@ -214,7 +214,9 @@ class Local_Crush_Media_Library {
         } elseif ( 'partial' === $state['status'] ) {
             $this->render_partial_status( $attachment_id, $state, $has_backup, $can_restore, $has_fallback );
         } elseif ( 'failed' === $state['status'] ) {
-            $this->render_failed_status( $attachment_id );
+            $this->render_failed_status( $attachment_id, $can_restore, $has_backup, $has_fallback );
+        } elseif ( 'skipped' === $state['status'] ) {
+            $this->render_skipped_status( $attachment_id, $can_restore, $has_backup, $has_fallback );
         } else {
             $this->render_uncompressed_status( $attachment_id );
         }
@@ -240,16 +242,39 @@ class Local_Crush_Media_Library {
     /**
      * 渲染压缩失败状态
      *
-     * @param int $attachment_id 附件 ID
+     * @param int  $attachment_id 附件 ID
+     * @param bool $can_restore   是否可恢复
+     * @param bool $has_backup    是否有备份
+     * @param bool $has_fallback  是否有兼容格式回退
      */
-    private function render_failed_status( int $attachment_id ) {
+    private function render_failed_status( int $attachment_id, bool $can_restore, bool $has_backup, bool $has_fallback ) {
         ?>
         <div class="local-crush-status" data-attachment-id="<?php echo esc_attr( $attachment_id ); ?>">
             <div class="local-crush-info">
                 <span class="status-text" style="color: #d63638;"><?php esc_html_e( '压缩失败', 'local-crush' ); ?></span>
                 <?php $this->render_storage_summary( $attachment_id ); ?>
             </div>
-            <?php $this->render_action_buttons( $attachment_id, 'compress', __( '重试', 'local-crush' ), false, false, false ); ?>
+            <?php $this->render_action_buttons( $attachment_id, 'compress', __( '重试', 'local-crush' ), $can_restore, $has_backup, $has_fallback ); ?>
+        </div>
+        <?php
+    }
+
+    /**
+     * 渲染主动跳过状态
+     *
+     * @param int  $attachment_id 附件 ID
+     * @param bool $can_restore   是否可恢复
+     * @param bool $has_backup    是否有备份
+     * @param bool $has_fallback  是否有兼容格式回退
+     */
+    private function render_skipped_status( int $attachment_id, bool $can_restore, bool $has_backup, bool $has_fallback ) {
+        ?>
+        <div class="local-crush-status" data-attachment-id="<?php echo esc_attr( $attachment_id ); ?>">
+            <div class="local-crush-info">
+                <span class="status-text" style="color: #dba617;"><?php esc_html_e( '已跳过', 'local-crush' ); ?></span>
+                <?php $this->render_storage_summary( $attachment_id ); ?>
+            </div>
+            <?php $this->render_action_buttons( $attachment_id, 'compress', __( '重试压缩', 'local-crush' ), $can_restore, $has_backup, $has_fallback ); ?>
         </div>
         <?php
     }

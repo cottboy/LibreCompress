@@ -195,6 +195,33 @@ class Local_Crush_Database {
     }
 
     /**
+     * 获取某个附件的全部压缩记录
+     *
+     * @param int $attachment_id 附件 ID
+     * @return array
+     */
+    public function get_records_by_attachment( $attachment_id ): array {
+        global $wpdb;
+
+        $attachment_id = absint( $attachment_id );
+
+        if ( ! $attachment_id ) {
+            return array();
+        }
+
+        // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+        $rows = $wpdb->get_results(
+            $wpdb->prepare(
+                "SELECT * FROM {$this->records_table} WHERE attachment_id = %d ORDER BY id ASC",
+                $attachment_id
+            ),
+            ARRAY_A
+        );
+
+        return is_array( $rows ) ? $rows : array();
+    }
+
+    /**
      * 更新压缩记录
      *
      * @param int   $record_id 记录 ID
@@ -800,10 +827,19 @@ class Local_Crush_Database {
                     FROM {$this->backups_table} b
                     LEFT JOIN {$wpdb->posts} p ON p.ID = b.attachment_id
                     WHERE b.attachment_id > %d AND ( p.ID IS NULL OR p.post_type <> 'attachment' )
+                    UNION
+                    SELECT DISTINCT m.post_id AS attachment_id
+                    FROM {$wpdb->postmeta} m
+                    LEFT JOIN {$wpdb->posts} p ON p.ID = m.post_id
+                    WHERE m.meta_key = %s
+                      AND m.post_id > %d
+                      AND p.ID IS NULL
                 ) orphan
                 ORDER BY attachment_id ASC
                 LIMIT %d",
                 $after_id,
+                $after_id,
+                Local_Crush_Output::OUTPUT_META_KEY,
                 $after_id,
                 $limit
             )

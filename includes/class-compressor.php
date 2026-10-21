@@ -764,6 +764,10 @@ class Local_Crush_Compressor {
      * @return bool
      */
     private function is_safe_path( string $file_path ): bool {
+        if ( is_link( $file_path ) ) {
+            return false;
+        }
+
         $upload_dir = wp_upload_dir();
         $base_dir   = realpath( $upload_dir['basedir'] );
         $real_path  = realpath( $file_path );

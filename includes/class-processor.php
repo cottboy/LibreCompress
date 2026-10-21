@@ -219,6 +219,9 @@ class Local_Crush_Processor {
             $state['status'] = 'failed';
         } elseif ( $state['pending_count'] > 0 ) {
             $state['status'] = 'pending';
+        } elseif ( $state['skipped_count'] > 0 ) {
+            // 文件都存在，只是被主动跳过（如 APNG 保护、缺工具），不是“没有文件”。
+            $state['status'] = 'skipped';
         }
 
         if ( $state['total_original_size'] > 0 ) {
@@ -445,7 +448,9 @@ class Local_Crush_Processor {
         }
 
         $state = $this->get_attachment_state( $attachment_id );
-        return in_array( $state['status'], array( 'partial', 'failed', 'pending' ), true );
+
+        // 只把真正还需要动作的文件算作待处理：跳过是最终结果，不再每轮批量重试。
+        return $state['pending_count'] > 0 || $state['failed_count'] > 0;
     }
 
     /**
@@ -454,7 +459,7 @@ class Local_Crush_Processor {
      * @param int $attachment_id 附件 ID
      * @return array
      */
-    public function compress_attachment( int $attachment_id ): array {
+    public function compress_attachment( int $attachment_id, bool $retry_skipped = true ): array {
         if ( ! $this->is_valid_attachment( $attachment_id ) ) {
             return $this->empty_result( __( '无效的图片附件', 'local-crush' ), 'failed' );
         }
@@ -477,7 +482,7 @@ class Local_Crush_Processor {
                 return $this->empty_result( __( '未找到可压缩的图片文件', 'local-crush' ), 'failed' );
             }
 
-            $pending = $this->collect_pending_files( $attachment_id, $files );
+            $pending = $this->collect_pending_files( $attachment_id, $files, $retry_skipped );
 
             // 只对待压缩的图片生效：已全部压缩的附件在这里直接返回，
             // 不会对同一张图反复处理，也不会动已压缩文件的大小。
@@ -614,14 +619,19 @@ class Local_Crush_Processor {
      *
      * @param int   $attachment_id 附件 ID
      * @param array $files         候选文件列表
+     * @param bool  $retry_skipped 是否重新尝试已跳过的文件（批量任务传 false）
      * @return array 待压缩文件列表
      */
-    private function collect_pending_files( int $attachment_id, array $files ): array {
+    private function collect_pending_files( int $attachment_id, array $files, bool $retry_skipped = true ): array {
         $pending = array();
 
         foreach ( $files as $file ) {
             $record_size_type = isset( $file['record_size_type'] ) ? $file['record_size_type'] : $file['size_type'];
             $record            = local_crush()->database->get_record( $attachment_id, $record_size_type );
+
+            if ( ! $retry_skipped && is_array( $record ) && 'skipped' === (string) $record['status'] ) {
+                continue;
+            }
 
             if ( ! $this->is_complete_record( $file['file_path'], $record ) ) {
                 $pending[] = $file;
@@ -1284,6 +1294,41 @@ class Local_Crush_Processor {
     }
 
     /**
+     * 删除已不存在附件的旧格式回退文件
+     *
+     * 优先按转换映射删除；如果附件删除时把 postmeta 一起带走了，映射已经不存在，
+     * 就从压缩记录里的 fallback_* 记录找旧格式文件路径。文件删不掉时返回 false，
+     * 让调用方保留记录，下一次清理还能重试。
+     *
+     * @param int $attachment_id 附件 ID
+     * @return bool 是否全部删除成功
+     */
+    private function delete_orphan_fallback_files( int $attachment_id ): bool {
+        $success = local_crush()->output_processor->delete_fallback_files( $attachment_id );
+
+        foreach ( local_crush()->database->get_records_by_attachment( $attachment_id ) as $record ) {
+            $size_type = isset( $record['size_type'] ) ? (string) $record['size_type'] : '';
+
+            if ( 0 !== strpos( $size_type, 'fallback_' ) ) {
+                continue;
+            }
+
+            $path = $this->abs_from_relative( isset( $record['file_path'] ) ? (string) $record['file_path'] : '' );
+
+            if ( '' === $path || ! is_file( $path ) || is_link( $path ) || ! $this->is_inside_upload_dir( $path ) ) {
+                continue;
+            }
+
+            // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
+            if ( ! unlink( $path ) && file_exists( $path ) ) {
+                $success = false;
+            }
+        }
+
+        return $success;
+    }
+
+    /**
      * 清除单个附件的全部处理痕迹
      *
      * 备份文件、备份索引、转换映射和压缩记录必须一起清除：只清记录会让下一轮压缩
@@ -1418,7 +1463,10 @@ class Local_Crush_Processor {
             }
 
             try {
-                if ( $this->clear_attachment_history( $attachment_id ) ) {
+                if ( ! $this->delete_orphan_fallback_files( $attachment_id ) ) {
+                    // 文件删不掉时保留记录，下一次清理还能按记录重试。
+                    $failed[] = $attachment_id;
+                } elseif ( $this->clear_attachment_history( $attachment_id ) ) {
                     $removed[] = $attachment_id;
                 } else {
                     $failed[] = $attachment_id;

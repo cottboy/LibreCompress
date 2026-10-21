@@ -444,6 +444,17 @@ class Local_Crush_Output {
             return $result_template;
         }
 
+        // 禁止把结果写到符号链接或上传目录之外。
+        if ( is_link( $target_path ) || is_dir( $target_path ) || ! $this->is_safe_destination_path( $target_path ) ) {
+            if ( file_exists( $temp_output ) ) {
+                // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
+                unlink( $temp_output );
+            }
+
+            $result_template['message'] = __( '压缩结果文件写入失败', 'local-crush' );
+            return $result_template;
+        }
+
         // 先写入目标文件并保留临时文件，状态写入失败时源文件仍然完好。
         // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_copy
         if ( ! copy( $temp_output, $target_path ) || ! file_exists( $target_path ) || (int) filesize( $target_path ) !== $compressed_size ) {
@@ -1678,15 +1689,21 @@ class Local_Crush_Output {
      *
      * @param int $attachment_id 附件 ID
      */
-    public function delete_fallback_files( int $attachment_id ): void {
+    public function delete_fallback_files( int $attachment_id ): bool {
+        $success = true;
+
         foreach ( $this->get_output_entries( $attachment_id ) as $entry ) {
             if ( is_link( $entry['from'] ) || ! is_file( $entry['from'] ) ) {
                 continue;
             }
 
             // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
-            unlink( $entry['from'] );
+            if ( ! unlink( $entry['from'] ) && file_exists( $entry['from'] ) ) {
+                $success = false;
+            }
         }
+
+        return $success;
     }
 
     /**
@@ -2273,7 +2290,7 @@ class Local_Crush_Output {
      * @return bool
      */
     private function is_safe_destination_path( string $file_path ): bool {
-        if ( false !== strpos( $file_path, '..' ) ) {
+        if ( false !== strpos( $file_path, '..' ) || is_link( $file_path ) ) {
             return false;
         }
 
@@ -2298,6 +2315,10 @@ class Local_Crush_Output {
      * @return bool 是否安全
      */
     private function is_safe_path( string $file_path ): bool {
+        if ( is_link( $file_path ) ) {
+            return false;
+        }
+
         $upload_dir = wp_get_upload_dir();
         $base_dir   = realpath( $upload_dir['basedir'] );
         $real_path  = realpath( $file_path );

@@ -60,6 +60,16 @@ class Local_Crush_Task {
     const WATCHDOG_BUDGET = 8;
 
     /**
+     * 批量任务单条外部命令上限（秒）
+     */
+    const COMMAND_TIMEOUT = 60;
+
+    /**
+     * 批量任务 PHP 执行上限在预算之外多留的余量（秒）
+     */
+    const PHP_LIMIT_GRACE = 160;
+
+    /**
      * 执行者心跳宽限（秒），超过这么久没有心跳就认为执行者已经死了
      */
     const RUNNER_GRACE = 15;
@@ -472,12 +482,19 @@ class Local_Crush_Task {
         // 后台请求不能因为 PHP 执行时间上限干到一半被杀
         if ( function_exists( 'set_time_limit' ) ) {
             // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
-            @set_time_limit( (int) $budget + 60 );
+            @set_time_limit( (int) $budget + self::PHP_LIMIT_GRACE );
         }
 
         ignore_user_abort( true );
 
-        $this->run( $runner, $budget );
+        // 子命令也必须收短：给 PHP 留出回滚、写记录和清理临时文件的时间。
+        Local_Crush_Tool_Base::set_command_timeout_cap( self::COMMAND_TIMEOUT );
+
+        try {
+            $this->run( $runner, $budget );
+        } finally {
+            Local_Crush_Tool_Base::reset_command_timeout_cap();
+        }
 
         return true;
     }
@@ -635,7 +652,8 @@ class Local_Crush_Task {
             return $outcome;
         }
 
-        $result = $processor->compress_attachment( $attachment_id );
+        // 批量任务不重新尝试已主动跳过的文件；用户手动点压缩时才会重试。
+        $result = $processor->compress_attachment( $attachment_id, false );
         $status = isset( $result['status'] ) ? (string) $result['status'] : 'failed';
 
         if ( 'success' === $status ) {

@@ -836,7 +836,9 @@ class Local_Crush_Animation {
             return $result;
         }
 
-        $run = Local_Crush_Tool_Base::run_command( $command, 300 );
+        // 单张请求的 PHP 上限是 300 秒，这里留 60 秒给清理和写记录。
+        // 批量任务会把子命令再压到 60 秒。
+        $run = Local_Crush_Tool_Base::run_command( $command, 240 );
 
         clearstatcache( true, $output );
         if ( empty( $run['success'] ) || ! file_exists( $output ) || 0 === (int) filesize( $output ) ) {

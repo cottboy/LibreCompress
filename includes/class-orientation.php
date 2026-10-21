@@ -389,6 +389,10 @@ class Local_Crush_Orientation {
             return true;
         }
 
+        if ( is_link( $file_path ) ) {
+            return false;
+        }
+
         if ( self::from_webp( $file_path ) > 1 ) {
             return true;
         }

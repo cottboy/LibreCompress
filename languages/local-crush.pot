@@ -643,6 +643,10 @@ msgstr ""
 msgid "已跳过"
 msgstr ""
 
+#: includes/class-media-library.php:277
+msgid "重试压缩"
+msgstr ""
+
 #: includes/class-settings.php:580
 msgid "常规会合并路径、精简属性；保守只做绝对安全的重写。"
 msgstr ""

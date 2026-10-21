@@ -25,6 +25,16 @@ abstract class Local_Crush_Tool_Base {
     protected $executable_path = null;
 
     /**
+     * 当前请求允许的单条外部命令上限（秒），0 表示不额外限制
+     *
+     * 批量任务会把 PHP 执行上限压得比较短；子命令必须同样收短，
+     * 否则 PHP 先被杀掉，回滚和临时文件清理都来不及执行。
+     *
+     * @var int
+     */
+    private static $command_timeout_cap = 0;
+
+    /**
      * 获取工具名称
      *
      * @return string 工具名称
@@ -288,6 +298,12 @@ abstract class Local_Crush_Tool_Base {
      * @return array{success:bool,output:string,return_code:int}
      */
     public static function run_command( array $command, int $timeout = 120, ?string $cwd = null ): array {
+        $timeout = max( 1, $timeout );
+
+        if ( self::$command_timeout_cap > 0 ) {
+            $timeout = min( $timeout, self::$command_timeout_cap );
+        }
+
         $command = array_values( array_filter( $command, static function ( $part ) {
             return '' !== $part && null !== $part;
         } ) );
@@ -385,6 +401,22 @@ abstract class Local_Crush_Tool_Base {
             'output'      => $output,
             'return_code' => $exitcode,
         );
+    }
+
+    /**
+     * 设置当前请求的单条外部命令上限
+     *
+     * @param int $seconds 秒数，0 表示取消限制
+     */
+    public static function set_command_timeout_cap( int $seconds ): void {
+        self::$command_timeout_cap = max( 0, $seconds );
+    }
+
+    /**
+     * 取消单条外部命令上限
+     */
+    public static function reset_command_timeout_cap(): void {
+        self::$command_timeout_cap = 0;
     }
 
     /**
@@ -488,6 +520,18 @@ abstract class Local_Crush_Tool_Base {
         // 按同一路径做替换和兜底清理。
         $temp_output = $this->get_temp_output_path( $file_path );
         $temp_paths  = array_filter( array_merge( array( $temp_output ), $this->get_extra_temp_paths( $file_path ) ) );
+
+        // 禁止工具沿着符号链接写出去：发现临时路径是链接时先删掉链接本身。
+        foreach ( $temp_paths as $temp_path ) {
+            if ( is_link( $temp_path ) && ! unlink( $temp_path ) ) {
+                return array(
+                    'success'         => false,
+                    'message'         => __( '压缩结果文件写入失败，已保留原文件', 'local-crush' ),
+                    'original_size'   => $original_size,
+                    'compressed_size' => $original_size,
+                );
+            }
+        }
 
         // 按顺序执行命令链，任一条失败即整体失败且不再执行后续命令
         $result = array( 'success' => false, 'output' => '', 'return_code' => -1 );

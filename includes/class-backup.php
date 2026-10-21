@@ -511,7 +511,7 @@ class Local_Crush_Backup {
      * @return bool
      */
     private function is_safe_destination_path( string $file_path ): bool {
-        if ( false !== strpos( $file_path, '..' ) ) {
+        if ( false !== strpos( $file_path, '..' ) || is_link( $file_path ) ) {
             return false;
         }
 
@@ -536,6 +536,10 @@ class Local_Crush_Backup {
      * @return bool 是否安全
      */
     private function is_safe_path( string $file_path ): bool {
+        if ( is_link( $file_path ) ) {
+            return false;
+        }
+
         // 获取上传目录
         $upload_dir = wp_upload_dir();
         $base_dir   = realpath( $upload_dir['basedir'] );
