@@ -55,7 +55,7 @@ define( 'LOCAL_CRUSH_BIN_PATH', WP_CONTENT_DIR . '/local-crush-bin/' );
 /**
  * 数据库版本号
  */
-define( 'LOCAL_CRUSH_DB_VERSION', '1.6.0' );
+define( 'LOCAL_CRUSH_DB_VERSION', '1.0.0' );
 
 /**
  * 加载插件文本域
