@@ -12,7 +12,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  * 使用 libjxl 的 cjxl 命令行工具。cjxl 能直接读 JPEG XL（包括动画），
  * 所以同格式压缩就是一条命令重编码，不需要拆帧。
  */
-class Libre_Compress_Cjxl extends Libre_Compress_Tool_Base {
+class Local_Crush_Cjxl extends Local_Crush_Tool_Base {
 
     /**
      * 获取工具名称
@@ -52,18 +52,18 @@ class Libre_Compress_Cjxl extends Libre_Compress_Tool_Base {
      * @return array|false 参数数组，工具不可用时返回 false
      */
     public static function build_command( string $source, string $output, string $group = 'jxl' ) {
-        $cjxl = Libre_Compress_Output::find_local_tool( 'cjxl' );
+        $cjxl = Local_Crush_Output::find_local_tool( 'cjxl' );
 
         if ( false === $cjxl ) {
             return false;
         }
 
-        $lossless = 'lossless' === Libre_Compress_Settings::param_mode( $group );
+        $lossless = 'lossless' === Local_Crush_Settings::param_mode( $group );
 
         $command = array(
             $cjxl,
             '-e',
-            (string) Libre_Compress_Settings::param_int( $group . '_effort' ),
+            (string) Local_Crush_Settings::param_int( $group . '_effort' ),
         );
 
         if ( $lossless ) {
@@ -72,14 +72,14 @@ class Libre_Compress_Cjxl extends Libre_Compress_Tool_Base {
             $command[] = '0';
         } else {
             $command[] = '-q';
-            $command[] = (string) Libre_Compress_Settings::param_int( $group . '_quality' );
+            $command[] = (string) Local_Crush_Settings::param_int( $group . '_quality' );
         }
 
         // JPEG 输入时 cjxl 默认走"JPEG 无损重构"，与 -q/-d 冲突会直接失败，统一关掉
         $command[] = '--lossless_jpeg=0';
 
         // 隐私清理必须明确告诉 cjxl 删除容器里的 Exif、XMP 与 JUMBF。
-        if ( Libre_Compress_Settings::strips_metadata() ) {
+        if ( Local_Crush_Settings::strips_metadata() ) {
             $command[] = '-x';
             $command[] = 'strip=exif';
             $command[] = '-x';
@@ -135,10 +135,10 @@ class Libre_Compress_Cjxl extends Libre_Compress_Tool_Base {
         return array(
             'ubuntu'  => 'sudo apt-get install libjxl-tools',
             'debian'  => 'sudo apt-get install libjxl-tools',
-            'centos'  => __( '暂无官方包，建议从 GitHub Releases 下载', 'libre-compress' ),
+            'centos'  => __( '暂无官方包，建议从 GitHub Releases 下载', 'local-crush' ),
             'fedora'  => 'sudo dnf install libjxl-tools',
             'macos'   => 'brew install libjxl',
-            'windows' => __( '从 libjxl GitHub Releases 下载 jxl-x64-windows.zip，把 bin 目录里的 cjxl.exe 与其依赖的 dll 一起放进 LibreCompress-bin', 'libre-compress' ),
+            'windows' => __( '从 libjxl GitHub Releases 下载 jxl-x64-windows.zip，把 bin 目录里的 cjxl.exe 与其依赖的 dll 一起放进 LocalCrush-bin', 'local-crush' ),
         );
     }
 }

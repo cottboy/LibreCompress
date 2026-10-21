@@ -2,7 +2,7 @@
 /**
  * Pngquant PNG 有损压缩渠道
  *
- * @package LibreCompress
+ * @package LocalCrush
  */
 
 // 防止直接访问
@@ -15,7 +15,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  *
  * 使用 pngquant 命令行工具进行 PNG 有损压缩
  */
-class Libre_Compress_Pngquant extends Libre_Compress_Tool_Base {
+class Local_Crush_Pngquant extends Local_Crush_Tool_Base {
 
     /**
      * 获取渠道名称
@@ -87,7 +87,7 @@ class Libre_Compress_Pngquant extends Libre_Compress_Tool_Base {
 
             return array(
                 'success'         => true,
-                'message'         => __( '压缩成功', 'libre-compress' ),
+                'message'         => __( '压缩成功', 'local-crush' ),
                 'original_size'   => $original_size,
                 'compressed_size' => $compressed_size,
             );
@@ -101,7 +101,7 @@ class Libre_Compress_Pngquant extends Libre_Compress_Tool_Base {
             if ( (int) filesize( $file_path ) === (int) $original_size ) {
                 return array(
                     'success'         => true,
-                    'message'         => __( '压缩成功', 'libre-compress' ),
+                    'message'         => __( '压缩成功', 'local-crush' ),
                     'original_size'   => $original_size,
                     'compressed_size' => $original_size,
                 );
@@ -128,8 +128,8 @@ class Libre_Compress_Pngquant extends Libre_Compress_Tool_Base {
 
         // pngquant 的质量本身就是「下限-上限」两段：低于下限就不保存、保留原图，
         // 上限用来决定最多保留多少颜色。界面直接对应这两个参数，不做二次换算。
-        $min_quality = Libre_Compress_Settings::param_int( 'png_lossy_quality_min' );
-        $max_quality = Libre_Compress_Settings::param_int( 'png_lossy_quality_max' );
+        $min_quality = Local_Crush_Settings::param_int( 'png_lossy_quality_min' );
+        $max_quality = Local_Crush_Settings::param_int( 'png_lossy_quality_max' );
 
         if ( $min_quality > $max_quality ) {
             $min_quality = $max_quality;
@@ -146,15 +146,15 @@ class Libre_Compress_Pngquant extends Libre_Compress_Tool_Base {
             '--skip-if-larger',
             sprintf( '--quality=%d-%d', $min_quality, $max_quality ),
             '--speed',
-            (string) Libre_Compress_Settings::param_int( 'png_lossy_speed' ),
+            (string) Local_Crush_Settings::param_int( 'png_lossy_speed' ),
         );
 
-        if ( ! Libre_Compress_Settings::param_flag( 'png_lossy_dither' ) ) {
+        if ( ! Local_Crush_Settings::param_flag( 'png_lossy_dither' ) ) {
             $command_parts[] = '--nofs';
         }
 
         // pngquant 只在 macOS 上默认清元数据，其他平台要显式加 --strip
-        if ( Libre_Compress_Settings::strips_metadata() ) {
+        if ( Local_Crush_Settings::strips_metadata() ) {
             $command_parts[] = '--strip';
         }
 
@@ -186,7 +186,7 @@ class Libre_Compress_Pngquant extends Libre_Compress_Tool_Base {
             'centos'  => 'sudo yum install pngquant',
             'fedora'  => 'sudo dnf install pngquant',
             'macos'   => 'brew install pngquant',
-            'windows' => __( '从官网下载预编译的二进制文件', 'libre-compress' ),
+            'windows' => __( '从官网下载预编译的二进制文件', 'local-crush' ),
         );
     }
 }

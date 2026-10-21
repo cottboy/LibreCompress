@@ -2,7 +2,7 @@
 /**
  * 兼容格式回退
  *
- * @package LibreCompress
+ * @package LocalCrush
  */
 
 // 防止直接访问
@@ -13,7 +13,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 /**
  * 暴露解析器当前标签范围，插入 picture 时保留其余 HTML 的原始字节。
  */
-class Libre_Compress_Image_Tag_Processor extends WP_HTML_Tag_Processor {
+class Local_Crush_Image_Tag_Processor extends WP_HTML_Tag_Processor {
 
     /**
      * 当前标签在原文中的起始位置与长度
@@ -21,12 +21,12 @@ class Libre_Compress_Image_Tag_Processor extends WP_HTML_Tag_Processor {
      * @return array 位置为 -1 表示取不到当前标签范围
      */
     public function current_span(): array {
-        if ( ! $this->set_bookmark( 'libre-compress-image' ) || ! isset( $this->bookmarks['libre-compress-image'] ) ) {
+        if ( ! $this->set_bookmark( 'local-crush-image' ) || ! isset( $this->bookmarks['local-crush-image'] ) ) {
             return array( -1, 0 );
         }
 
-        $span = $this->bookmarks['libre-compress-image'];
-        $this->release_bookmark( 'libre-compress-image' );
+        $span = $this->bookmarks['local-crush-image'];
+        $this->release_bookmark( 'local-crush-image' );
 
         return array( (int) $span->start, (int) $span->length );
     }
@@ -39,7 +39,7 @@ class Libre_Compress_Image_Tag_Processor extends WP_HTML_Tag_Processor {
  * 源文件原地不动并同样经过压缩，作为回退文件。前台输出新格式图片时，把链接去掉最后一段
  * 扩展名就得到回退地址，是确定性推导而非探头猜测，不需要查询数据库。
  */
-class Libre_Compress_Compatible_Fallback {
+class Local_Crush_Compatible_Fallback {
 
     /**
      * 构造函数
@@ -67,7 +67,7 @@ class Libre_Compress_Compatible_Fallback {
             return false;
         }
 
-        $general = get_option( 'libre_compress_general', array() );
+        $general = get_option( 'local_crush_general', array() );
 
         return ! empty( $general['fallback_enabled'] );
     }
@@ -106,7 +106,7 @@ class Libre_Compress_Compatible_Fallback {
             return $html;
         }
 
-        $parser       = new Libre_Compress_Image_Tag_Processor( $html );
+        $parser       = new Local_Crush_Image_Tag_Processor( $html );
         $replacements = array();
         $images       = array();
         $picture_depth = 0;

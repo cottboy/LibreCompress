@@ -4,7 +4,7 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-class Libre_Compress_Settings {
+class Local_Crush_Settings {
 
     /**
      * 原图备份永久保留的取值
@@ -39,10 +39,10 @@ class Libre_Compress_Settings {
     private static function mode_param(): array {
         return array(
             'type'    => 'mode',
-            'label'   => __( '压缩模式', 'libre-compress' ),
+            'label'   => __( '压缩模式', 'local-crush' ),
             'flag'    => '',
             'default' => 'lossy',
-            'desc'    => __( '有损会丢掉部分画面细节来换更小体积；无损只重排压缩数据，画面一个像素都不变。', 'libre-compress' ),
+            'desc'    => __( '有损会丢掉部分画面细节来换更小体积；无损只重排压缩数据，画面一个像素都不变。', 'local-crush' ),
         );
     }
 
@@ -64,61 +64,61 @@ class Libre_Compress_Settings {
             $group . '_mode'           => self::mode_param(),
             $group . '_quality'        => array(
                 'type'    => 'int',
-                'label'   => __( '有损质量', 'libre-compress' ),
+                'label'   => __( '有损质量', 'local-crush' ),
                 'flag'    => 'cwebp -q',
                 'min'     => 0,
                 'max'     => 100,
                 'default' => 80,
-                'desc'    => __( '填多少就传给 -q 多少，0 最省体积、100 最好。只有有损模式有效。', 'libre-compress' ),
+                'desc'    => __( '填多少就传给 -q 多少，0 最省体积、100 最好。只有有损模式有效。', 'local-crush' ),
             ),
             $group . '_method'         => array(
                 'type'    => 'int',
-                'label'   => __( '有损压缩方法', 'libre-compress' ),
+                'label'   => __( '有损压缩方法', 'local-crush' ),
                 'flag'    => 'cwebp -m',
                 'min'     => 0,
                 'max'     => 6,
                 'default' => 4,
-                'desc'    => __( '0 最快、6 最慢但最小。方法只影响耗时和体积，不影响画质。', 'libre-compress' ),
+                'desc'    => __( '0 最快、6 最慢但最小。方法只影响耗时和体积，不影响画质。', 'local-crush' ),
             ),
             $group . '_lossless_level' => array(
                 'type'    => 'int',
-                'label'   => __( '无损级别', 'libre-compress' ),
+                'label'   => __( '无损级别', 'local-crush' ),
                 'flag'    => 'cwebp -z',
                 'min'     => 0,
                 'max'     => 9,
                 'default' => 6,
-                'desc'    => __( '只有无损模式有效，0 最快、9 最小。', 'libre-compress' ),
+                'desc'    => __( '只有无损模式有效，0 最快、9 最小。', 'local-crush' ),
             ),
             $group . '_alpha_quality'  => array(
                 'type'    => 'int',
-                'label'   => __( '透明通道质量', 'libre-compress' ),
+                'label'   => __( '透明通道质量', 'local-crush' ),
                 'flag'    => 'cwebp -alpha_q',
                 'min'     => 0,
                 'max'     => 100,
                 'default' => 100,
-                'desc'    => __( '透明通道单独编码，100 表示透明通道无损。', 'libre-compress' ),
+                'desc'    => __( '透明通道单独编码，100 表示透明通道无损。', 'local-crush' ),
             ),
             $group . '_preset'         => array(
                 'type'    => 'choice',
-                'label'   => __( '内容预设', 'libre-compress' ),
+                'label'   => __( '内容预设', 'local-crush' ),
                 'flag'    => 'cwebp -preset',
                 'choices' => array(
-                    'default' => __( '默认', 'libre-compress' ),
-                    'photo'   => __( '照片', 'libre-compress' ),
-                    'picture' => __( '室内人像', 'libre-compress' ),
-                    'drawing' => __( '绘图 / 线稿', 'libre-compress' ),
-                    'icon'    => __( '图标 / 小彩图', 'libre-compress' ),
-                    'text'    => __( '文字截图', 'libre-compress' ),
+                    'default' => __( '默认', 'local-crush' ),
+                    'photo'   => __( '照片', 'local-crush' ),
+                    'picture' => __( '室内人像', 'local-crush' ),
+                    'drawing' => __( '绘图 / 线稿', 'local-crush' ),
+                    'icon'    => __( '图标 / 小彩图', 'local-crush' ),
+                    'text'    => __( '文字截图', 'local-crush' ),
                 ),
                 'default' => 'default',
-                'desc'    => __( '按内容类型预调参数。预设会重置质量和压缩方法，所以它排在命令行最前面，后面的显式值仍然生效。', 'libre-compress' ),
+                'desc'    => __( '按内容类型预调参数。预设会重置质量和压缩方法，所以它排在命令行最前面，后面的显式值仍然生效。', 'local-crush' ),
             ),
             $group . '_exact'          => array(
                 'type'    => 'bool',
-                'label'   => __( '保留透明区域颜色', 'libre-compress' ),
+                'label'   => __( '保留透明区域颜色', 'local-crush' ),
                 'flag'    => 'cwebp -exact',
                 'default' => false,
-                'desc'    => __( '默认会把全透明像素的 RGB 抹平；勾选则原样保留，代价是体积约多 16%。', 'libre-compress' ),
+                'desc'    => __( '默认会把全透明像素的 RGB 抹平；勾选则原样保留，代价是体积约多 16%。', 'local-crush' ),
             ),
         );
     }
@@ -134,64 +134,64 @@ class Libre_Compress_Settings {
             $group . '_mode'          => self::mode_param(),
             $group . '_quality'       => array(
                 'type'    => 'int',
-                'label'   => __( '有损质量', 'libre-compress' ),
+                'label'   => __( '有损质量', 'local-crush' ),
                 'flag'    => 'avifenc -q',
                 'min'     => 0,
                 'max'     => 100,
                 'default' => 80,
-                'desc'    => __( '填多少就传给 -q 多少，100 为无损、0 最省体积。只有有损模式有效。', 'libre-compress' ),
+                'desc'    => __( '填多少就传给 -q 多少，100 为无损、0 最省体积。只有有损模式有效。', 'local-crush' ),
             ),
             $group . '_alpha_quality' => array(
                 'type'    => 'int',
-                'label'   => __( '透明通道质量', 'libre-compress' ),
+                'label'   => __( '透明通道质量', 'local-crush' ),
                 'flag'    => 'avifenc --qalpha',
                 'min'     => 0,
                 'max'     => 100,
                 'default' => 80,
-                'desc'    => __( '100 为透明通道无损；半透明边缘多的图建议调高。', 'libre-compress' ),
+                'desc'    => __( '100 为透明通道无损；半透明边缘多的图建议调高。', 'local-crush' ),
             ),
             $group . '_speed'         => array(
                 'type'    => 'int',
-                'label'   => __( '编码速度', 'libre-compress' ),
+                'label'   => __( '编码速度', 'local-crush' ),
                 'flag'    => 'avifenc -s',
                 'min'     => 0,
                 'max'     => 10,
                 'default' => 6,
-                'desc'    => __( '0 最慢最小、10 最快最大，avifenc 自己的范围就是 0-10。', 'libre-compress' ),
+                'desc'    => __( '0 最慢最小、10 最快最大，avifenc 自己的范围就是 0-10。', 'local-crush' ),
             ),
             $group . '_chroma'        => array(
                 'type'    => 'choice',
-                'label'   => __( '色彩抽样', 'libre-compress' ),
+                'label'   => __( '色彩抽样', 'local-crush' ),
                 'flag'    => 'avifenc -y',
                 'choices' => array(
-                    'auto' => __( '自动（按输入决定）', 'libre-compress' ),
-                    '444'  => __( '4:4:4（色彩最准）', 'libre-compress' ),
-                    '422'  => __( '4:2:2（横向减半）', 'libre-compress' ),
-                    '420'  => __( '4:2:0 + sharpyuv（最小，边缘略糊）', 'libre-compress' ),
+                    'auto' => __( '自动（按输入决定）', 'local-crush' ),
+                    '444'  => __( '4:4:4（色彩最准）', 'local-crush' ),
+                    '422'  => __( '4:2:2（横向减半）', 'local-crush' ),
+                    '420'  => __( '4:2:0 + sharpyuv（最小，边缘略糊）', 'local-crush' ),
                 ),
                 'default' => 'auto',
-                'desc'    => __( '只有有损模式有效。选 4:2:0 会额外带上 avifenc 的 --sharpyuv，选自动时不传这个参数。', 'libre-compress' ),
+                'desc'    => __( '只有有损模式有效。选 4:2:0 会额外带上 avifenc 的 --sharpyuv，选自动时不传这个参数。', 'local-crush' ),
             ),
             $group . '_depth'         => array(
                 'type'    => 'choice',
-                'label'   => __( '位深', 'libre-compress' ),
+                'label'   => __( '位深', 'local-crush' ),
                 'flag'    => 'avifenc -d',
                 'choices' => array(
-                    '8'  => __( '8 位（默认，浏览器都能显示）', 'libre-compress' ),
-                    '10' => __( '10 位（渐变更平滑，体积略大）', 'libre-compress' ),
-                    '12' => __( '12 位（几乎用不到）', 'libre-compress' ),
+                    '8'  => __( '8 位（默认，浏览器都能显示）', 'local-crush' ),
+                    '10' => __( '10 位（渐变更平滑，体积略大）', 'local-crush' ),
+                    '12' => __( '12 位（几乎用不到）', 'local-crush' ),
                 ),
                 'default' => '8',
-                'desc'    => __( '位深越高渐变越平滑，但 10/12 位文件更大、老设备可能不支持。8 位时不传这个参数。', 'libre-compress' ),
+                'desc'    => __( '位深越高渐变越平滑，但 10/12 位文件更大、老设备可能不支持。8 位时不传这个参数。', 'local-crush' ),
             ),
             $group . '_jobs'          => array(
                 'type'    => 'int',
-                'label'   => __( '并行线程数', 'libre-compress' ),
+                'label'   => __( '并行线程数', 'local-crush' ),
                 'flag'    => 'avifenc -j',
                 'min'     => 1,
                 'max'     => 256,
                 'default' => 4,
-                'desc'    => __( '同时开几个编码线程，填多少传多少。开太多会和网站抢 CPU。', 'libre-compress' ),
+                'desc'    => __( '同时开几个编码线程，填多少传多少。开太多会和网站抢 CPU。', 'local-crush' ),
             ),
         );
     }
@@ -207,43 +207,43 @@ class Libre_Compress_Settings {
             $group . '_mode'    => self::mode_param(),
             $group . '_crf'     => array(
                 'type'    => 'int',
-                'label'   => __( 'CRF（质量）', 'libre-compress' ),
+                'label'   => __( 'CRF（质量）', 'local-crush' ),
                 'flag'    => 'FFmpeg -crf',
                 'min'     => 0,
                 'max'     => 63,
                 'default' => 20,
-                'desc'    => __( '直接对应 libaom 的 -crf：数值越小画质越好、体积越大，0 接近无损，63 最差。只有有损模式有效。', 'libre-compress' ),
+                'desc'    => __( '直接对应 libaom 的 -crf：数值越小画质越好、体积越大，0 接近无损，63 最差。只有有损模式有效。', 'local-crush' ),
             ),
             $group . '_speed'   => array(
                 'type'    => 'int',
-                'label'   => __( '编码速度', 'libre-compress' ),
+                'label'   => __( '编码速度', 'local-crush' ),
                 'flag'    => 'FFmpeg -cpu-used',
                 'min'     => 0,
                 'max'     => 8,
                 'default' => 6,
-                'desc'    => __( '直接对应 libaom 的 -cpu-used：0 最慢最小、8 最快最大。', 'libre-compress' ),
+                'desc'    => __( '直接对应 libaom 的 -cpu-used：0 最慢最小、8 最快最大。', 'local-crush' ),
             ),
             $group . '_threads' => array(
                 'type'    => 'int',
-                'label'   => __( '编码线程数', 'libre-compress' ),
+                'label'   => __( '编码线程数', 'local-crush' ),
                 'flag'    => 'FFmpeg -threads',
                 'min'     => 1,
                 'max'     => 256,
                 'default' => 4,
-                'desc'    => __( '直接对应 FFmpeg 的 -threads，填多少传多少。开太多会和网站抢 CPU。', 'libre-compress' ),
+                'desc'    => __( '直接对应 FFmpeg 的 -threads，填多少传多少。开太多会和网站抢 CPU。', 'local-crush' ),
             ),
             $group . '_chroma'  => array(
                 'type'    => 'choice',
-                'label'   => __( '色彩抽样', 'libre-compress' ),
+                'label'   => __( '色彩抽样', 'local-crush' ),
                 'flag'    => 'FFmpeg -pix_fmt',
                 'choices' => array(
-                    'auto' => __( '自动（编码器自己挑）', 'libre-compress' ),
-                    '444'  => __( '4:4:4（yuv444p，色彩最准）', 'libre-compress' ),
-                    '422'  => __( '4:2:2（yuv422p，横向减半）', 'libre-compress' ),
-                    '420'  => __( '4:2:0（yuv420p，最小，边缘略糊）', 'libre-compress' ),
+                    'auto' => __( '自动（编码器自己挑）', 'local-crush' ),
+                    '444'  => __( '4:4:4（yuv444p，色彩最准）', 'local-crush' ),
+                    '422'  => __( '4:2:2（yuv422p，横向减半）', 'local-crush' ),
+                    '420'  => __( '4:2:0（yuv420p，最小，边缘略糊）', 'local-crush' ),
                 ),
                 'default' => 'auto',
-                'desc'    => __( '只有有损模式有效，直接对应 FFmpeg 的 -pix_fmt。选自动时不传这个参数，由编码器按输入决定。', 'libre-compress' ),
+                'desc'    => __( '只有有损模式有效，直接对应 FFmpeg 的 -pix_fmt。选自动时不传这个参数，由编码器按输入决定。', 'local-crush' ),
             ),
         );
     }
@@ -259,21 +259,21 @@ class Libre_Compress_Settings {
             $group . '_mode'    => self::mode_param(),
             $group . '_quality' => array(
                 'type'    => 'int',
-                'label'   => __( '有损质量', 'libre-compress' ),
+                'label'   => __( '有损质量', 'local-crush' ),
                 'flag'    => 'FFmpeg -quality',
                 'min'     => 0,
                 'max'     => 100,
                 'default' => 80,
-                'desc'    => __( '填多少就传给 -quality 多少。FFmpeg 自己的默认值是 75。只有有损模式有效。', 'libre-compress' ),
+                'desc'    => __( '填多少就传给 -quality 多少。FFmpeg 自己的默认值是 75。只有有损模式有效。', 'local-crush' ),
             ),
             $group . '_method'  => array(
                 'type'    => 'int',
-                'label'   => __( '压缩方法', 'libre-compress' ),
+                'label'   => __( '压缩方法', 'local-crush' ),
                 'flag'    => 'FFmpeg -compression_level',
                 'min'     => 0,
                 'max'     => 6,
                 'default' => 4,
-                'desc'    => __( '0 最快、6 最慢但最小，就是 libwebp 的 method 范围，有损与无损都生效。', 'libre-compress' ),
+                'desc'    => __( '0 最快、6 最慢但最小，就是 libwebp 的 method 范围，有损与无损都生效。', 'local-crush' ),
             ),
         );
     }
@@ -289,21 +289,21 @@ class Libre_Compress_Settings {
             $group . '_mode'    => self::mode_param(),
             $group . '_quality' => array(
                 'type'    => 'int',
-                'label'   => __( '有损质量', 'libre-compress' ),
+                'label'   => __( '有损质量', 'local-crush' ),
                 'flag'    => 'cjxl -q',
                 'min'     => 0,
                 'max'     => 100,
                 'default' => 80,
-                'desc'    => __( '填多少就传给 -q 多少，100 等于数学无损、90 已经是视觉无损。只有有损模式有效。', 'libre-compress' ),
+                'desc'    => __( '填多少就传给 -q 多少，100 等于数学无损、90 已经是视觉无损。只有有损模式有效。', 'local-crush' ),
             ),
             $group . '_effort'  => array(
                 'type'    => 'int',
-                'label'   => __( '压缩级别', 'libre-compress' ),
+                'label'   => __( '压缩级别', 'local-crush' ),
                 'flag'    => 'cjxl -e',
                 'min'     => 1,
                 'max'     => 10,
                 'default' => 7,
-                'desc'    => __( '级别越高越慢、同样画质体积越小，7 是 cjxl 默认值。', 'libre-compress' ),
+                'desc'    => __( '级别越高越慢、同样画质体积越小，7 是 cjxl 默认值。', 'local-crush' ),
             ),
         );
     }
@@ -320,28 +320,28 @@ class Libre_Compress_Settings {
         return array(
             $group . '_lossy'   => array(
                 'type'    => 'bool',
-                'label'   => __( '启用有损', 'libre-compress' ),
+                'label'   => __( '启用有损', 'local-crush' ),
                 'flag'    => 'gif2webp -lossy',
                 'default' => true,
-                'desc'    => __( '勾选时带上 -lossy 并按下面的质量重新量化；取消则只重排数据，画面不变、体积也降得少。', 'libre-compress' ),
+                'desc'    => __( '勾选时带上 -lossy 并按下面的质量重新量化；取消则只重排数据，画面不变、体积也降得少。', 'local-crush' ),
             ),
             $group . '_quality' => array(
                 'type'    => 'int',
-                'label'   => __( '有损质量', 'libre-compress' ),
+                'label'   => __( '有损质量', 'local-crush' ),
                 'flag'    => 'gif2webp -q',
                 'min'     => 0,
                 'max'     => 100,
                 'default' => 80,
-                'desc'    => __( '只有勾上“启用有损”才传，填多少传多少，0 最省体积、100 最好。', 'libre-compress' ),
+                'desc'    => __( '只有勾上“启用有损”才传，填多少传多少，0 最省体积、100 最好。', 'local-crush' ),
             ),
             $group . '_method'  => array(
                 'type'    => 'int',
-                'label'   => __( '压缩方法', 'libre-compress' ),
+                'label'   => __( '压缩方法', 'local-crush' ),
                 'flag'    => 'gif2webp -m',
                 'min'     => 0,
                 'max'     => 6,
                 'default' => 4,
-                'desc'    => __( '0 最快、6 最慢但最小。', 'libre-compress' ),
+                'desc'    => __( '0 最快、6 最慢但最小。', 'local-crush' ),
             ),
         );
     }
@@ -356,26 +356,26 @@ class Libre_Compress_Settings {
         return array(
             $prefix . '_oxipng_level'  => array(
                 'type'    => 'int',
-                'label'   => __( 'oxipng 无损级别', 'libre-compress' ),
+                'label'   => __( 'oxipng 无损级别', 'local-crush' ),
                 'flag'    => 'oxipng -o',
                 'min'     => 0,
                 'max'     => 6,
                 'default' => 2,
-                'desc'    => __( '数值越大压得越小、越慢（6 非常慢）。2 是 oxipng 默认值，日常够用。', 'libre-compress' ),
+                'desc'    => __( '数值越大压得越小、越慢（6 非常慢）。2 是 oxipng 默认值，日常够用。', 'local-crush' ),
             ),
             $prefix . '_oxipng_alpha'  => array(
                 'type'    => 'bool',
-                'label'   => __( '优化透明通道', 'libre-compress' ),
+                'label'   => __( '优化透明通道', 'local-crush' ),
                 'flag'    => 'oxipng --alpha',
                 'default' => false,
-                'desc'    => __( '把完全透明的像素颜色改写成可压缩的值，带透明的大图能再小一截。画面看起来不变。', 'libre-compress' ),
+                'desc'    => __( '把完全透明的像素颜色改写成可压缩的值，带透明的大图能再小一截。画面看起来不变。', 'local-crush' ),
             ),
             $prefix . '_oxipng_zopfli' => array(
                 'type'    => 'bool',
-                'label'   => __( 'Zopfli 极限压缩', 'libre-compress' ),
+                'label'   => __( 'Zopfli 极限压缩', 'local-crush' ),
                 'flag'    => 'oxipng --zopfli',
                 'default' => false,
-                'desc'    => __( '更慢更狠的压缩算法，通常还能再省几个百分点，大图或帧多的动图容易跑到超时。', 'libre-compress' ),
+                'desc'    => __( '更慢更狠的压缩算法，通常还能再省几个百分点，大图或帧多的动图容易跑到超时。', 'local-crush' ),
             ),
         );
     }
@@ -411,195 +411,195 @@ class Libre_Compress_Settings {
         $groups = array(
 
             'jpeg'                => array(
-                'title'  => __( 'JPEG 压缩（jpegoptim）', 'libre-compress' ),
-                'note'   => __( '所有 JPEG 都走这里。有损模式传 --max 设定质量上限，无损模式不传质量参数，只重排压缩数据。', 'libre-compress' ),
+                'title'  => __( 'JPEG 压缩（jpegoptim）', 'local-crush' ),
+                'note'   => __( '所有 JPEG 都走这里。有损模式传 --max 设定质量上限，无损模式不传质量参数，只重排压缩数据。', 'local-crush' ),
                 'params' => array(
                     'jpeg_mode'        => self::mode_param(),
                     'jpeg_quality'     => array(
                         'type'    => 'int',
-                        'label'   => __( '有损质量', 'libre-compress' ),
+                        'label'   => __( '有损质量', 'local-crush' ),
                         'flag'    => 'jpegoptim --max',
                         'min'     => 0,
                         'max'     => 100,
                         'default' => 80,
-                        'desc'    => __( '填多少就传给 --max 多少，0 最省体积、100 最好。只有有损模式有效。', 'libre-compress' ),
+                        'desc'    => __( '填多少就传给 --max 多少，0 最省体积、100 最好。只有有损模式有效。', 'local-crush' ),
                     ),
                     'jpeg_progressive' => array(
                         'type'    => 'choice',
-                        'label'   => __( '渐进式编码', 'libre-compress' ),
+                        'label'   => __( '渐进式编码', 'local-crush' ),
                         'flag'    => 'jpegoptim --all-progressive / --all-normal / --auto-mode',
                         'choices' => array(
-                            'auto'        => __( '自动（--auto-mode，让 jpegoptim 挑更小的）', 'libre-compress' ),
-                            'normal'      => __( '顺序式（--all-normal，整张出现）', 'libre-compress' ),
-                            'progressive' => __( '渐进式（--all-progressive，先糊后清）', 'libre-compress' ),
+                            'auto'        => __( '自动（--auto-mode，让 jpegoptim 挑更小的）', 'local-crush' ),
+                            'normal'      => __( '顺序式（--all-normal，整张出现）', 'local-crush' ),
+                            'progressive' => __( '渐进式（--all-progressive，先糊后清）', 'local-crush' ),
                         ),
                         'default' => 'progressive',
-                        'desc'    => __( '渐进式通常体积更小、加载观感更好；个别老软件不认渐进式就选顺序式。', 'libre-compress' ),
+                        'desc'    => __( '渐进式通常体积更小、加载观感更好；个别老软件不认渐进式就选顺序式。', 'local-crush' ),
                     ),
                 ),
             ),
             'png_lossy'           => array(
-                'title'  => __( 'PNG 有损压缩（pngquant）', 'libre-compress' ),
-                'note'   => __( '这一节是 pngquant 的全部参数。本节最上面的“PNG 走哪条路径”选无损时，本节参数不生效，改由下一节 oxipng 负责。APNG 动图永远不会走 pngquant。', 'libre-compress' ),
+                'title'  => __( 'PNG 有损压缩（pngquant）', 'local-crush' ),
+                'note'   => __( '这一节是 pngquant 的全部参数。本节最上面的“PNG 走哪条路径”选无损时，本节参数不生效，改由下一节 oxipng 负责。APNG 动图永远不会走 pngquant。', 'local-crush' ),
                 'params' => array(
                     'png_mode'             => array(
                         'type'    => 'mode',
-                        'label'   => __( 'PNG 走哪条路径', 'libre-compress' ),
+                        'label'   => __( 'PNG 走哪条路径', 'local-crush' ),
                         'flag'    => '',
                         'default' => 'lossy',
-                        'desc'    => __( '有损：走本节 pngquant 的参数；无损：走下一节 oxipng 的参数。两条路径只能二选一，不会同时执行。', 'libre-compress' ),
+                        'desc'    => __( '有损：走本节 pngquant 的参数；无损：走下一节 oxipng 的参数。两条路径只能二选一，不会同时执行。', 'local-crush' ),
                     ),
                     'png_lossy_quality_min' => array(
                         'type'    => 'int',
-                        'label'   => __( '有损质量下限', 'libre-compress' ),
+                        'label'   => __( '有损质量下限', 'local-crush' ),
                         'flag'    => 'pngquant --quality 下限',
                         'min'     => 0,
                         'max'     => 100,
                         'default' => 60,
-                        'desc'    => __( '低于这个质量就不保存、直接保留原图，用来防止压得太糊。0 表示不设下限。', 'libre-compress' ),
+                        'desc'    => __( '低于这个质量就不保存、直接保留原图，用来防止压得太糊。0 表示不设下限。', 'local-crush' ),
                     ),
                     'png_lossy_quality_max' => array(
                         'type'    => 'int',
-                        'label'   => __( '有损质量上限', 'libre-compress' ),
+                        'label'   => __( '有损质量上限', 'local-crush' ),
                         'flag'    => 'pngquant --quality 上限',
                         'min'     => 0,
                         'max'     => 100,
                         'default' => 80,
-                        'desc'    => __( '追求的最高质量，凑不到时会自动减少颜色数。下限填得比上限大时会自动对调。', 'libre-compress' ),
+                        'desc'    => __( '追求的最高质量，凑不到时会自动减少颜色数。下限填得比上限大时会自动对调。', 'local-crush' ),
                     ),
                     'png_lossy_speed'      => array(
                         'type'    => 'int',
-                        'label'   => __( 'pngquant 速度', 'libre-compress' ),
+                        'label'   => __( 'pngquant 速度', 'local-crush' ),
                         'flag'    => 'pngquant --speed',
                         'min'     => 1,
                         'max'     => 11,
                         'default' => 4,
-                        'desc'    => __( '数值越大越快越省 CPU，画质越粗糙；1 最慢最细，4 是 pngquant 默认值。', 'libre-compress' ),
+                        'desc'    => __( '数值越大越快越省 CPU，画质越粗糙；1 最慢最细，4 是 pngquant 默认值。', 'local-crush' ),
                     ),
                     'png_lossy_dither'     => array(
                         'type'    => 'bool',
-                        'label'   => __( '抖动', 'libre-compress' ),
+                        'label'   => __( '抖动', 'local-crush' ),
                         'flag'    => 'pngquant（取消勾选时加 --nofs）',
                         'default' => true,
-                        'desc'    => __( '勾选：减少颜色后用抖动过渡，照片类渐变更自然；取消：色块更干净、体积更小，适合扁平图标。', 'libre-compress' ),
+                        'desc'    => __( '勾选：减少颜色后用抖动过渡，照片类渐变更自然；取消：色块更干净、体积更小，适合扁平图标。', 'local-crush' ),
                     ),
                 ),
             ),
             'png_lossless'        => array(
-                'title'  => __( 'PNG / APNG 无损压缩（oxipng）', 'libre-compress' ),
-                'note'   => __( '静态 PNG 走无损模式时用这一节，APNG 动图也整只交给 oxipng 用这一节——两者的工具链完全一样，所以共用一组参数。oxipng 只重排压缩数据，画面一个像素都不变，也能保住 APNG 的帧结构与每帧时长。', 'libre-compress' ),
+                'title'  => __( 'PNG / APNG 无损压缩（oxipng）', 'local-crush' ),
+                'note'   => __( '静态 PNG 走无损模式时用这一节，APNG 动图也整只交给 oxipng 用这一节——两者的工具链完全一样，所以共用一组参数。oxipng 只重排压缩数据，画面一个像素都不变，也能保住 APNG 的帧结构与每帧时长。', 'local-crush' ),
                 'params' => array_merge(
                     array(
                         'apng_enabled' => array(
                             'type'    => 'bool',
-                            'label'   => __( 'APNG 自动无损压缩', 'libre-compress' ),
+                            'label'   => __( 'APNG 自动无损压缩', 'local-crush' ),
                             'flag'    => 'APNG 走 oxipng',
                             'default' => true,
-                            'desc'    => __( 'PNG 走有损模式时，勾上这一项会让 APNG 绕开 pngquant、单独用 oxipng 整只无损压缩；不勾则 PNG 有损时不压 APNG。PNG 本身选的就是无损时，APNG 总是走无损压缩。它不控制 APNG 转格式，那个在基本设置里单独勾。', 'libre-compress' ),
+                            'desc'    => __( 'PNG 走有损模式时，勾上这一项会让 APNG 绕开 pngquant、单独用 oxipng 整只无损压缩；不勾则 PNG 有损时不压 APNG。PNG 本身选的就是无损时，APNG 总是走无损压缩。它不控制 APNG 转格式，那个在基本设置里单独勾。', 'local-crush' ),
                         ),
                     ),
                     self::oxipng_params( 'png_lossless' )
                 ),
             ),
             'gif'                 => array(
-                'title'  => __( 'GIF 压缩（gifsicle）', 'libre-compress' ),
-                'note'   => __( '整只 GIF（含动画）交给 gifsicle 原地重压，插件不拆帧、不动透明像素。', 'libre-compress' ),
+                'title'  => __( 'GIF 压缩（gifsicle）', 'local-crush' ),
+                'note'   => __( '整只 GIF（含动画）交给 gifsicle 原地重压，插件不拆帧、不动透明像素。', 'local-crush' ),
                 'params' => array(
                     'gif_mode'       => self::mode_param(),
                     'gif_lossy' => array(
                         'type'    => 'int',
-                        'label'   => __( '有损强度', 'libre-compress' ),
+                        'label'   => __( '有损强度', 'local-crush' ),
                         'flag'    => 'gifsicle --lossy',
                         'min'     => 0,
                         'max'     => 1000,
                         'default' => 80,
-                        'desc'    => __( '填多少就传给 --lossy 多少，数值越大文件越小、噪点越多，常用 20-200；填 0 表示不加有损。只有有损模式有效。', 'libre-compress' ),
+                        'desc'    => __( '填多少就传给 --lossy 多少，数值越大文件越小、噪点越多，常用 20-200；填 0 表示不加有损。只有有损模式有效。', 'local-crush' ),
                     ),
                     'gif_colors'     => array(
                         'type'    => 'int',
-                        'label'   => __( '调色板颜色数', 'libre-compress' ),
+                        'label'   => __( '调色板颜色数', 'local-crush' ),
                         'flag'    => 'gifsicle --colors',
                         'min'     => 2,
                         'max'     => 256,
                         'default' => 256,
-                        'desc'    => __( 'GIF 最多 256 色。256 等于不缩色；调低后体积更小但会掉色，图标类 64-128 往往够用。', 'libre-compress' ),
+                        'desc'    => __( 'GIF 最多 256 色。256 等于不缩色；调低后体积更小但会掉色，图标类 64-128 往往够用。', 'local-crush' ),
                     ),
                     'gif_level' => array(
                         'type'    => 'int',
-                        'label'   => __( '优化级别', 'libre-compress' ),
+                        'label'   => __( '优化级别', 'local-crush' ),
                         'flag'    => 'gifsicle -O',
                         'min'     => 1,
                         'max'     => 3,
                         'default' => 2,
-                        'desc'    => __( '3 会多存一张透明度索引表，能再小一点；2 是官方推荐的平衡档。', 'libre-compress' ),
+                        'desc'    => __( '3 会多存一张透明度索引表，能再小一点；2 是官方推荐的平衡档。', 'local-crush' ),
                     ),
                 ),
             ),
             'svg'                 => array(
-                'title'  => __( 'SVG 压缩（oxvg）', 'libre-compress' ),
-                'note'   => __( '由 oxvg 处理，两种预设都会删掉 <metadata> 和注释；开启“删除图片元数据”时插件还会再清一遍 <metadata> 与注释，确保不留作者、软件等来源信息。', 'libre-compress' ),
+                'title'  => __( 'SVG 压缩（oxvg）', 'local-crush' ),
+                'note'   => __( '由 oxvg 处理，两种预设都会删掉 <metadata> 和注释；开启“删除图片元数据”时插件还会再清一遍 <metadata> 与注释，确保不留作者、软件等来源信息。', 'local-crush' ),
                 'params' => array(
                     'svg_preset' => array(
                         'type'    => 'choice',
-                        'label'   => __( '优化预设', 'libre-compress' ),
+                        'label'   => __( '优化预设', 'local-crush' ),
                         'flag'    => 'oxvg optimise -e',
                         'choices' => array(
-                            'default' => __( '常规（default）', 'libre-compress' ),
-                            'safe'    => __( '保守（safe，几乎不改视觉）', 'libre-compress' ),
+                            'default' => __( '常规（default）', 'local-crush' ),
+                            'safe'    => __( '保守（safe，几乎不改视觉）', 'local-crush' ),
                         ),
                         'default' => 'default',
-                        'desc'    => __( '常规会合并路径、精简属性；保守只做绝对安全的重写。', 'libre-compress' ),
+                        'desc'    => __( '常规会合并路径、精简属性；保守只做绝对安全的重写。', 'local-crush' ),
                     ),
                 ),
             ),
             'webp'                => array(
-                'title'  => __( 'WebP 编码（cwebp）', 'libre-compress' ),
-                'note'   => __( 'WebP 静图同格式压缩与 PNG / JPG 转 WebP 都是 cwebp 一条命令，工具链完全一样，所以共用这一组参数。动画 WebP 不在这一条路径上。', 'libre-compress' ),
+                'title'  => __( 'WebP 编码（cwebp）', 'local-crush' ),
+                'note'   => __( 'WebP 静图同格式压缩与 PNG / JPG 转 WebP 都是 cwebp 一条命令，工具链完全一样，所以共用这一组参数。动画 WebP 不在这一条路径上。', 'local-crush' ),
                 'params' => self::cwebp_params( 'webp' ),
             ),
             'webp_anim'           => array(
-                'title'  => __( '动画 WebP 编码（FFmpeg + webpmux）', 'libre-compress' ),
-                'note'   => __( '动画 WebP 同格式压缩与 APNG 转 WebP 都走 FFmpeg 的 libwebp_anim，再用 webpmux 回写播放参数，工具链完全一样。参数直接对应 FFmpeg 的 -quality 与 -compression_level，不做任何换算。', 'libre-compress' ),
+                'title'  => __( '动画 WebP 编码（FFmpeg + webpmux）', 'local-crush' ),
+                'note'   => __( '动画 WebP 同格式压缩与 APNG 转 WebP 都走 FFmpeg 的 libwebp_anim，再用 webpmux 回写播放参数，工具链完全一样。参数直接对应 FFmpeg 的 -quality 与 -compression_level，不做任何换算。', 'local-crush' ),
                 'params' => self::ffmpeg_webp_params( 'webp_anim' ),
             ),
             'avif'                => array(
-                'title'  => __( 'AVIF 同格式压缩（avifdec + avifenc）', 'libre-compress' ),
-                'note'   => __( 'AVIF 静图要先由 avifdec 解成 PNG 再交给 avifenc 重压，比其它 AVIF 路径多一个解码步骤，所以单独一组。', 'libre-compress' ),
+                'title'  => __( 'AVIF 同格式压缩（avifdec + avifenc）', 'local-crush' ),
+                'note'   => __( 'AVIF 静图要先由 avifdec 解成 PNG 再交给 avifenc 重压，比其它 AVIF 路径多一个解码步骤，所以单独一组。', 'local-crush' ),
                 'params' => self::avifenc_params( 'avif' ),
             ),
             'avif_anim'           => array(
-                'title'  => __( '动画 AVIF 同格式压缩（avifdec + ffmpeg + ffprobe）', 'libre-compress' ),
-                'note'   => __( '动画 AVIF 先由 ffprobe 挑出完整动画轨道、avifdec 读原图信息，再交给 FFmpeg 的 libaom-av1 重压，比转 AVIF 多两步，所以单独一组。', 'libre-compress' ),
+                'title'  => __( '动画 AVIF 同格式压缩（avifdec + ffmpeg + ffprobe）', 'local-crush' ),
+                'note'   => __( '动画 AVIF 先由 ffprobe 挑出完整动画轨道、avifdec 读原图信息，再交给 FFmpeg 的 libaom-av1 重压，比转 AVIF 多两步，所以单独一组。', 'local-crush' ),
                 'params' => self::ffmpeg_avif_params( 'avif_anim' ),
             ),
             'jxl'                 => array(
-                'title'  => __( 'JPEG XL 编码（cjxl）', 'libre-compress' ),
-                'note'   => __( 'JXL 同格式压缩（静图与动图）与 PNG / JPG / GIF / APNG 转 JXL 全部只调用 cjxl，工具链完全一样，所以共用这一组参数。cjxl 能直接读写动画 JXL，一条命令重编码，不需要拆帧。', 'libre-compress' ),
+                'title'  => __( 'JPEG XL 编码（cjxl）', 'local-crush' ),
+                'note'   => __( 'JXL 同格式压缩（静图与动图）与 PNG / JPG / GIF / APNG 转 JXL 全部只调用 cjxl，工具链完全一样，所以共用这一组参数。cjxl 能直接读写动画 JXL，一条命令重编码，不需要拆帧。', 'local-crush' ),
                 'params' => self::cjxl_params( 'jxl' ),
             ),
             'gif_to_webp'         => array(
-                'title'  => __( '静态 GIF 转 WebP（gif2webp）', 'libre-compress' ),
-                'note'   => __( '只有 gif2webp 一条命令，不需要回写播放参数。参数与动画 GIF 转 WebP 分开设置。', 'libre-compress' ),
+                'title'  => __( '静态 GIF 转 WebP（gif2webp）', 'local-crush' ),
+                'note'   => __( '只有 gif2webp 一条命令，不需要回写播放参数。参数与动画 GIF 转 WebP 分开设置。', 'local-crush' ),
                 'params' => self::gif2webp_params( 'gif_to_webp' ),
             ),
             'gif_to_webp_anim'    => array(
-                'title'  => __( '动画 GIF 转 WebP（gif2webp + webpmux）', 'libre-compress' ),
-                'note'   => __( '整只动画 GIF 交给 gif2webp，多帧出来仍是动画；写完后还要用 webpmux 把末帧时长与背景色改回原值，比静态 GIF 多一个工具，所以单独一组。', 'libre-compress' ),
+                'title'  => __( '动画 GIF 转 WebP（gif2webp + webpmux）', 'local-crush' ),
+                'note'   => __( '整只动画 GIF 交给 gif2webp，多帧出来仍是动画；写完后还要用 webpmux 把末帧时长与背景色改回原值，比静态 GIF 多一个工具，所以单独一组。', 'local-crush' ),
                 'params' => self::gif2webp_params( 'gif_to_webp_anim' ),
             ),
             'avif_convert'        => array(
-                'title'  => __( 'PNG / JPG 转 AVIF（avifenc）', 'libre-compress' ),
-                'note'   => __( 'avifenc 直读 PNG / JPG，不需要额外解码工具，所以只调用 avifenc。参数与 AVIF 同格式压缩、静态 GIF 转 AVIF 分开设置。', 'libre-compress' ),
+                'title'  => __( 'PNG / JPG 转 AVIF（avifenc）', 'local-crush' ),
+                'note'   => __( 'avifenc 直读 PNG / JPG，不需要额外解码工具，所以只调用 avifenc。参数与 AVIF 同格式压缩、静态 GIF 转 AVIF 分开设置。', 'local-crush' ),
                 'params' => self::avifenc_params( 'avif_convert' ),
             ),
             'avif_convert_gif'    => array(
-                'title'  => __( '静态 GIF 转 AVIF（GD + avifenc）', 'libre-compress' ),
-                'note'   => __( 'avifenc 不认 GIF，必须先用 GD 扩展解成 PNG 再交给 avifenc，多一个 GD 步骤，所以单独一组。', 'libre-compress' ),
+                'title'  => __( '静态 GIF 转 AVIF（GD + avifenc）', 'local-crush' ),
+                'note'   => __( 'avifenc 不认 GIF，必须先用 GD 扩展解成 PNG 再交给 avifenc，多一个 GD 步骤，所以单独一组。', 'local-crush' ),
                 'params' => self::avifenc_params( 'avif_convert_gif' ),
             ),
             'avif_convert_anim'   => array(
-                'title'  => __( '动画 GIF / APNG 转 AVIF（ffmpeg）', 'libre-compress' ),
-                'note'   => __( '整只动画交给 FFmpeg 的 libaom-av1，一条命令读写全部帧，不需要 ffprobe 或 avifdec，所以单独一组。-crf / -cpu-used / -pix_fmt 都是 FFmpeg 的原始参数。', 'libre-compress' ),
+                'title'  => __( '动画 GIF / APNG 转 AVIF（ffmpeg）', 'local-crush' ),
+                'note'   => __( '整只动画交给 FFmpeg 的 libaom-av1，一条命令读写全部帧，不需要 ffprobe 或 avifdec，所以单独一组。-crf / -cpu-used / -pix_fmt 都是 FFmpeg 的原始参数。', 'local-crush' ),
                 'params' => self::ffmpeg_avif_params( 'avif_convert_anim' ),
             ),
         );
@@ -717,7 +717,7 @@ class Libre_Compress_Settings {
             return null;
         }
 
-        $settings = get_option( 'libre_compress_tools', array() );
+        $settings = get_option( 'local_crush_tools', array() );
         $settings = is_array( $settings ) ? $settings : array();
 
         return self::normalize_param( $map[ $key ], $settings[ $key ] ?? null );
@@ -835,7 +835,7 @@ class Libre_Compress_Settings {
      * @return bool
      */
     public static function image_scale_enabled(): bool {
-        $general = get_option( 'libre_compress_general', array() );
+        $general = get_option( 'local_crush_general', array() );
 
         return ! isset( $general['image_scale_enabled'] ) || ! empty( $general['image_scale_enabled'] );
     }
@@ -846,7 +846,7 @@ class Libre_Compress_Settings {
      * @return int 像素值，仅在开启自动缩放时生效
      */
     public static function image_size_threshold(): int {
-        $general = get_option( 'libre_compress_general', array() );
+        $general = get_option( 'local_crush_general', array() );
 
         return self::normalize_image_size_threshold( $general['image_size_threshold'] ?? null );
     }
@@ -860,7 +860,7 @@ class Libre_Compress_Settings {
      * @return bool
      */
     public static function strips_metadata(): bool {
-        $general = get_option( 'libre_compress_general', array() );
+        $general = get_option( 'local_crush_general', array() );
 
         return ! isset( $general['strip_metadata'] ) || (bool) $general['strip_metadata'];
     }
@@ -874,7 +874,7 @@ class Libre_Compress_Settings {
      * @return bool
      */
     public static function resize_is_lossless(): bool {
-        $general = get_option( 'libre_compress_general', array() );
+        $general = get_option( 'local_crush_general', array() );
 
         return ! empty( $general['resize_lossless'] );
     }
@@ -890,24 +890,24 @@ class Libre_Compress_Settings {
 
     public function add_settings_menu() {
         add_options_page(
-            __( 'LibreCompress', 'libre-compress' ),
-            __( 'LibreCompress', 'libre-compress' ),
+            __( 'Local Crush', 'local-crush' ),
+            __( 'Local Crush', 'local-crush' ),
             'manage_options',
-            'libre-compress',
+            'local-crush',
             array( $this, 'render_settings_page' )
         );
     }
 
     public function register_settings() {
         register_setting(
-            'libre_compress_general_group',
-            'libre_compress_general',
+            'local_crush_general_group',
+            'local_crush_general',
             array( $this, 'sanitize_general_settings' )
         );
 
         register_setting(
-            'libre_compress_tools_group',
-            'libre_compress_tools',
+            'local_crush_tools_group',
+            'local_crush_tools',
             array( $this, 'sanitize_tools_settings' )
         );
     }
@@ -916,7 +916,7 @@ class Libre_Compress_Settings {
         $input = is_array( $input ) ? $input : array();
         $sanitized = array();
 
-        $current_general = get_option( 'libre_compress_general', array() );
+        $current_general = get_option( 'local_crush_general', array() );
         $sanitized['auto_compress']      = ! empty( $input['auto_compress'] );
         $sanitized['backup_enabled']     = ! empty( $input['backup_enabled'] );
         $sanitized['backup_retention_days'] = self::normalize_retention_days( isset( $input['backup_retention_days'] ) ? $input['backup_retention_days'] : null );
@@ -981,14 +981,14 @@ class Libre_Compress_Settings {
         }
         ?>
         <div class="wrap">
-            <h1><?php esc_html_e( 'LibreCompress', 'libre-compress' ); ?></h1>
+            <h1><?php esc_html_e( 'Local Crush', 'local-crush' ); ?></h1>
 
             <nav class="nav-tab-wrapper">
-                <a href="<?php echo esc_url( admin_url( 'options-general.php?page=libre-compress&tab=general' ) ); ?>" class="nav-tab <?php echo 'general' === $this->current_tab ? 'nav-tab-active' : ''; ?>">
-                    <?php esc_html_e( '基本设置', 'libre-compress' ); ?>
+                <a href="<?php echo esc_url( admin_url( 'options-general.php?page=local-crush&tab=general' ) ); ?>" class="nav-tab <?php echo 'general' === $this->current_tab ? 'nav-tab-active' : ''; ?>">
+                    <?php esc_html_e( '基本设置', 'local-crush' ); ?>
                 </a>
-                <a href="<?php echo esc_url( admin_url( 'options-general.php?page=libre-compress&tab=tools' ) ); ?>" class="nav-tab <?php echo 'tools' === $this->current_tab ? 'nav-tab-active' : ''; ?>">
-                    <?php esc_html_e( '压缩工具', 'libre-compress' ); ?>
+                <a href="<?php echo esc_url( admin_url( 'options-general.php?page=local-crush&tab=tools' ) ); ?>" class="nav-tab <?php echo 'tools' === $this->current_tab ? 'nav-tab-active' : ''; ?>">
+                    <?php esc_html_e( '压缩工具', 'local-crush' ); ?>
                 </a>
             </nav>
 
@@ -1009,145 +1009,145 @@ class Libre_Compress_Settings {
     }
 
     private function render_general_tab() {
-        $options = get_option( 'libre_compress_general', array() );
-        $retention_days = Libre_Compress_Settings::normalize_retention_days( isset( $options['backup_retention_days'] ) ? $options['backup_retention_days'] : null );
+        $options = get_option( 'local_crush_general', array() );
+        $retention_days = Local_Crush_Settings::normalize_retention_days( isset( $options['backup_retention_days'] ) ? $options['backup_retention_days'] : null );
         $registered_sizes = wp_get_registered_image_subsizes();
-        $disabled_sizes   = Libre_Compress_Thumbnail_Manager::disabled_sizes();
+        $disabled_sizes   = Local_Crush_Thumbnail_Manager::disabled_sizes();
         ?>
         <style>
-            .libre-compress-seg { position: relative; display: inline-flex; background: #dcdcde; border-radius: 8px; padding: 3px; vertical-align: middle; }
-            .libre-compress-seg input { position: absolute; opacity: 0; width: 0; height: 0; pointer-events: none; }
-            .libre-compress-seg label { position: relative; z-index: 2; flex: 1; min-width: 64px; padding: 5px 16px; text-align: center; color: #50575e; font-weight: 500; cursor: pointer; border-radius: 6px; transition: color .15s; }
-            .libre-compress-seg .seg-thumb { position: absolute; z-index: 1; top: 3px; bottom: 3px; left: 3px; width: calc((100% - 6px) / 3); background: #fff; border-radius: 6px; box-shadow: 0 1px 3px rgba(0, 0, 0, .15); transition: transform .2s ease; }
-            #libre-compress-seg-avif:checked ~ .seg-thumb { transform: translateX(100%); }
-            #libre-compress-seg-jxl:checked ~ .seg-thumb { transform: translateX(200%); }
-            #libre-compress-seg-webp:checked ~ label[for="libre-compress-seg-webp"],
-            #libre-compress-seg-avif:checked ~ label[for="libre-compress-seg-avif"],
-            #libre-compress-seg-jxl:checked ~ label[for="libre-compress-seg-jxl"] { color: #1d2327; font-weight: 600; }
+            .local-crush-seg { position: relative; display: inline-flex; background: #dcdcde; border-radius: 8px; padding: 3px; vertical-align: middle; }
+            .local-crush-seg input { position: absolute; opacity: 0; width: 0; height: 0; pointer-events: none; }
+            .local-crush-seg label { position: relative; z-index: 2; flex: 1; min-width: 64px; padding: 5px 16px; text-align: center; color: #50575e; font-weight: 500; cursor: pointer; border-radius: 6px; transition: color .15s; }
+            .local-crush-seg .seg-thumb { position: absolute; z-index: 1; top: 3px; bottom: 3px; left: 3px; width: calc((100% - 6px) / 3); background: #fff; border-radius: 6px; box-shadow: 0 1px 3px rgba(0, 0, 0, .15); transition: transform .2s ease; }
+            #local-crush-seg-avif:checked ~ .seg-thumb { transform: translateX(100%); }
+            #local-crush-seg-jxl:checked ~ .seg-thumb { transform: translateX(200%); }
+            #local-crush-seg-webp:checked ~ label[for="local-crush-seg-webp"],
+            #local-crush-seg-avif:checked ~ label[for="local-crush-seg-avif"],
+            #local-crush-seg-jxl:checked ~ label[for="local-crush-seg-jxl"] { color: #1d2327; font-weight: 600; }
         </style>
         <form method="post" action="options.php">
-            <?php settings_fields( 'libre_compress_general_group' ); ?>
+            <?php settings_fields( 'local_crush_general_group' ); ?>
 
             <table class="form-table">
                 <tr>
-                    <th scope="row"><?php esc_html_e( '自动压缩', 'libre-compress' ); ?></th>
+                    <th scope="row"><?php esc_html_e( '自动压缩', 'local-crush' ); ?></th>
                     <td>
                         <label>
-                            <input type="checkbox" name="libre_compress_general[auto_compress]" value="1" <?php checked( ! empty( $options['auto_compress'] ) ); ?>>
-                            <?php esc_html_e( '上传图片时自动压缩', 'libre-compress' ); ?>
+                            <input type="checkbox" name="local_crush_general[auto_compress]" value="1" <?php checked( ! empty( $options['auto_compress'] ) ); ?>>
+                            <?php esc_html_e( '上传图片时自动压缩', 'local-crush' ); ?>
                         </label>
                     </td>
                 </tr>
                 <tr>
-                    <th scope="row"><?php esc_html_e( '备份原图', 'libre-compress' ); ?></th>
+                    <th scope="row"><?php esc_html_e( '备份原图', 'local-crush' ); ?></th>
                     <td>
                         <label>
-                            <input type="checkbox" name="libre_compress_general[backup_enabled]" value="1" <?php checked( $options['backup_enabled'] ?? true ); ?>>
-                            <?php esc_html_e( '压缩前备份原图', 'libre-compress' ); ?>
+                            <input type="checkbox" name="local_crush_general[backup_enabled]" value="1" <?php checked( $options['backup_enabled'] ?? true ); ?>>
+                            <?php esc_html_e( '压缩前备份原图', 'local-crush' ); ?>
                         </label>
                     </td>
                 </tr>
                 <tr>
-                    <th scope="row"><label for="libre-compress-retention-days"><?php esc_html_e( '原图备份保留时长', 'libre-compress' ); ?></label></th>
+                    <th scope="row"><label for="local-crush-retention-days"><?php esc_html_e( '原图备份保留时长', 'local-crush' ); ?></label></th>
                     <td>
-                        <input type="number" id="libre-compress-retention-days" name="libre_compress_general[backup_retention_days]" value="<?php echo esc_attr( $retention_days ); ?>" min="-1" step="1" class="small-text">
-                        <?php esc_html_e( '天', 'libre-compress' ); ?>
-                        <p class="description"><?php esc_html_e( '填 -1 表示永久保留；填天数则备份到期后自动删除，届时这张图将无法再恢复原图。0 无效，步进时会自动跳过 0。', 'libre-compress' ); ?></p>
+                        <input type="number" id="local-crush-retention-days" name="local_crush_general[backup_retention_days]" value="<?php echo esc_attr( $retention_days ); ?>" min="-1" step="1" class="small-text">
+                        <?php esc_html_e( '天', 'local-crush' ); ?>
+                        <p class="description"><?php esc_html_e( '填 -1 表示永久保留；填天数则备份到期后自动删除，届时这张图将无法再恢复原图。0 无效，步进时会自动跳过 0。', 'local-crush' ); ?></p>
                     </td>
                 </tr>
                 <tr>
-                    <th scope="row"><?php esc_html_e( '图片元数据', 'libre-compress' ); ?></th>
+                    <th scope="row"><?php esc_html_e( '图片元数据', 'local-crush' ); ?></th>
                     <td>
                         <label style="display:block;">
-                            <input type="checkbox" name="libre_compress_general[strip_metadata]" value="1" <?php checked( $options['strip_metadata'] ?? true ); ?>>
-                            <?php esc_html_e( '压缩时删除图片元数据', 'libre-compress' ); ?>
+                            <input type="checkbox" name="local_crush_general[strip_metadata]" value="1" <?php checked( $options['strip_metadata'] ?? true ); ?>>
+                            <?php esc_html_e( '压缩时删除图片元数据', 'local-crush' ); ?>
                         </label>
-                        <p class="description"><?php esc_html_e( '删除 EXIF、GPS 拍摄位置、设备型号、作者与软件信息等隐私数据，对同格式压缩与格式转换的所有路径都生效。ICC 色彩配置会尽量保留以免偏色；取消勾选则尽量保留元数据；经过解码再编码的路径（如 AVIF、动画 WebP）仍可能留不住全部元数据。', 'libre-compress' ); ?></p>
+                        <p class="description"><?php esc_html_e( '删除 EXIF、GPS 拍摄位置、设备型号、作者与软件信息等隐私数据，对同格式压缩与格式转换的所有路径都生效。ICC 色彩配置会尽量保留以免偏色；取消勾选则尽量保留元数据；经过解码再编码的路径（如 AVIF、动画 WebP）仍可能留不住全部元数据。', 'local-crush' ); ?></p>
                     </td>
                 </tr>
                 <tr>
-                    <th scope="row"><?php esc_html_e( '缩放画质', 'libre-compress' ); ?></th>
+                    <th scope="row"><?php esc_html_e( '缩放画质', 'local-crush' ); ?></th>
                     <td>
                         <label style="display:block;">
-                            <input type="checkbox" name="libre_compress_general[resize_lossless]" value="1" <?php checked( Libre_Compress_Settings::resize_is_lossless() ); ?>>
-                            <?php esc_html_e( '调整图片尺寸时把保存质量拉满', 'libre-compress' ); ?>
+                            <input type="checkbox" name="local_crush_general[resize_lossless]" value="1" <?php checked( Local_Crush_Settings::resize_is_lossless() ); ?>>
+                            <?php esc_html_e( '调整图片尺寸时把保存质量拉满', 'local-crush' ); ?>
                         </label>
-                        <p class="description"><?php esc_html_e( 'WordPress 生成缩略图和 -scaled 缩放图时，会用 GD / Imagick 把图片重新编码一遍，默认质量会把画质先损耗一次，压缩工具再怎么调也补不回来。勾选后，JPG、WebP、AVIF、JPEG XL 保存时一律用质量 100，先保住画质再交给各格式的专精工具压缩；PNG、GIF 这类本来就是无损编码，质量参数在它们身上会被换算成压缩级别，改它只会让文件变大，所以不碰。注意：JPG 是有损格式，质量 100 只是肉眼看不出差别，不是数学意义上的无损；代价是这一步的中间文件更大、生成缩略图稍慢。', 'libre-compress' ); ?></p>
+                        <p class="description"><?php esc_html_e( 'WordPress 生成缩略图和 -scaled 缩放图时，会用 GD / Imagick 把图片重新编码一遍，默认质量会把画质先损耗一次，压缩工具再怎么调也补不回来。勾选后，JPG、WebP、AVIF、JPEG XL 保存时一律用质量 100，先保住画质再交给各格式的专精工具压缩；PNG、GIF 这类本来就是无损编码，质量参数在它们身上会被换算成压缩级别，改它只会让文件变大，所以不碰。注意：JPG 是有损格式，质量 100 只是肉眼看不出差别，不是数学意义上的无损；代价是这一步的中间文件更大、生成缩略图稍慢。', 'local-crush' ); ?></p>
                     </td>
                 </tr>
                 <tr>
-                    <th scope="row"><?php esc_html_e( 'SVG 上传', 'libre-compress' ); ?></th>
+                    <th scope="row"><?php esc_html_e( 'SVG 上传', 'local-crush' ); ?></th>
                     <td>
                         <label>
-                            <input type="checkbox" name="libre_compress_general[allow_svg_upload]" value="1" <?php checked( ! empty( $options['allow_svg_upload'] ) ); ?>>
-                            <?php esc_html_e( '允许上传 SVG 文件', 'libre-compress' ); ?>
+                            <input type="checkbox" name="local_crush_general[allow_svg_upload]" value="1" <?php checked( ! empty( $options['allow_svg_upload'] ) ); ?>>
+                            <?php esc_html_e( '允许上传 SVG 文件', 'local-crush' ); ?>
                         </label>
-                        <p class="description"><?php esc_html_e( '上传时自动清理脚本等危险内容；SVG 可能被用于 XSS 攻击，仅在信任上传者时开启。', 'libre-compress' ); ?></p>
+                        <p class="description"><?php esc_html_e( '上传时自动清理脚本等危险内容；SVG 可能被用于 XSS 攻击，仅在信任上传者时开启。', 'local-crush' ); ?></p>
                     </td>
                 </tr>
                 <tr>
-                    <th scope="row"><?php esc_html_e( '格式转换', 'libre-compress' ); ?></th>
+                    <th scope="row"><?php esc_html_e( '格式转换', 'local-crush' ); ?></th>
                     <td>
                         <label>
-                            <input type="checkbox" name="libre_compress_general[output_png]" value="1" <?php checked( ! empty( $options['output_png'] ) ); ?>>
-                            <?php esc_html_e( 'PNG', 'libre-compress' ); ?>
+                            <input type="checkbox" name="local_crush_general[output_png]" value="1" <?php checked( ! empty( $options['output_png'] ) ); ?>>
+                            <?php esc_html_e( 'PNG', 'local-crush' ); ?>
                         </label>
                         &nbsp;&nbsp;
                         <label>
-                            <input type="checkbox" name="libre_compress_general[output_jpg]" value="1" <?php checked( ! empty( $options['output_jpg'] ) ); ?>>
-                            <?php esc_html_e( 'JPG', 'libre-compress' ); ?>
+                            <input type="checkbox" name="local_crush_general[output_jpg]" value="1" <?php checked( ! empty( $options['output_jpg'] ) ); ?>>
+                            <?php esc_html_e( 'JPG', 'local-crush' ); ?>
                         </label>
                         &nbsp;&nbsp;
                         <label>
-                            <input type="checkbox" name="libre_compress_general[output_gif]" value="1" <?php checked( ! empty( $options['output_gif'] ) ); ?>>
-                            <?php esc_html_e( 'GIF', 'libre-compress' ); ?>
+                            <input type="checkbox" name="local_crush_general[output_gif]" value="1" <?php checked( ! empty( $options['output_gif'] ) ); ?>>
+                            <?php esc_html_e( 'GIF', 'local-crush' ); ?>
                         </label>
                         &nbsp;&nbsp;
                         <label>
-                            <input type="checkbox" name="libre_compress_general[output_apng]" value="1" <?php checked( ! empty( $options['output_apng'] ) ); ?>>
-                            <?php esc_html_e( 'APNG', 'libre-compress' ); ?>
+                            <input type="checkbox" name="local_crush_general[output_apng]" value="1" <?php checked( ! empty( $options['output_apng'] ) ); ?>>
+                            <?php esc_html_e( 'APNG', 'local-crush' ); ?>
                         </label>
-                        <p class="description"><?php esc_html_e( '勾选的源格式执行压缩时输出为目标格式；未勾选的格式只执行同格式压缩。所有成功结果都记为已压缩。只有 PNG、JPG、GIF、APNG 能转换格式：APNG 由自己的勾选单独控制，与 PNG 无关，不勾就只做无损压缩。WebP、AVIF、JPEG XL 无论静图动图都只做同格式压缩，不会再来一遍转换。动图整张交给支持动画和透明背景的工具处理，插件不拆帧、不修改透明像素。', 'libre-compress' ); ?></p>
+                        <p class="description"><?php esc_html_e( '勾选的源格式执行压缩时输出为目标格式；未勾选的格式只执行同格式压缩。所有成功结果都记为已压缩。只有 PNG、JPG、GIF、APNG 能转换格式：APNG 由自己的勾选单独控制，与 PNG 无关，不勾就只做无损压缩。WebP、AVIF、JPEG XL 无论静图动图都只做同格式压缩，不会再来一遍转换。动图整张交给支持动画和透明背景的工具处理，插件不拆帧、不修改透明像素。', 'local-crush' ); ?></p>
                     </td>
                 </tr>
                 <tr>
-                    <th scope="row"><?php esc_html_e( '兼容格式回退', 'libre-compress' ); ?></th>
+                    <th scope="row"><?php esc_html_e( '兼容格式回退', 'local-crush' ); ?></th>
                     <td>
                         <label style="display:block;">
-                            <input type="checkbox" name="libre_compress_general[fallback_enabled]" value="1" <?php checked( $options['fallback_enabled'] ?? false ); ?>>
-                            <?php esc_html_e( '为转换后的图片提供旧格式回退', 'libre-compress' ); ?>
+                            <input type="checkbox" name="local_crush_general[fallback_enabled]" value="1" <?php checked( $options['fallback_enabled'] ?? false ); ?>>
+                            <?php esc_html_e( '为转换后的图片提供旧格式回退', 'local-crush' ); ?>
                         </label>
-                        <p class="description"><?php esc_html_e( '开启后，格式转换会把旧格式文件原地留下并同样压缩，新的 WebP/AVIF 以“原文件名.webp”“原文件名.avif”的双扩展名形式生成，前台用 <picture> 输出：支持新格式的浏览器加载新格式，不支持的浏览器加载同样压缩过的旧格式。关闭后转换不再保留旧格式文件，新格式直接替换源文件，前台也只输出新格式。此前已转换的图片仍留着旧格式文件，可用下方的“删除所有兼容格式回退”清理。', 'libre-compress' ); ?></p>
+                        <p class="description"><?php esc_html_e( '开启后，格式转换会把旧格式文件原地留下并同样压缩，新的 WebP/AVIF 以“原文件名.webp”“原文件名.avif”的双扩展名形式生成，前台用 <picture> 输出：支持新格式的浏览器加载新格式，不支持的浏览器加载同样压缩过的旧格式。关闭后转换不再保留旧格式文件，新格式直接替换源文件，前台也只输出新格式。此前已转换的图片仍留着旧格式文件，可用下方的“删除所有兼容格式回退”清理。', 'local-crush' ); ?></p>
                     </td>
                 </tr>
                 <tr>
-                    <th scope="row"><?php esc_html_e( '目标格式', 'libre-compress' ); ?></th>
+                    <th scope="row"><?php esc_html_e( '目标格式', 'local-crush' ); ?></th>
                     <td>
-                        <span class="libre-compress-seg">
-                            <input type="radio" name="libre_compress_general[output_format]" value="webp" id="libre-compress-seg-webp" <?php checked( ( $options['output_format'] ?? 'avif' ), 'webp' ); ?>>
-                            <label for="libre-compress-seg-webp"><?php esc_html_e( 'WebP', 'libre-compress' ); ?></label>
-                            <input type="radio" name="libre_compress_general[output_format]" value="avif" id="libre-compress-seg-avif" <?php checked( ( $options['output_format'] ?? 'avif' ), 'avif' ); ?>>
-                            <label for="libre-compress-seg-avif"><?php esc_html_e( 'AVIF', 'libre-compress' ); ?></label>
-                            <input type="radio" name="libre_compress_general[output_format]" value="jxl" id="libre-compress-seg-jxl" <?php checked( ( $options['output_format'] ?? 'avif' ), 'jxl' ); ?>>
-                            <label for="libre-compress-seg-jxl"><?php esc_html_e( 'JPEG XL', 'libre-compress' ); ?></label>
+                        <span class="local-crush-seg">
+                            <input type="radio" name="local_crush_general[output_format]" value="webp" id="local-crush-seg-webp" <?php checked( ( $options['output_format'] ?? 'avif' ), 'webp' ); ?>>
+                            <label for="local-crush-seg-webp"><?php esc_html_e( 'WebP', 'local-crush' ); ?></label>
+                            <input type="radio" name="local_crush_general[output_format]" value="avif" id="local-crush-seg-avif" <?php checked( ( $options['output_format'] ?? 'avif' ), 'avif' ); ?>>
+                            <label for="local-crush-seg-avif"><?php esc_html_e( 'AVIF', 'local-crush' ); ?></label>
+                            <input type="radio" name="local_crush_general[output_format]" value="jxl" id="local-crush-seg-jxl" <?php checked( ( $options['output_format'] ?? 'avif' ), 'jxl' ); ?>>
+                            <label for="local-crush-seg-jxl"><?php esc_html_e( 'JPEG XL', 'local-crush' ); ?></label>
                             <span class="seg-thumb"></span>
                         </span>
-                        <p class="description"><?php esc_html_e( '选择目标格式：AVIF 压缩率更高但压缩更慢，WebP 兼容性最好，JPEG XL 同画质体积最小但浏览器支持仍不完整（动画 JXL 更是只有少数浏览器能播），选 JPEG XL 时建议同时开启上面的“兼容格式回退”。', 'libre-compress' ); ?></p>
+                        <p class="description"><?php esc_html_e( '选择目标格式：AVIF 压缩率更高但压缩更慢，WebP 兼容性最好，JPEG XL 同画质体积最小但浏览器支持仍不完整（动画 JXL 更是只有少数浏览器能播），选 JPEG XL 时建议同时开启上面的“兼容格式回退”。', 'local-crush' ); ?></p>
                     </td>
                 </tr>
                 <tr>
-                    <th scope="row"><?php esc_html_e( '缩略图尺寸', 'libre-compress' ); ?></th>
+                    <th scope="row"><?php esc_html_e( '缩略图尺寸', 'local-crush' ); ?></th>
                     <td>
                         <label style="display:block; margin-bottom:10px;">
-                            <input type="checkbox" name="libre_compress_general[image_scale_enabled]" value="1" <?php checked( Libre_Compress_Settings::image_scale_enabled() ); ?>>
-                            <?php esc_html_e( '自动缩放超尺寸的主图，阈值', 'libre-compress' ); ?>
-                            <input type="number" name="libre_compress_general[image_size_threshold]" value="<?php echo esc_attr( Libre_Compress_Settings::image_size_threshold() ); ?>" min="1" max="20000" step="1" class="small-text">
-                            <?php esc_html_e( '像素', 'libre-compress' ); ?>
+                            <input type="checkbox" name="local_crush_general[image_scale_enabled]" value="1" <?php checked( Local_Crush_Settings::image_scale_enabled() ); ?>>
+                            <?php esc_html_e( '自动缩放超尺寸的主图，阈值', 'local-crush' ); ?>
+                            <input type="number" name="local_crush_general[image_size_threshold]" value="<?php echo esc_attr( Local_Crush_Settings::image_size_threshold() ); ?>" min="1" max="20000" step="1" class="small-text">
+                            <?php esc_html_e( '像素', 'local-crush' ); ?>
                         </label>
-                        <p class="description" style="margin-top:0;"><?php esc_html_e( '勾选后，上传或补生成缩略图时，宽或高超过此阈值的主图会另存为 -scaled 缩放图并接管主文件，未缩放的源文件仍留在磁盘上；不勾选则关闭自动缩放，原图直接投入使用。压缩已有图片时不会改动缩放，改动缩放请用下方的“删除未勾选尺寸的缩略图”和“补生成缺失尺寸的缩略图”两个按钮。默认 2560，与 WordPress 默认一致。', 'libre-compress' ); ?></p>
+                        <p class="description" style="margin-top:0;"><?php esc_html_e( '勾选后，上传或补生成缩略图时，宽或高超过此阈值的主图会另存为 -scaled 缩放图并接管主文件，未缩放的源文件仍留在磁盘上；不勾选则关闭自动缩放，原图直接投入使用。压缩已有图片时不会改动缩放，改动缩放请用下方的“删除未勾选尺寸的缩略图”和“补生成缺失尺寸的缩略图”两个按钮。默认 2560，与 WordPress 默认一致。', 'local-crush' ); ?></p>
                         <div style="margin-top:14px;">
                             <?php if ( empty( $registered_sizes ) ) : ?>
-                                <p class="description"><?php esc_html_e( '当前没有注册额外的缩略图尺寸。', 'libre-compress' ); ?></p>
+                                <p class="description"><?php esc_html_e( '当前没有注册额外的缩略图尺寸。', 'local-crush' ); ?></p>
                             <?php else : ?>
                                 <?php foreach ( $registered_sizes as $size_name => $size_config ) : ?>
                                     <?php
@@ -1156,18 +1156,18 @@ class Libre_Compress_Settings {
                                     // 宽或高为 0 表示该方向不限，由 WordPress 按原图比例自动推算。
                                     $dimension = sprintf(
                                         '%1$s×%2$s',
-                                        $width > 0 ? $width : __( '自动', 'libre-compress' ),
-                                        $height > 0 ? $height : __( '自动', 'libre-compress' )
+                                        $width > 0 ? $width : __( '自动', 'local-crush' ),
+                                        $height > 0 ? $height : __( '自动', 'local-crush' )
                                     );
-                                    $crop      = empty( $size_config['crop'] ) ? __( '等比', 'libre-compress' ) : __( '裁剪', 'libre-compress' );
+                                    $crop      = empty( $size_config['crop'] ) ? __( '等比', 'local-crush' ) : __( '裁剪', 'local-crush' );
                                     ?>
                                     <label style="display:block;">
-                                        <input type="hidden" name="libre_compress_general[thumbnail_state][<?php echo esc_attr( $size_name ); ?>]" value="0">
-                                        <input type="checkbox" name="libre_compress_general[thumbnail_state][<?php echo esc_attr( $size_name ); ?>]" value="1" <?php checked( ! in_array( $size_name, $disabled_sizes, true ) ); ?>>
+                                        <input type="hidden" name="local_crush_general[thumbnail_state][<?php echo esc_attr( $size_name ); ?>]" value="0">
+                                        <input type="checkbox" name="local_crush_general[thumbnail_state][<?php echo esc_attr( $size_name ); ?>]" value="1" <?php checked( ! in_array( $size_name, $disabled_sizes, true ) ); ?>>
                                         <?php
                                         printf(
                                             /* translators: 1: 尺寸名, 2: 目标像素, 3: 裁剪方式 */
-                                            esc_html__( '%1$s（%2$s，%3$s）', 'libre-compress' ),
+                                            esc_html__( '%1$s（%2$s，%3$s）', 'local-crush' ),
                                             esc_html( $size_name ),
                                             esc_html( $dimension ),
                                             esc_html( $crop )
@@ -1175,7 +1175,7 @@ class Libre_Compress_Settings {
                                         ?>
                                     </label>
                                 <?php endforeach; ?>
-                                <p class="description"><?php esc_html_e( '取消勾选的尺寸在上传图片时不再生成；已经存在的文件用下方“删除未勾选尺寸的缩略图”清理。以后新注册的尺寸默认勾选。', 'libre-compress' ); ?></p>
+                                <p class="description"><?php esc_html_e( '取消勾选的尺寸在上传图片时不再生成；已经存在的文件用下方“删除未勾选尺寸的缩略图”清理。以后新注册的尺寸默认勾选。', 'local-crush' ); ?></p>
                             <?php endif; ?>
                         </div>
                     </td>
@@ -1190,89 +1190,89 @@ class Libre_Compress_Settings {
         <table class="form-table">
             <tr>
                 <td style="width: 200px; padding: 10px 0;">
-                    <button type="button" class="button" id="libre-compress-bulk-compress">
-                        <?php esc_html_e( '批量压缩未压缩的图片', 'libre-compress' ); ?>
+                    <button type="button" class="button" id="local-crush-bulk-compress">
+                        <?php esc_html_e( '批量压缩未压缩的图片', 'local-crush' ); ?>
                     </button>
                 </td>
                 <td style="padding: 10px 0;">
-                    <span class="description"><?php esc_html_e( '按当前设置压缩媒体库中所有未压缩的图片', 'libre-compress' ); ?></span>
+                    <span class="description"><?php esc_html_e( '按当前设置压缩媒体库中所有未压缩的图片', 'local-crush' ); ?></span>
                 </td>
             </tr>
             <tr>
                 <td style="padding: 10px 0;">
-                    <button type="button" class="button" id="libre-compress-restore-all">
-                        <?php esc_html_e( '恢复所有原图备份', 'libre-compress' ); ?>
+                    <button type="button" class="button" id="local-crush-restore-all">
+                        <?php esc_html_e( '恢复所有原图备份', 'local-crush' ); ?>
                     </button>
                 </td>
                 <td style="padding: 10px 0;">
-                    <span class="description"><?php esc_html_e( '将所有已压缩的图片恢复为原图', 'libre-compress' ); ?></span>
+                    <span class="description"><?php esc_html_e( '将所有已压缩的图片恢复为原图', 'local-crush' ); ?></span>
                 </td>
             </tr>
             <tr>
                 <td style="padding: 10px 0;">
-                    <button type="button" class="button" id="libre-compress-delete-all-backups">
-                        <?php esc_html_e( '删除所有原图备份', 'libre-compress' ); ?>
+                    <button type="button" class="button" id="local-crush-delete-all-backups">
+                        <?php esc_html_e( '删除所有原图备份', 'local-crush' ); ?>
                     </button>
                 </td>
                 <td style="padding: 10px 0;">
-                    <span class="description"><?php esc_html_e( '删除所有备份文件，释放磁盘空间', 'libre-compress' ); ?></span>
+                    <span class="description"><?php esc_html_e( '删除所有备份文件，释放磁盘空间', 'local-crush' ); ?></span>
                 </td>
             </tr>
             <tr>
                 <td style="padding: 10px 0;">
-                    <button type="button" class="button" id="libre-compress-delete-all-fallbacks">
-                        <?php esc_html_e( '删除所有兼容格式回退', 'libre-compress' ); ?>
+                    <button type="button" class="button" id="local-crush-delete-all-fallbacks">
+                        <?php esc_html_e( '删除所有兼容格式回退', 'local-crush' ); ?>
                     </button>
                 </td>
                 <td style="padding: 10px 0;">
-                    <span class="description"><?php esc_html_e( '删除媒体库中转换后保留的旧格式回退文件，并把文章里指向它们的图片链接改到新格式；删除后不支持新格式的浏览器将直接加载新格式图片', 'libre-compress' ); ?></span>
+                    <span class="description"><?php esc_html_e( '删除媒体库中转换后保留的旧格式回退文件，并把文章里指向它们的图片链接改到新格式；删除后不支持新格式的浏览器将直接加载新格式图片', 'local-crush' ); ?></span>
                 </td>
             </tr>
             <tr>
                 <td style="padding: 10px 0;">
-                    <button type="button" class="button" id="libre-compress-delete-thumbnails">
-                        <?php esc_html_e( '删除未勾选尺寸的缩略图', 'libre-compress' ); ?>
+                    <button type="button" class="button" id="local-crush-delete-thumbnails">
+                        <?php esc_html_e( '删除未勾选尺寸的缩略图', 'local-crush' ); ?>
                     </button>
                 </td>
                 <td style="padding: 10px 0;">
-                    <span class="description"><?php esc_html_e( '删除未勾选尺寸已存在的缩略图，文章里指向它们的图片链接会改到面积最接近的现有尺寸；若关闭了自动缩放，或现有 -scaled 缩放图与阈值不符，也会删除缩放图让主图退回原图', 'libre-compress' ); ?></span>
+                    <span class="description"><?php esc_html_e( '删除未勾选尺寸已存在的缩略图，文章里指向它们的图片链接会改到面积最接近的现有尺寸；若关闭了自动缩放，或现有 -scaled 缩放图与阈值不符，也会删除缩放图让主图退回原图', 'local-crush' ); ?></span>
                 </td>
             </tr>
             <tr>
                 <td style="padding: 10px 0;">
-                    <button type="button" class="button" id="libre-compress-generate-thumbnails">
-                        <?php esc_html_e( '补生成缺失尺寸的缩略图', 'libre-compress' ); ?>
+                    <button type="button" class="button" id="local-crush-generate-thumbnails">
+                        <?php esc_html_e( '补生成缺失尺寸的缩略图', 'local-crush' ); ?>
                     </button>
                 </td>
                 <td style="padding: 10px 0;">
-                    <span class="description"><?php esc_html_e( '为已勾选但缺失的尺寸补生成缩略图；若开启了自动缩放且主图超过阈值，还会生成或修正 -scaled 缩放图。不会重建已存在的缩略图，纯缩略图缺失也不改动文章链接', 'libre-compress' ); ?></span>
+                    <span class="description"><?php esc_html_e( '为已勾选但缺失的尺寸补生成缩略图；若开启了自动缩放且主图超过阈值，还会生成或修正 -scaled 缩放图。不会重建已存在的缩略图，纯缩略图缺失也不改动文章链接', 'local-crush' ); ?></span>
                 </td>
             </tr>
         </table>
 
         <?php
-        // 批量操作由服务器自己在后台一批批地跑（见 Libre_Compress_Task），
+        // 批量操作由服务器自己在后台一批批地跑（见 Local_Crush_Task），
         // 这里的面板只负责把进度摆出来给用户看，初始状态由脚本数据带过去。
         ?>
         <style>
-            .libre-compress-task { margin-top: 12px; padding: 12px 14px; max-width: 900px; background: #fff; border: 1px solid #c3c4c7; border-left: 4px solid #2271b1; border-radius: 3px; }
-            .libre-compress-task.is-done { border-left-color: #00a32a; }
-            .libre-compress-task.is-stopped { border-left-color: #dba617; }
-            .libre-compress-task-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 8px; }
-            .libre-compress-task-head .task-label { font-size: 14px; }
-            .libre-compress-task-head .task-status { color: #646970; font-size: 12px; }
-            .libre-compress-task .task-bar { position: relative; height: 22px; background: #f0f0f1; border-radius: 3px; overflow: hidden; }
-            .libre-compress-task .task-bar-fill { width: 0; height: 100%; background: #2271b1; border-radius: 3px; transition: width .3s ease; }
-            .libre-compress-task.is-done .task-bar-fill { background: #00a32a; }
-            .libre-compress-task.is-stopped .task-bar-fill { background: #dba617; }
-            .libre-compress-task .task-bar-text { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 12px; color: #1d2327; }
-            .libre-compress-task .task-line { margin: 8px 0 0; color: #50575e; font-size: 13px; }
-            .libre-compress-task .task-current { word-break: break-all; }
-            .libre-compress-task .task-summary { margin: 10px 0 0; white-space: pre-line; font-size: 13px; color: #1d2327; }
-            .libre-compress-task .task-actions { margin: 10px 0 0; display: flex; flex-wrap: wrap; gap: 8px; }
+            .local-crush-task { margin-top: 12px; padding: 12px 14px; max-width: 900px; background: #fff; border: 1px solid #c3c4c7; border-left: 4px solid #2271b1; border-radius: 3px; }
+            .local-crush-task.is-done { border-left-color: #00a32a; }
+            .local-crush-task.is-stopped { border-left-color: #dba617; }
+            .local-crush-task-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 8px; }
+            .local-crush-task-head .task-label { font-size: 14px; }
+            .local-crush-task-head .task-status { color: #646970; font-size: 12px; }
+            .local-crush-task .task-bar { position: relative; height: 22px; background: #f0f0f1; border-radius: 3px; overflow: hidden; }
+            .local-crush-task .task-bar-fill { width: 0; height: 100%; background: #2271b1; border-radius: 3px; transition: width .3s ease; }
+            .local-crush-task.is-done .task-bar-fill { background: #00a32a; }
+            .local-crush-task.is-stopped .task-bar-fill { background: #dba617; }
+            .local-crush-task .task-bar-text { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 12px; color: #1d2327; }
+            .local-crush-task .task-line { margin: 8px 0 0; color: #50575e; font-size: 13px; }
+            .local-crush-task .task-current { word-break: break-all; }
+            .local-crush-task .task-summary { margin: 10px 0 0; white-space: pre-line; font-size: 13px; color: #1d2327; }
+            .local-crush-task .task-actions { margin: 10px 0 0; display: flex; flex-wrap: wrap; gap: 8px; }
         </style>
-        <div id="libre-compress-task" class="libre-compress-task" style="display: none;">
-            <div class="libre-compress-task-head">
+        <div id="local-crush-task" class="local-crush-task" style="display: none;">
+            <div class="local-crush-task-head">
                 <strong class="task-label"></strong>
                 <span class="task-status"></span>
             </div>
@@ -1285,21 +1285,21 @@ class Libre_Compress_Settings {
             <p class="task-line task-current"></p>
             <p class="task-summary"></p>
             <p class="task-actions">
-                <button type="button" class="button" id="libre-compress-task-stop"><?php esc_html_e( '停止任务', 'libre-compress' ); ?></button>
-                <button type="button" class="button" id="libre-compress-task-resume"><?php esc_html_e( '继续执行', 'libre-compress' ); ?></button>
-                <button type="button" class="button" id="libre-compress-task-retry"><?php esc_html_e( '重试失败的项目', 'libre-compress' ); ?></button>
-                <button type="button" class="button" id="libre-compress-task-dismiss"><?php esc_html_e( '完成', 'libre-compress' ); ?></button>
+                <button type="button" class="button" id="local-crush-task-stop"><?php esc_html_e( '停止任务', 'local-crush' ); ?></button>
+                <button type="button" class="button" id="local-crush-task-resume"><?php esc_html_e( '继续执行', 'local-crush' ); ?></button>
+                <button type="button" class="button" id="local-crush-task-retry"><?php esc_html_e( '重试失败的项目', 'local-crush' ); ?></button>
+                <button type="button" class="button" id="local-crush-task-dismiss"><?php esc_html_e( '完成', 'local-crush' ); ?></button>
             </p>
         </div>
         <?php
     }
 
     private function render_tools_tab() {
-        $compressor       = libre_compress()->compressor;
-        $output_processor = libre_compress()->output_processor;
+        $compressor       = local_crush()->compressor;
+        $output_processor = local_crush()->output_processor;
         $tools            = $compressor->get_tools();
 
-        $proc_open_available = Libre_Compress_Tool_Base::is_command_execution_available();
+        $proc_open_available = Local_Crush_Tool_Base::is_command_execution_available();
 
         // 全部压缩工具，按格式相邻排序：同格式的排在一起，编码/解码工具也挨着放
         $all_tools = array(
@@ -1329,7 +1329,7 @@ class Libre_Compress_Settings {
             }
         }
         ?>
-        <h2><?php esc_html_e( '系统状态', 'libre-compress' ); ?></h2>
+        <h2><?php esc_html_e( '系统状态', 'local-crush' ); ?></h2>
         <table class="widefat" style="max-width: 900px; table-layout: fixed;">
             <colgroup>
                 <col style="width: 130px;">
@@ -1341,21 +1341,21 @@ class Libre_Compress_Settings {
                 <td><strong>proc_open()</strong></td>
                 <td>
                     <?php if ( $proc_open_available ) : ?>
-                        <span style="color: #00a32a;">✓ <?php esc_html_e( '可用', 'libre-compress' ); ?></span>
+                        <span style="color: #00a32a;">✓ <?php esc_html_e( '可用', 'local-crush' ); ?></span>
                     <?php else : ?>
-                        <span><?php esc_html_e( '不可用', 'libre-compress' ); ?></span>
+                        <span><?php esc_html_e( '不可用', 'local-crush' ); ?></span>
                     <?php endif; ?>
                 </td>
                 <td>
                     <?php if ( ! $proc_open_available ) : ?>
-                        <span class="description"><?php esc_html_e( '插件的所有压缩都靠 proc_open() 直接启动命令行工具，请联系主机商启用', 'libre-compress' ); ?></span>
+                        <span class="description"><?php esc_html_e( '插件的所有压缩都靠 proc_open() 直接启动命令行工具，请联系主机商启用', 'local-crush' ); ?></span>
                     <?php endif; ?>
                 </td>
                 <td></td>
             </tr>
         </table>
 
-        <h2><?php esc_html_e( '工具状态', 'libre-compress' ); ?></h2>
+        <h2><?php esc_html_e( '工具状态', 'local-crush' ); ?></h2>
         <table class="widefat" style="max-width: 900px; table-layout: fixed;">
             <colgroup>
                 <col style="width: 130px;">
@@ -1365,10 +1365,10 @@ class Libre_Compress_Settings {
             </colgroup>
             <thead>
                 <tr>
-                    <th><?php esc_html_e( '工具', 'libre-compress' ); ?></th>
-                    <th><?php esc_html_e( '状态', 'libre-compress' ); ?></th>
-                    <th><?php esc_html_e( '安装路径', 'libre-compress' ); ?></th>
-                    <th><?php esc_html_e( '链接', 'libre-compress' ); ?></th>
+                    <th><?php esc_html_e( '工具', 'local-crush' ); ?></th>
+                    <th><?php esc_html_e( '状态', 'local-crush' ); ?></th>
+                    <th><?php esc_html_e( '安装路径', 'local-crush' ); ?></th>
+                    <th><?php esc_html_e( '链接', 'local-crush' ); ?></th>
                 </tr>
             </thead>
             <tbody>
@@ -1377,9 +1377,9 @@ class Libre_Compress_Settings {
                         <td><strong><?php echo esc_html( $row['name'] ); ?></strong></td>
                         <td>
                             <?php if ( $row['available'] ) : ?>
-                                <span style="color: #00a32a;">✓ <?php esc_html_e( '已安装', 'libre-compress' ); ?></span>
+                                <span style="color: #00a32a;">✓ <?php esc_html_e( '已安装', 'local-crush' ); ?></span>
                             <?php else : ?>
-                                <span><?php esc_html_e( '未安装', 'libre-compress' ); ?></span>
+                                <span><?php esc_html_e( '未安装', 'local-crush' ); ?></span>
                             <?php endif; ?>
                         </td>
                         <td>
@@ -1391,7 +1391,7 @@ class Libre_Compress_Settings {
                         </td>
                         <td>
                             <a href="<?php echo esc_url( $row['url'] ); ?>" target="_blank" rel="noopener noreferrer">
-                                <?php esc_html_e( '跳转', 'libre-compress' ); ?>
+                                <?php esc_html_e( '跳转', 'local-crush' ); ?>
                             </a>
                         </td>
                     </tr>
@@ -1400,16 +1400,16 @@ class Libre_Compress_Settings {
         </table>
 
         <p class="description" style="max-width: 900px; margin-top: 10px;">
-            <?php esc_html_e( '安装方式：① 把可执行文件直接放进 /wp-content/LibreCompress-bin 目录；② 把工具所在文件夹加入系统 Path 环境变量；③ 使用包管理器安装。', 'libre-compress' ); ?>
+            <?php esc_html_e( '安装方式：① 把可执行文件直接放进 /wp-content/LocalCrush-bin 目录；② 把工具所在文件夹加入系统 Path 环境变量；③ 使用包管理器安装。', 'local-crush' ); ?>
         </p>
 
-        <h2 style="margin-top: 30px;"><?php esc_html_e( '路径支持状态', 'libre-compress' ); ?></h2>
+        <h2 style="margin-top: 30px;"><?php esc_html_e( '路径支持状态', 'local-crush' ); ?></h2>
         <table class="widefat" style="max-width: 900px;">
             <thead>
                 <tr>
-                    <th style="width: 220px;"><?php esc_html_e( '路径', 'libre-compress' ); ?></th>
-                    <th><?php esc_html_e( '依赖', 'libre-compress' ); ?></th>
-                    <th style="width: 280px;"><?php esc_html_e( '状态', 'libre-compress' ); ?></th>
+                    <th style="width: 220px;"><?php esc_html_e( '路径', 'local-crush' ); ?></th>
+                    <th><?php esc_html_e( '依赖', 'local-crush' ); ?></th>
+                    <th style="width: 280px;"><?php esc_html_e( '状态', 'local-crush' ); ?></th>
                 </tr>
             </thead>
             <tbody>
@@ -1419,11 +1419,11 @@ class Libre_Compress_Settings {
                         <td><?php echo wp_kses_post( $row['deps_display'] ); ?></td>
                         <td>
                             <?php if ( $row['supported'] ) : ?>
-                                <span style="color: #00a32a;">✓ <?php esc_html_e( '支持', 'libre-compress' ); ?></span>
+                                <span style="color: #00a32a;">✓ <?php esc_html_e( '支持', 'local-crush' ); ?></span>
                             <?php else : ?>
-                                <span><?php esc_html_e( '不支持', 'libre-compress' ); ?></span>
+                                <span><?php esc_html_e( '不支持', 'local-crush' ); ?></span>
                                 <?php if ( ! empty( $row['missing'] ) ) : ?>
-                                    <span class="description">— <?php echo esc_html( sprintf( __( '缺少：%s', 'libre-compress' ), implode( '、', $row['missing'] ) ) ); ?></span>
+                                    <span class="description">— <?php echo esc_html( sprintf( __( '缺少：%s', 'local-crush' ), implode( '、', $row['missing'] ) ) ); ?></span>
                                 <?php endif; ?>
                             <?php endif; ?>
                         </td>
@@ -1434,12 +1434,12 @@ class Libre_Compress_Settings {
 
         <hr>
 
-        <h2><?php esc_html_e( '压缩参数', 'libre-compress' ); ?></h2>
+        <h2><?php esc_html_e( '压缩参数', 'local-crush' ); ?></h2>
         <p class="description" style="max-width: 900px;">
-            <?php esc_html_e( '参数按压缩路径分组：只有整条工具链完全一致的路径才共用一节，其余各自独立，改了不会连带改到别的路径。输入框后面标的就是它实际传给哪个工具的哪个参数，取值也就是工具本身的取值范围，插件不做换算、不折算档位，你填多少就传多少；只有超出范围时保存时会收到该参数的边界值，免得把非法数字塞给工具。没列出来的参数一律不传，由工具用自己内部的默认值。改动只影响之后的压缩，已经压好的图片不会自动重压。', 'libre-compress' ); ?>
+            <?php esc_html_e( '参数按压缩路径分组：只有整条工具链完全一致的路径才共用一节，其余各自独立，改了不会连带改到别的路径。输入框后面标的就是它实际传给哪个工具的哪个参数，取值也就是工具本身的取值范围，插件不做换算、不折算档位，你填多少就传多少；只有超出范围时保存时会收到该参数的边界值，免得把非法数字塞给工具。没列出来的参数一律不传，由工具用自己内部的默认值。改动只影响之后的压缩，已经压好的图片不会自动重压。', 'local-crush' ); ?>
         </p>
         <form method="post" action="options.php">
-            <?php settings_fields( 'libre_compress_tools_group' ); ?>
+            <?php settings_fields( 'local_crush_tools_group' ); ?>
 
             <?php
             // 一个工具一个分组：同一个工具的静图、动图、同格式压缩与格式转换共用一套参数。
@@ -1471,35 +1471,35 @@ class Libre_Compress_Settings {
      */
     private function render_param_row( string $key, array $param ): void {
         $value = self::param( $key );
-        $id    = 'libre-compress-' . $key;
+        $id    = 'local-crush-' . $key;
         ?>
         <tr>
             <th scope="row"><label for="<?php echo esc_attr( $id ); ?>"><?php echo esc_html( $param['label'] ); ?></label></th>
             <td>
                 <?php if ( 'mode' === $param['type'] ) : ?>
                     <label>
-                        <input type="radio" name="libre_compress_tools[<?php echo esc_attr( $key ); ?>]" value="lossy" <?php checked( $value, 'lossy' ); ?>>
-                        <?php esc_html_e( '有损压缩', 'libre-compress' ); ?>
+                        <input type="radio" name="local_crush_tools[<?php echo esc_attr( $key ); ?>]" value="lossy" <?php checked( $value, 'lossy' ); ?>>
+                        <?php esc_html_e( '有损压缩', 'local-crush' ); ?>
                     </label>
                     &nbsp;&nbsp;
                     <label>
-                        <input type="radio" name="libre_compress_tools[<?php echo esc_attr( $key ); ?>]" value="lossless" <?php checked( $value, 'lossless' ); ?>>
-                        <?php esc_html_e( '无损压缩', 'libre-compress' ); ?>
+                        <input type="radio" name="local_crush_tools[<?php echo esc_attr( $key ); ?>]" value="lossless" <?php checked( $value, 'lossless' ); ?>>
+                        <?php esc_html_e( '无损压缩', 'local-crush' ); ?>
                     </label>
                 <?php elseif ( 'choice' === $param['type'] ) : ?>
-                    <select id="<?php echo esc_attr( $id ); ?>" name="libre_compress_tools[<?php echo esc_attr( $key ); ?>]">
+                    <select id="<?php echo esc_attr( $id ); ?>" name="local_crush_tools[<?php echo esc_attr( $key ); ?>]">
                         <?php foreach ( $param['choices'] as $choice => $text ) : ?>
                             <option value="<?php echo esc_attr( $choice ); ?>" <?php selected( (string) $value, (string) $choice ); ?>><?php echo esc_html( $text ); ?></option>
                         <?php endforeach; ?>
                     </select>
                 <?php elseif ( 'bool' === $param['type'] ) : ?>
-                    <input type="hidden" name="libre_compress_tools[<?php echo esc_attr( $key ); ?>]" value="0">
+                    <input type="hidden" name="local_crush_tools[<?php echo esc_attr( $key ); ?>]" value="0">
                     <label>
-                        <input type="checkbox" id="<?php echo esc_attr( $id ); ?>" name="libre_compress_tools[<?php echo esc_attr( $key ); ?>]" value="1" <?php checked( (bool) $value ); ?>>
+                        <input type="checkbox" id="<?php echo esc_attr( $id ); ?>" name="local_crush_tools[<?php echo esc_attr( $key ); ?>]" value="1" <?php checked( (bool) $value ); ?>>
                         <?php echo esc_html( $param['desc'] ); ?>
                     </label>
                 <?php else : ?>
-                    <input type="number" id="<?php echo esc_attr( $id ); ?>" name="libre_compress_tools[<?php echo esc_attr( $key ); ?>]" value="<?php echo esc_attr( $value ); ?>" min="<?php echo esc_attr( $param['min'] ); ?>" max="<?php echo esc_attr( $param['max'] ); ?>" step="1" class="small-text">
+                    <input type="number" id="<?php echo esc_attr( $id ); ?>" name="local_crush_tools[<?php echo esc_attr( $key ); ?>]" value="<?php echo esc_attr( $value ); ?>" min="<?php echo esc_attr( $param['min'] ); ?>" max="<?php echo esc_attr( $param['max'] ); ?>" step="1" class="small-text">
                 <?php endif; ?>
 
                 <?php if ( ! empty( $param['flag'] ) ) : ?>
@@ -1512,7 +1512,7 @@ class Libre_Compress_Settings {
                         if ( 'int' === $param['type'] ) {
                             printf(
                                 /* translators: 1: 最小取值，2: 最大取值，3: 默认值 */
-                                esc_html__( '范围 %1$d-%2$d，默认 %3$d。', 'libre-compress' ),
+                                esc_html__( '范围 %1$d-%2$d，默认 %3$d。', 'local-crush' ),
                                 (int) $param['min'],
                                 (int) $param['max'],
                                 (int) $param['default']
@@ -1538,8 +1538,8 @@ class Libre_Compress_Settings {
      * @return array[] 每行包含 label、deps_display、supported、missing
      */
     private function get_path_support_rows(): array {
-        $tools            = libre_compress()->compressor->get_tools();
-        $output_processor = libre_compress()->output_processor;
+        $tools            = local_crush()->compressor->get_tools();
+        $output_processor = local_crush()->output_processor;
 
         $available = array();
         foreach ( $tools as $name => $tool ) {
@@ -1575,26 +1575,26 @@ class Libre_Compress_Settings {
             'ffprobe'   => 'ffprobe',
             'webpmux'   => 'webpmux',
             'ffmpeg'    => 'ffmpeg',
-            'gd'        => __( 'GD 扩展', 'libre-compress' ),
+            'gd'        => __( 'GD 扩展', 'local-crush' ),
         );
 
         // 一行一条路径，和参数区一一对应：deps 就是这条命令真实调用的全部工具，一个不多一个不少。
         $rows_definition = array(
-            array( 'label' => __( 'JPEG 压缩', 'libre-compress' ), 'deps' => array( 'jpegoptim' ) ),
-            array( 'label' => __( 'PNG 有损压缩', 'libre-compress' ), 'deps' => array( 'pngquant' ) ),
-            array( 'label' => __( 'PNG / APNG 无损压缩', 'libre-compress' ), 'deps' => array( 'oxipng' ) ),
-            array( 'label' => __( 'GIF 压缩', 'libre-compress' ), 'deps' => array( 'gifsicle' ) ),
-            array( 'label' => __( 'SVG 压缩', 'libre-compress' ), 'deps' => array( 'oxvg' ) ),
-            array( 'label' => __( 'WebP 压缩 / PNG·JPG 转 WebP', 'libre-compress' ), 'deps' => array( 'cwebp' ) ),
-            array( 'label' => __( '动画 WebP 压缩 / APNG 转 WebP', 'libre-compress' ), 'deps' => Libre_Compress_Animation::required_tool_groups( 'webp', '' ) ),
-            array( 'label' => __( 'AVIF 同格式压缩', 'libre-compress' ), 'deps' => array( 'avifdec', 'avifenc' ) ),
-            array( 'label' => __( '动画 AVIF 同格式压缩', 'libre-compress' ), 'deps' => Libre_Compress_Animation::required_tool_groups( 'avif', '' ) ),
-            array( 'label' => __( 'JPEG XL 压缩 / 全部转 JPEG XL', 'libre-compress' ), 'deps' => array( 'cjxl' ) ),
-            array( 'label' => __( '静态 GIF 转 WebP', 'libre-compress' ), 'deps' => array( 'gif2webp' ) ),
-            array( 'label' => __( '动画 GIF 转 WebP', 'libre-compress' ), 'deps' => Libre_Compress_Animation::required_tool_groups( 'gif', 'webp' ) ),
-            array( 'label' => __( 'PNG / JPG 转 AVIF', 'libre-compress' ), 'deps' => array( 'avifenc' ) ),
-            array( 'label' => __( '静态 GIF 转 AVIF', 'libre-compress' ), 'deps' => array( 'gd', 'avifenc' ) ),
-            array( 'label' => __( '动画 GIF / APNG 转 AVIF', 'libre-compress' ), 'deps' => Libre_Compress_Animation::required_tool_groups( 'gif', 'avif' ) ),
+            array( 'label' => __( 'JPEG 压缩', 'local-crush' ), 'deps' => array( 'jpegoptim' ) ),
+            array( 'label' => __( 'PNG 有损压缩', 'local-crush' ), 'deps' => array( 'pngquant' ) ),
+            array( 'label' => __( 'PNG / APNG 无损压缩', 'local-crush' ), 'deps' => array( 'oxipng' ) ),
+            array( 'label' => __( 'GIF 压缩', 'local-crush' ), 'deps' => array( 'gifsicle' ) ),
+            array( 'label' => __( 'SVG 压缩', 'local-crush' ), 'deps' => array( 'oxvg' ) ),
+            array( 'label' => __( 'WebP 压缩 / PNG·JPG 转 WebP', 'local-crush' ), 'deps' => array( 'cwebp' ) ),
+            array( 'label' => __( '动画 WebP 压缩 / APNG 转 WebP', 'local-crush' ), 'deps' => Local_Crush_Animation::required_tool_groups( 'webp', '' ) ),
+            array( 'label' => __( 'AVIF 同格式压缩', 'local-crush' ), 'deps' => array( 'avifdec', 'avifenc' ) ),
+            array( 'label' => __( '动画 AVIF 同格式压缩', 'local-crush' ), 'deps' => Local_Crush_Animation::required_tool_groups( 'avif', '' ) ),
+            array( 'label' => __( 'JPEG XL 压缩 / 全部转 JPEG XL', 'local-crush' ), 'deps' => array( 'cjxl' ) ),
+            array( 'label' => __( '静态 GIF 转 WebP', 'local-crush' ), 'deps' => array( 'gif2webp' ) ),
+            array( 'label' => __( '动画 GIF 转 WebP', 'local-crush' ), 'deps' => Local_Crush_Animation::required_tool_groups( 'gif', 'webp' ) ),
+            array( 'label' => __( 'PNG / JPG 转 AVIF', 'local-crush' ), 'deps' => array( 'avifenc' ) ),
+            array( 'label' => __( '静态 GIF 转 AVIF', 'local-crush' ), 'deps' => array( 'gd', 'avifenc' ) ),
+            array( 'label' => __( '动画 GIF / APNG 转 AVIF', 'local-crush' ), 'deps' => Local_Crush_Animation::required_tool_groups( 'gif', 'avif' ) ),
         );
 
         $rows = array();
@@ -1627,7 +1627,7 @@ class Libre_Compress_Settings {
 
             $rows[] = array(
                 'label'        => $definition['label'],
-                'deps_display' => implode( ' ' . __( '或', 'libre-compress' ) . ' ', $deps_display ),
+                'deps_display' => implode( ' ' . __( '或', 'local-crush' ) . ' ', $deps_display ),
                 'supported'    => empty( $missing ),
                 'missing'      => array_values( array_unique( $missing ) ),
             );

@@ -2,7 +2,7 @@
 /**
  * 数据库操作类
  *
- * @package LibreCompress
+ * @package LocalCrush
  */
 
 // 防止直接访问
@@ -15,7 +15,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  *
  * 负责创建和管理压缩记录表、备份记录表
  */
-class Libre_Compress_Database {
+class Local_Crush_Database {
 
     /**
      * 压缩记录表名
@@ -36,8 +36,8 @@ class Libre_Compress_Database {
      */
     public function __construct() {
         global $wpdb;
-        $this->records_table = $wpdb->prefix . 'libre_compress_records';
-        $this->backups_table = $wpdb->prefix . 'libre_compress_backups';
+        $this->records_table = $wpdb->prefix . 'local_crush_records';
+        $this->backups_table = $wpdb->prefix . 'local_crush_backups';
     }
 
     /**
@@ -564,7 +564,7 @@ class Libre_Compress_Database {
                   AND p.post_status <> 'trash'
                 ORDER BY m.post_id ASC
                 LIMIT %d",
-                Libre_Compress_Output::OUTPUT_META_KEY,
+                Local_Crush_Output::OUTPUT_META_KEY,
                 $after_id,
                 $limit
             )
@@ -589,7 +589,7 @@ class Libre_Compress_Database {
                 WHERE m.meta_key = %s
                   AND p.post_type = 'attachment'
                   AND p.post_status <> 'trash'",
-                Libre_Compress_Output::OUTPUT_META_KEY
+                Local_Crush_Output::OUTPUT_META_KEY
             )
         );
     }
@@ -680,7 +680,7 @@ class Libre_Compress_Database {
                 ORDER BY attachment_id ASC
                 LIMIT %d",
                 $after_id,
-                Libre_Compress_Processor::RESTORE_STATE_META_KEY,
+                Local_Crush_Processor::RESTORE_STATE_META_KEY,
                 $after_id,
                 $limit
             )
@@ -714,7 +714,7 @@ class Libre_Compress_Database {
                       AND p.post_type = 'attachment'
                       AND p.post_status <> 'trash'
                 ) candidates",
-                Libre_Compress_Processor::RESTORE_STATE_META_KEY
+                Local_Crush_Processor::RESTORE_STATE_META_KEY
             )
         );
     }

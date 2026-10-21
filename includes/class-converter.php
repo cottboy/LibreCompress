@@ -2,7 +2,7 @@
 /**
  * 目标格式输出处理器
  *
- * @package LibreCompress
+ * @package LocalCrush
  */
 
 // 防止直接访问
@@ -26,14 +26,14 @@ if ( ! defined( 'ABSPATH' ) ) {
  * 链接，任何一步失败都会把引用退回源文件并记录失败，下次执行凭映射接管已有结果
  * 继续提交，不会重复编码。
  */
-class Libre_Compress_Output {
+class Local_Crush_Output {
 
     /**
      * 目标格式输出映射 post meta 键（供恢复原图时反向处理）
      *
      * @var string
      */
-    const OUTPUT_META_KEY = '_libre_compress_output';
+    const OUTPUT_META_KEY = '_local_crush_output';
 
     /**
      * 正文链接扫描的单页文章数量
@@ -98,7 +98,7 @@ class Libre_Compress_Output {
      * @return array target: webp|avif|jxl, formats: 已勾选的源格式列表, apng: 是否转换 APNG
      */
     public function get_output_settings(): array {
-        $general = get_option( 'libre_compress_general', array() );
+        $general = get_option( 'local_crush_general', array() );
 
         // 默认 AVIF：存的目标格式必须在白名单里，缺失或被篡改一律按 AVIF 处理。
         $target = isset( $general['output_format'] ) && in_array( $general['output_format'], array( 'webp', 'avif', 'jxl' ), true )
@@ -133,13 +133,13 @@ class Libre_Compress_Output {
         $settings = $this->get_output_settings();
         $format   = $this->format_of( $file_path );
 
-        if ( 'png' === $format && Libre_Compress_Animation::is_animated( $file_path ) ) {
-            return ! empty( $settings['apng'] ) && Libre_Compress_Animation::convert_supported( 'png', $settings['target'] );
+        if ( 'png' === $format && Local_Crush_Animation::is_animated( $file_path ) ) {
+            return ! empty( $settings['apng'] ) && Local_Crush_Animation::convert_supported( 'png', $settings['target'] );
         }
 
-        if ( 'gif' === $format && Libre_Compress_Animation::is_animated( $file_path ) ) {
+        if ( 'gif' === $format && Local_Crush_Animation::is_animated( $file_path ) ) {
             return in_array( 'gif', $settings['formats'], true )
-                && Libre_Compress_Animation::convert_supported( 'gif', $settings['target'] );
+                && Local_Crush_Animation::convert_supported( 'gif', $settings['target'] );
         }
 
         if ( ! in_array( $format, $settings['formats'], true ) ) {
@@ -159,7 +159,7 @@ class Libre_Compress_Output {
      * @return bool
      */
     public function fallback_retained(): bool {
-        $general = get_option( 'libre_compress_general', array() );
+        $general = get_option( 'local_crush_general', array() );
 
         return ! empty( $general['fallback_enabled'] );
     }
@@ -192,12 +192,12 @@ class Libre_Compress_Output {
         );
 
         if ( ! file_exists( $file_path ) ) {
-            $result_template['message'] = __( '文件不存在', 'libre-compress' );
+            $result_template['message'] = __( '文件不存在', 'local-crush' );
             return $result_template;
         }
 
         if ( ! $this->is_safe_path( $file_path ) ) {
-            $result_template['message'] = __( '文件路径不安全', 'libre-compress' );
+            $result_template['message'] = __( '文件路径不安全', 'local-crush' );
             return $result_template;
         }
 
@@ -206,18 +206,18 @@ class Libre_Compress_Output {
         $format   = $this->format_of( $file_path );
 
         // 动图判定：APNG 与 GIF 的多帧情况由动画层处理，其余源一律静图路径
-        $animation_plan = in_array( $format, array( 'png', 'gif' ), true ) ? Libre_Compress_Animation::analyze( $file_path ) : null;
+        $animation_plan = in_array( $format, array( 'png', 'gif' ), true ) ? Local_Crush_Animation::analyze( $file_path ) : null;
         $is_animation   = null !== $animation_plan && $animation_plan['frames'] > 1;
 
-        if ( 'gif' === $format && Libre_Compress_Compressor::is_animated_gif( $file_path ) && null === $animation_plan ) {
+        if ( 'gif' === $format && Local_Crush_Compressor::is_animated_gif( $file_path ) && null === $animation_plan ) {
             $result_template['status'] = 'skipped';
-            $result_template['message'] = __( '无法读取 GIF 动画信息，已跳过以保护动画内容', 'libre-compress' );
+            $result_template['message'] = __( '无法读取 GIF 动画信息，已跳过以保护动画内容', 'local-crush' );
             return $result_template;
         }
 
-        if ( 'png' === $format && Libre_Compress_Compressor::is_apng( $file_path ) && null === $animation_plan ) {
+        if ( 'png' === $format && Local_Crush_Compressor::is_apng( $file_path ) && null === $animation_plan ) {
             $result_template['status']  = 'skipped';
-            $result_template['message'] = __( '无法读取 APNG 动画信息，已跳过以保护动画内容', 'libre-compress' );
+            $result_template['message'] = __( '无法读取 APNG 动画信息，已跳过以保护动画内容', 'local-crush' );
             return $result_template;
         }
 
@@ -228,13 +228,13 @@ class Libre_Compress_Output {
 
         if ( ! $format_enabled ) {
             $result_template['status']  = 'skipped';
-            $result_template['message'] = __( '该格式未配置格式转换', 'libre-compress' );
+            $result_template['message'] = __( '该格式未配置格式转换', 'local-crush' );
             return $result_template;
         }
 
-        if ( $is_animation && ! Libre_Compress_Animation::convert_supported( $format, $target ) ) {
+        if ( $is_animation && ! Local_Crush_Animation::convert_supported( $format, $target ) ) {
             $result_template['status']  = 'skipped';
-            $result_template['message'] = Libre_Compress_Animation::skip_reason( $format, $target );
+            $result_template['message'] = Local_Crush_Animation::skip_reason( $format, $target );
             return $result_template;
         }
 
@@ -250,7 +250,7 @@ class Libre_Compress_Output {
             // 映射指向旧的命名规则，按新规则从头再来：先把引用退回源文件、清掉残留文件，
             // 否则附件路径谁都不认识，这次转换会被当成失败。
             if ( ! $this->discard_stale_output_entry( $attachment_id, $entry ) ) {
-                $result_template['message']       = __( '无法清理旧的转换结果，已保留原文件', 'libre-compress' );
+                $result_template['message']       = __( '无法清理旧的转换结果，已保留原文件', 'local-crush' );
                 $result_template['original_size'] = $original_size;
                 return $result_template;
             }
@@ -264,7 +264,7 @@ class Libre_Compress_Output {
             $renamed = $this->rename_source_for_target( $attachment_id, $file_path );
 
             if ( null === $renamed ) {
-                $result_template['message']       = __( '无法为源文件分配新文件名，已保留原文件', 'libre-compress' );
+                $result_template['message']       = __( '无法为源文件分配新文件名，已保留原文件', 'local-crush' );
                 $result_template['original_size'] = $original_size;
                 return $result_template;
             }
@@ -299,7 +299,7 @@ class Libre_Compress_Output {
         $animation_done = false;
 
         if ( $is_animation ) {
-            $animation = Libre_Compress_Animation::convert( $file_path, $target, $temp_output );
+            $animation = Local_Crush_Animation::convert( $file_path, $target, $temp_output );
             $animation_done = true;
             $encode_ok = $animation['success'];
             $error_msg = $animation['message'];
@@ -309,16 +309,16 @@ class Libre_Compress_Output {
             //（cwebp 读 GIF 会丢透明，实测过），只有 AVIF 必须先经 GD 解成 PNG —— avifenc 不认 GIF。
             // 静态 GIF 的三条转换各用自己那一组参数：它们的工具链和别的路径都不一样。
             if ( 'webp' === $target ) {
-                $gif2webp = Libre_Compress_Animation::gif2webp_command( $file_path, $temp_output, 'gif_to_webp' );
+                $gif2webp = Local_Crush_Animation::gif2webp_command( $file_path, $temp_output, 'gif_to_webp' );
                 $command  = false === $gif2webp ? false : array( $gif2webp );
             } elseif ( 'jxl' === $target ) {
-                $cjxl    = Libre_Compress_Cjxl::build_command( $file_path, $temp_output, 'jxl' );
+                $cjxl    = Local_Crush_Cjxl::build_command( $file_path, $temp_output, 'jxl' );
                 $command = false === $cjxl ? false : array( $cjxl );
             } else {
                 $temp_source = $file_path . '.lc-source-' . $temp_token . '.png';
                 if ( ! function_exists( 'imagecreatefromgif' ) || ! function_exists( 'imagepng' ) ) {
                     $result_template['status']  = 'skipped';
-                    $result_template['message'] = __( 'GIF 转 AVIF 需要 GD 扩展', 'libre-compress' );
+                    $result_template['message'] = __( 'GIF 转 AVIF 需要 GD 扩展', 'local-crush' );
                     return $result_template;
                 }
                 if ( ! $this->decode_gif_to_png( $file_path, $temp_source ) ) {
@@ -326,7 +326,7 @@ class Libre_Compress_Output {
                         // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
                         unlink( $temp_source );
                     }
-                    $result_template['message'] = __( 'GIF 压缩预处理失败', 'libre-compress' );
+                    $result_template['message'] = __( 'GIF 压缩预处理失败', 'local-crush' );
                     return $result_template;
                 }
                 $command = $this->build_encode_command( $temp_source, $temp_output, $target, 'avif_convert_gif' );
@@ -340,18 +340,18 @@ class Libre_Compress_Output {
         if ( $animation_done ) {
             // 动画层已经执行完命令并核对过帧数、时长与透明，这里不再跑命令链
             if ( ! $encode_ok && '' === $error_msg ) {
-                $error_msg = __( '动图转换失败', 'libre-compress' );
+                $error_msg = __( '动图转换失败', 'local-crush' );
             }
         } elseif ( false === $command ) {
             // 缺编码工具（cwebp/avifenc/cjxl）：环境未配齐，不写入压缩记录，保留为待处理。
-            $error_msg                 = __( '没有可用的压缩工具', 'libre-compress' );
+            $error_msg                 = __( '没有可用的压缩工具', 'local-crush' );
             $result_template['status'] = 'skipped';
         } else {
             // 命令链按顺序执行，任一步失败即整体失败且不再执行后续步骤
             $exec_result = array( 'success' => false, 'output' => '', 'return_code' => -1 );
 
             foreach ( $command as $step ) {
-                $exec_result = Libre_Compress_Tool_Base::run_command( $step );
+                $exec_result = Local_Crush_Tool_Base::run_command( $step );
 
                 if ( ! $exec_result['success'] ) {
                     break;
@@ -361,7 +361,7 @@ class Libre_Compress_Output {
             clearstatcache( true, $temp_output );
 
             if ( ! $exec_result['success'] || ! file_exists( $temp_output ) || filesize( $temp_output ) <= 0 ) {
-                $error_msg = __( '压缩失败', 'libre-compress' );
+                $error_msg = __( '压缩失败', 'local-crush' );
 
                 // 编码失败时清理可能残留的部分输出文件
                 if ( file_exists( $temp_output ) ) {
@@ -395,7 +395,7 @@ class Libre_Compress_Output {
 
             // 转换后更大说明目标格式对该图片没有收益，保留原图并按 0% 记为已压缩。
             if ( ! $this->save_record( $attachment_id, $file_path, $size_type, $original_size, $original_size, $tool_name, 'success', '' ) ) {
-                $result_template['message'] = __( '压缩记录保存失败，请重新压缩', 'libre-compress' );
+                $result_template['message'] = __( '压缩记录保存失败，请重新压缩', 'local-crush' );
                 return $result_template;
             }
 
@@ -409,7 +409,7 @@ class Libre_Compress_Output {
             }
 
             $result_template['status']          = 'success';
-            $result_template['message']         = __( '转换结果没有变小，已保留原图', 'libre-compress' );
+            $result_template['message']         = __( '转换结果没有变小，已保留原图', 'local-crush' );
             $result_template['original_size']   = $original_size;
             $result_template['compressed_size'] = $original_size;
             return $result_template;
@@ -424,7 +424,7 @@ class Libre_Compress_Output {
             }
             // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
             unlink( $temp_output );
-            $result_template['message'] = __( '压缩结果文件写入失败', 'libre-compress' );
+            $result_template['message'] = __( '压缩结果文件写入失败', 'local-crush' );
             return $result_template;
         }
 
@@ -433,17 +433,17 @@ class Libre_Compress_Output {
             unlink( $target_path );
             // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
             unlink( $temp_output );
-            $result_template['message'] = __( '压缩记录保存失败，已保留原文件', 'libre-compress' );
+            $result_template['message'] = __( '压缩记录保存失败，已保留原文件', 'local-crush' );
             return $result_template;
         }
 
         if ( ! $this->add_output_entry( $attachment_id, $size_type, $file_path, $target_path ) ) {
             // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
             unlink( $target_path );
-            $this->save_record( $attachment_id, $file_path, $size_type, $original_size, $original_size, $tool_name, 'failed', __( '恢复映射保存失败，已保留原文件', 'libre-compress' ) );
+            $this->save_record( $attachment_id, $file_path, $size_type, $original_size, $original_size, $tool_name, 'failed', __( '恢复映射保存失败，已保留原文件', 'local-crush' ) );
             // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
             unlink( $temp_output );
-            $result_template['message'] = __( '恢复映射保存失败，已保留原文件', 'libre-compress' );
+            $result_template['message'] = __( '恢复映射保存失败，已保留原文件', 'local-crush' );
             return $result_template;
         }
 
@@ -463,7 +463,7 @@ class Libre_Compress_Output {
             'to'              => $target_path,
             'size_type'       => $size_type,
             'status'          => 'success',
-            'message'         => __( '压缩成功', 'libre-compress' ),
+            'message'         => __( '压缩成功', 'local-crush' ),
             'original_size'   => $original_size,
             'compressed_size' => $compressed_size,
             'tool_name'       => $tool_name,
@@ -490,7 +490,7 @@ class Libre_Compress_Output {
                 'from'            => $file_path,
                 'to'              => '',
                 'status'          => 'failed',
-                'message'         => __( '压缩记录保存失败，已保留原文件', 'libre-compress' ),
+                'message'         => __( '压缩记录保存失败，已保留原文件', 'local-crush' ),
                 'size_type'       => $size_type,
                 'original_size'   => $original_size,
                 'compressed_size' => 0,
@@ -503,7 +503,7 @@ class Libre_Compress_Output {
             'to'              => $target_path,
             'size_type'       => $size_type,
             'status'          => 'success',
-            'message'         => __( '压缩成功', 'libre-compress' ),
+            'message'         => __( '压缩成功', 'local-crush' ),
             'original_size'   => $original_size,
             'compressed_size' => $compressed_size,
             'tool_name'       => $tool_name,
@@ -533,15 +533,15 @@ class Libre_Compress_Output {
         $mime       = isset( $this->target_mimes[ $target ] ) ? $this->target_mimes[ $target ] : '';
 
         if ( ! $this->sync_attachment_paths( $attachment_id, $entries, $target ) ) {
-            return $this->abort_commit( $attachment_id, $snapshot, $entries, __( '附件路径同步失败，已保留原文件', 'libre-compress' ) );
+            return $this->abort_commit( $attachment_id, $snapshot, $entries, __( '附件路径同步失败，已保留原文件', 'local-crush' ) );
         }
 
         if ( '' !== $mime && ! $this->sync_attachment_mime( $attachment_id, $entries, $mime ) ) {
-            return $this->abort_commit( $attachment_id, $snapshot, $entries, __( '附件 MIME 类型同步失败，已保留原文件', 'libre-compress' ) );
+            return $this->abort_commit( $attachment_id, $snapshot, $entries, __( '附件 MIME 类型同步失败，已保留原文件', 'local-crush' ) );
         }
 
         if ( ! $this->update_content_references( $this->reference_pairs( $entries, false ) ) ) {
-            return $this->abort_commit( $attachment_id, $snapshot, $entries, __( '文章图片链接替换失败，已保留原文件', 'libre-compress' ) );
+            return $this->abort_commit( $attachment_id, $snapshot, $entries, __( '文章图片链接替换失败，已保留原文件', 'local-crush' ) );
         }
 
         // 引用和正文链接都已指向新格式，这时删除旧格式源文件才不会留下任何悬空引用。
@@ -630,7 +630,7 @@ class Libre_Compress_Output {
 
             if ( ! $saved ) {
                 // 连失败记录都写不进去时，绝不能留下成功记录造成误判。
-                libre_compress()->database->delete_records_by_attachment( $attachment_id );
+                local_crush()->database->delete_records_by_attachment( $attachment_id );
             }
         }
 
@@ -1541,14 +1541,14 @@ class Libre_Compress_Output {
      */
     private function compress_fallback_file( int $attachment_id, string $file_path, string $size_type ): void {
         $fallback_size_type = $this->fallback_size_type( $size_type );
-        $record             = libre_compress()->database->get_record( $attachment_id, $fallback_size_type );
+        $record             = local_crush()->database->get_record( $attachment_id, $fallback_size_type );
 
         // 已经按同样大小压缩过就跳过：接管旧结果时重复压缩没有收益。
         if ( $this->record_matches_file( $record, $file_path ) ) {
             return;
         }
 
-        libre_compress()->compressor->compress_file( $attachment_id, $file_path, $fallback_size_type );
+        local_crush()->compressor->compress_file( $attachment_id, $file_path, $fallback_size_type );
     }
 
     /**
@@ -1620,7 +1620,7 @@ class Libre_Compress_Output {
     public function get_fallback_entries( int $attachment_id ): array {
         $live = array();
 
-        foreach ( libre_compress()->compressor->get_attachment_files( $attachment_id ) as $file ) {
+        foreach ( local_crush()->compressor->get_attachment_files( $attachment_id ) as $file ) {
             $live[] = $this->normalized_path( $file['file_path'] );
         }
 
@@ -1670,10 +1670,10 @@ class Libre_Compress_Output {
      */
     public function forget_fallback_records( int $attachment_id, array $size_types ): void {
         foreach ( $size_types as $size_type ) {
-            $record = libre_compress()->database->get_record( $attachment_id, $this->fallback_size_type( (string) $size_type ) );
+            $record = local_crush()->database->get_record( $attachment_id, $this->fallback_size_type( (string) $size_type ) );
 
             if ( is_array( $record ) && ! empty( $record['id'] ) ) {
-                libre_compress()->database->delete_record( (int) $record['id'] );
+                local_crush()->database->delete_record( (int) $record['id'] );
             }
         }
     }
@@ -1692,7 +1692,7 @@ class Libre_Compress_Output {
      * @return bool 是否写入成功
      */
     private function save_record( int $attachment_id, string $file_path, string $size_type, int $original_size, int $compressed_size, string $tool_name, string $status, string $message ): bool {
-        return libre_compress()->compressor->save_compression_record(
+        return local_crush()->compressor->save_compression_record(
             $attachment_id,
             $file_path,
             $size_type,
@@ -2033,7 +2033,7 @@ class Libre_Compress_Output {
      */
     private function build_encode_command( string $source, string $output, string $target, string $group ) {
         $tool_name = isset( $this->target_tools[ $target ] ) ? $this->target_tools[ $target ] : '';
-        $tools     = libre_compress()->compressor->get_tools();
+        $tools     = local_crush()->compressor->get_tools();
 
         if ( '' === $tool_name || empty( $tools[ $tool_name ] ) ) {
             return false;
@@ -2051,16 +2051,16 @@ class Libre_Compress_Output {
 
         if ( 'webp' === $target ) {
             // 参数拼装与同格式压缩共用一份，避免两边走样。
-            return array( array_merge( array( $binary ), Libre_Compress_Cwebp::build_encode_args( $group, $source, $output ) ) );
+            return array( array_merge( array( $binary ), Local_Crush_Cwebp::build_encode_args( $group, $source, $output ) ) );
         }
 
         if ( 'jxl' === $target ) {
-            $command = Libre_Compress_Cjxl::build_command( $source, $output, $group );
+            $command = Local_Crush_Cjxl::build_command( $source, $output, $group );
 
             return false === $command ? false : array( $command );
         }
 
-        return array( array_merge( array( $binary ), Libre_Compress_Avif::build_encode_args( $group, $source, $output ) ) );
+        return array( array_merge( array( $binary ), Local_Crush_Avif::build_encode_args( $group, $source, $output ) ) );
     }
 
     /**
@@ -2094,7 +2094,7 @@ class Libre_Compress_Output {
     /**
      * 查找本地辅助工具（gif2webp、ffmpeg 等）
      *
-     * 优先 wp-content/LibreCompress-bin 目录，其次系统 PATH。
+     * 优先 wp-content/LocalCrush-bin 目录，其次系统 PATH。
      * 设置页复用此方法展示辅助工具的安装状态与路径。
      *
      * @param string $name 可执行文件名
@@ -2108,13 +2108,13 @@ class Libre_Compress_Output {
         }
 
         // proc_open() 不可用就执行不了本地工具，直接判为找不到，避免后续调用失败的函数。
-        if ( ! Libre_Compress_Tool_Base::is_command_execution_available() ) {
+        if ( ! Local_Crush_Tool_Base::is_command_execution_available() ) {
             $cache[ $name ] = false;
             return false;
         }
 
         $is_windows = 'WIN' === strtoupper( substr( PHP_OS, 0, 3 ) );
-        $candidates = array( LIBRE_COMPRESS_BIN_PATH . $name );
+        $candidates = array( LOCAL_CRUSH_BIN_PATH . $name );
 
         foreach ( $candidates as $bin_path ) {
             if ( $is_windows ) {
@@ -2126,7 +2126,7 @@ class Libre_Compress_Output {
             }
         }
 
-        $found = Libre_Compress_Tool_Base::run_command(
+        $found = Local_Crush_Tool_Base::run_command(
             array( $is_windows ? 'where' : 'which', $name ),
             15
         );

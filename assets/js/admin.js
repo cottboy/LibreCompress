@@ -1,22 +1,22 @@
 /**
- * LibreCompress 后台 JavaScript
+ * Local Crush 后台 JavaScript
  *
- * @package LibreCompress
+ * @package LocalCrush
  */
 
 (function($) {
     'use strict';
 
     // 确保数据对象存在
-    if (typeof libreCompressData === 'undefined') {
+    if (typeof localCrushData === 'undefined') {
         return;
     }
 
     var LC = {
-        ajaxUrl: libreCompressData.ajaxUrl,
-        nonce: libreCompressData.nonce,
-        i18n: libreCompressData.i18n,
-        taskState: libreCompressData.taskState || { has_task: false },
+        ajaxUrl: localCrushData.ajaxUrl,
+        nonce: localCrushData.nonce,
+        i18n: localCrushData.i18n,
+        taskState: localCrushData.taskState || { has_task: false },
 
         // 批量任务：面板、轮询定时器、连续取不到状态的次数
         $panel: null,
@@ -27,12 +27,12 @@
          * 批量按钮与后台任务类型的对应关系
          */
         batchButtons: {
-            '#libre-compress-bulk-compress': { type: 'compress', confirm: 'confirmBulkCompress' },
-            '#libre-compress-restore-all': { type: 'restore', confirm: 'confirmRestoreAll' },
-            '#libre-compress-delete-all-backups': { type: 'delete_backups', confirm: 'confirmDeleteAllBackups' },
-            '#libre-compress-delete-all-fallbacks': { type: 'delete_fallbacks', confirm: 'confirmDeleteAllFallbacks' },
-            '#libre-compress-delete-thumbnails': { type: 'delete_thumbnails', confirm: 'confirmDeleteThumbnails' },
-            '#libre-compress-generate-thumbnails': { type: 'generate_thumbnails', confirm: 'confirmGenerateThumbnails' }
+            '#local-crush-bulk-compress': { type: 'compress', confirm: 'confirmBulkCompress' },
+            '#local-crush-restore-all': { type: 'restore', confirm: 'confirmRestoreAll' },
+            '#local-crush-delete-all-backups': { type: 'delete_backups', confirm: 'confirmDeleteAllBackups' },
+            '#local-crush-delete-all-fallbacks': { type: 'delete_fallbacks', confirm: 'confirmDeleteAllFallbacks' },
+            '#local-crush-delete-thumbnails': { type: 'delete_thumbnails', confirm: 'confirmDeleteThumbnails' },
+            '#local-crush-generate-thumbnails': { type: 'generate_thumbnails', confirm: 'confirmGenerateThumbnails' }
         },
 
         /**
@@ -50,7 +50,7 @@
             var self = this;
 
             // 媒体库压缩/恢复按钮
-            $(document).on('click', '.libre-compress-btn', this.handleMediaLibraryAction.bind(this));
+            $(document).on('click', '.local-crush-btn', this.handleMediaLibraryAction.bind(this));
 
             // 批量按钮：只是把任务交给服务器，之后由面板显示进度
             $.each(this.batchButtons, function(selector, config) {
@@ -61,13 +61,13 @@
             });
 
             // 任务面板上的按钮
-            $(document).on('click', '#libre-compress-task-stop', this.stopTask.bind(this));
-            $(document).on('click', '#libre-compress-task-resume', this.resumeTask.bind(this));
-            $(document).on('click', '#libre-compress-task-retry', this.retryTask.bind(this));
-            $(document).on('click', '#libre-compress-task-dismiss', this.dismissTask.bind(this));
+            $(document).on('click', '#local-crush-task-stop', this.stopTask.bind(this));
+            $(document).on('click', '#local-crush-task-resume', this.resumeTask.bind(this));
+            $(document).on('click', '#local-crush-task-retry', this.retryTask.bind(this));
+            $(document).on('click', '#local-crush-task-dismiss', this.dismissTask.bind(this));
 
             // 原图备份保留时长不接受 0，步进跨过 0 时按方向落到 1 或 -1
-            $(document).on('input change', '#libre-compress-retention-days', this.skipRetentionZero.bind(this));
+            $(document).on('input change', '#local-crush-retention-days', this.skipRetentionZero.bind(this));
         },
 
         /**
@@ -135,7 +135,7 @@
                 url: this.ajaxUrl,
                 type: 'POST',
                 data: {
-                    action: 'libre_compress_compress_single',
+                    action: 'local_crush_compress_single',
                     nonce: this.nonce,
                     attachment_id: attachmentId
                 },
@@ -174,7 +174,7 @@
                 url: this.ajaxUrl,
                 type: 'POST',
                 data: {
-                    action: 'libre_compress_get_details',
+                    action: 'local_crush_get_details',
                     nonce: this.nonce,
                     attachment_id: attachmentId
                 },
@@ -208,13 +208,13 @@
             var rows = details.items || [];
             var html = '';
 
-            html += '<div class="libre-compress-details-modal" role="dialog" aria-modal="true">';
-            html += '<div class="libre-compress-details-dialog">';
-            html += '<div class="libre-compress-details-head">';
+            html += '<div class="local-crush-details-modal" role="dialog" aria-modal="true">';
+            html += '<div class="local-crush-details-dialog">';
+            html += '<div class="local-crush-details-head">';
             html += '<h2>' + this.escapeHtml(i18n.detailsTitle) + '</h2>';
-            html += '<button type="button" class="button-link libre-compress-details-close">' + this.escapeHtml(i18n.detailsClose) + '</button>';
+            html += '<button type="button" class="button-link local-crush-details-close">' + this.escapeHtml(i18n.detailsClose) + '</button>';
             html += '</div>';
-            html += '<table class="libre-compress-details-table"><thead><tr>';
+            html += '<table class="local-crush-details-table"><thead><tr>';
             html += '<th>' + this.escapeHtml(i18n.detailsGroup) + '</th>';
             html += '<th>' + this.escapeHtml(i18n.detailsItem) + '</th>';
             html += '<th>' + this.escapeHtml(i18n.detailsFormat) + '</th>';
@@ -246,22 +246,22 @@
 
             html += '</tbody></table></div></div>';
 
-            $('.libre-compress-details-modal').remove();
+            $('.local-crush-details-modal').remove();
             $('body').append(html);
 
-            var $modal = $('.libre-compress-details-modal').last();
+            var $modal = $('.local-crush-details-modal').last();
 
             function closeModal() {
                 $modal.remove();
-                $(document).off('keydown.libreCompressDetails');
+                $(document).off('keydown.localCrushDetails');
             }
 
             $modal.on('click', function(e) {
-                if (e.target === this || $(e.target).hasClass('libre-compress-details-close')) {
+                if (e.target === this || $(e.target).hasClass('local-crush-details-close')) {
                     closeModal();
                 }
             });
-            $(document).off('keydown.libreCompressDetails').on('keydown.libreCompressDetails', function(e) {
+            $(document).off('keydown.localCrushDetails').on('keydown.localCrushDetails', function(e) {
                 if (e.key === 'Escape') {
                     closeModal();
                 }
@@ -298,7 +298,7 @@
                 url: this.ajaxUrl,
                 type: 'POST',
                 data: {
-                    action: 'libre_compress_restore',
+                    action: 'local_crush_restore',
                     nonce: this.nonce,
                     attachment_id: attachmentId
                 },
@@ -332,7 +332,7 @@
                 url: this.ajaxUrl,
                 type: 'POST',
                 data: {
-                    action: 'libre_compress_delete_backup',
+                    action: 'local_crush_delete_backup',
                     nonce: this.nonce,
                     attachment_id: attachmentId
                 },
@@ -366,7 +366,7 @@
                 url: this.ajaxUrl,
                 type: 'POST',
                 data: {
-                    action: 'libre_compress_delete_fallback',
+                    action: 'local_crush_delete_fallback',
                     nonce: this.nonce,
                     attachment_id: attachmentId
                 },
@@ -393,7 +393,7 @@
          * 页面载入时按服务端给的状态恢复面板
          */
         initTaskPanel: function() {
-            this.$panel = $('#libre-compress-task');
+            this.$panel = $('#local-crush-task');
 
             if (!this.$panel.length) {
                 this.$panel = null;
@@ -428,7 +428,7 @@
                 type: 'POST',
                 timeout: 60000,
                 data: {
-                    action: 'libre_compress_task_start',
+                    action: 'local_crush_task_start',
                     nonce: this.nonce,
                     type: type
                 },
@@ -462,7 +462,7 @@
                 return;
             }
 
-            this.taskAction('libre_compress_task_stop');
+            this.taskAction('local_crush_task_stop');
         },
 
         /**
@@ -473,7 +473,7 @@
                 e.preventDefault();
             }
 
-            this.taskAction('libre_compress_task_status');
+            this.taskAction('local_crush_task_status');
         },
 
         /**
@@ -484,7 +484,7 @@
                 e.preventDefault();
             }
 
-            this.taskAction('libre_compress_task_retry');
+            this.taskAction('local_crush_task_retry');
         },
 
         /**
@@ -504,7 +504,7 @@
                 type: 'POST',
                 timeout: 30000,
                 data: {
-                    action: 'libre_compress_task_dismiss',
+                    action: 'local_crush_task_dismiss',
                     nonce: this.nonce
                 },
                 success: function(response) {
@@ -605,7 +605,7 @@
                 type: 'POST',
                 timeout: 60000,
                 data: {
-                    action: 'libre_compress_task_status',
+                    action: 'local_crush_task_status',
                     nonce: this.nonce
                 },
                 success: function(response) {
@@ -683,12 +683,12 @@
 
             var running = state.status === 'running';
 
-            this.$panel.find('#libre-compress-task-stop').toggle(running);
-            this.$panel.find('#libre-compress-task-resume').toggle(running && !!state.stalled);
-            this.$panel.find('#libre-compress-task-dismiss').toggle(!running);
+            this.$panel.find('#local-crush-task-stop').toggle(running);
+            this.$panel.find('#local-crush-task-resume').toggle(running && !!state.stalled);
+            this.$panel.find('#local-crush-task-dismiss').toggle(!running);
 
             var retryCount = parseInt(state.retry_count, 10) || 0;
-            var $retry = this.$panel.find('#libre-compress-task-retry');
+            var $retry = this.$panel.find('#local-crush-task-retry');
 
             $retry.toggle(!running && retryCount > 0);
 

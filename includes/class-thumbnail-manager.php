@@ -2,7 +2,7 @@
 /**
  * 缩略图管理类
  *
- * @package LibreCompress
+ * @package LocalCrush
  */
 
 // 防止直接访问
@@ -15,7 +15,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  *
  * 按设置决定生成哪些尺寸的缩略图、调整大图缩放阈值，并负责清理未勾选尺寸的旧文件、补生成缺失的尺寸
  */
-class Libre_Compress_Thumbnail_Manager {
+class Local_Crush_Thumbnail_Manager {
 
     /**
      * 构造函数
@@ -50,7 +50,7 @@ class Libre_Compress_Thumbnail_Manager {
      * @return int
      */
     public function filter_editor_quality( $quality, $mime_type = '' ) {
-        if ( ! Libre_Compress_Settings::resize_is_lossless() ) {
+        if ( ! Local_Crush_Settings::resize_is_lossless() ) {
             return $quality;
         }
 
@@ -66,7 +66,7 @@ class Libre_Compress_Thumbnail_Manager {
      * @return string[]
      */
     public static function disabled_sizes(): array {
-        $settings = get_option( 'libre_compress_general', array() );
+        $settings = get_option( 'local_crush_general', array() );
         $disabled = isset( $settings['disabled_thumbnail_sizes'] ) ? (array) $settings['disabled_thumbnail_sizes'] : array();
 
         return array_values( array_filter( array_map( 'sanitize_key', $disabled ) ) );
@@ -124,8 +124,8 @@ class Libre_Compress_Thumbnail_Manager {
      * @return int 开启自动缩放时为设定阈值，关闭时为 0
      */
     public function filter_big_image_size_threshold( $threshold ) {
-        return Libre_Compress_Settings::image_scale_enabled()
-            ? Libre_Compress_Settings::image_size_threshold()
+        return Local_Crush_Settings::image_scale_enabled()
+            ? Local_Crush_Settings::image_size_threshold()
             : 0;
     }
 
@@ -138,14 +138,14 @@ class Libre_Compress_Thumbnail_Manager {
      * @return array|null 计划结果；锁被占用或元数据写入失败时返回 null
      */
     public function delete_disabled_for_attachment( int $attachment_id ): ?array {
-        $lock = libre_compress()->processor->acquire_attachment_lock( $attachment_id );
+        $lock = local_crush()->processor->acquire_attachment_lock( $attachment_id );
         if ( false === $lock ) {
             return null;
         }
 
-        $global_lock = libre_compress()->processor->acquire_global_lock( false );
+        $global_lock = local_crush()->processor->acquire_global_lock( false );
         if ( false === $global_lock ) {
-            libre_compress()->processor->release_attachment_lock( $lock );
+            local_crush()->processor->release_attachment_lock( $lock );
             return null;
         }
 
@@ -238,7 +238,7 @@ class Libre_Compress_Thumbnail_Manager {
             // 兼容格式不写进附件元数据，必须按转换映射找到同尺寸的旧文件。
             // 这里不看“兼容格式回退”开关：开关关闭后，磁盘上仍可能留有旧文件。
             $fallback_by_size = array();
-            foreach ( libre_compress()->output_processor->get_fallback_entries( $attachment_id ) as $entry ) {
+            foreach ( local_crush()->output_processor->get_fallback_entries( $attachment_id ) as $entry ) {
                 $size_type = isset( $entry['size_type'] ) ? (string) $entry['size_type'] : '';
 
                 if ( '' !== $size_type && isset( $victims[ $size_type ] ) ) {
@@ -263,7 +263,7 @@ class Libre_Compress_Thumbnail_Manager {
 
             $replaced = 0;
 
-            if ( ! libre_compress()->output_processor->update_content_references( $replacements, $replaced ) ) {
+            if ( ! local_crush()->output_processor->update_content_references( $replacements, $replaced ) ) {
                 return array(
                     'deleted'        => $deleted_base,
                     'replaced'       => $replaced_base + $replaced,
@@ -296,7 +296,7 @@ class Libre_Compress_Thumbnail_Manager {
                 }
 
                 $deleted++;
-                $database = libre_compress()->database;
+                $database = local_crush()->database;
                 $record   = $database->get_record( $attachment_id, $size_name );
 
                 if ( $record ) {
@@ -328,7 +328,7 @@ class Libre_Compress_Thumbnail_Manager {
                 }
 
                 if ( ! empty( $deleted_fallback_sizes ) ) {
-                    libre_compress()->output_processor->forget_fallback_records( $attachment_id, $deleted_fallback_sizes );
+                    local_crush()->output_processor->forget_fallback_records( $attachment_id, $deleted_fallback_sizes );
                 }
             }
 
@@ -337,8 +337,8 @@ class Libre_Compress_Thumbnail_Manager {
                 'replaced' => $replaced_base + $replaced,
             );
         } finally {
-            libre_compress()->processor->release_attachment_lock( $global_lock );
-            libre_compress()->processor->release_attachment_lock( $lock );
+            local_crush()->processor->release_attachment_lock( $global_lock );
+            local_crush()->processor->release_attachment_lock( $lock );
         }
     }
 
@@ -400,14 +400,14 @@ class Libre_Compress_Thumbnail_Manager {
      * @return int|string|null 新增文件数；无需处理时返回原因字符串；失败返回 null
      */
     private function generate_missing_for_attachment( int $attachment_id, array $enabled, array $registered ) {
-        $lock = libre_compress()->processor->acquire_attachment_lock( $attachment_id );
+        $lock = local_crush()->processor->acquire_attachment_lock( $attachment_id );
         if ( false === $lock ) {
             return null;
         }
 
-        $global_lock = libre_compress()->processor->acquire_global_lock( false );
+        $global_lock = local_crush()->processor->acquire_global_lock( false );
         if ( false === $global_lock ) {
-            libre_compress()->processor->release_attachment_lock( $lock );
+            local_crush()->processor->release_attachment_lock( $lock );
             return null;
         }
 
@@ -483,7 +483,7 @@ class Libre_Compress_Thumbnail_Manager {
 
             $legacy_entries = array();
             if ( null !== $legacy_source ) {
-                foreach ( libre_compress()->output_processor->get_output_entries( $attachment_id ) as $entry ) {
+                foreach ( local_crush()->output_processor->get_output_entries( $attachment_id ) as $entry ) {
                     $size_name = isset( $entry['size_type'] ) ? (string) $entry['size_type'] : '';
 
                     if ( '' !== $size_name && is_file( $entry['from'] ) && $this->is_safe_upload_path( $entry['from'] ) ) {
@@ -516,7 +516,7 @@ class Libre_Compress_Thumbnail_Manager {
                 return 0;
             };
 
-            $processor = libre_compress()->processor;
+            $processor = local_crush()->processor;
             $was       = $processor->is_auto_compress_suppressed();
             $processor->set_auto_compress_suppressed( true );
 
@@ -641,14 +641,14 @@ class Libre_Compress_Thumbnail_Manager {
                 $new_path    = $base_dir . '/' . $file_dir . '/' . $merged['sizes'][ $size_name ]['file'];
 
                 if ( is_file( $legacy_path ) && is_file( $new_path ) ) {
-                    libre_compress()->output_processor->save_output_mapping( $attachment_id, $size_name, $legacy_path, $new_path );
+                    local_crush()->output_processor->save_output_mapping( $attachment_id, $size_name, $legacy_path, $new_path );
                 }
             }
 
             return $generated + $scaled_count;
         } finally {
-            libre_compress()->processor->release_attachment_lock( $global_lock );
-            libre_compress()->processor->release_attachment_lock( $lock );
+            local_crush()->processor->release_attachment_lock( $global_lock );
+            local_crush()->processor->release_attachment_lock( $lock );
         }
     }
 
@@ -663,7 +663,7 @@ class Libre_Compress_Thumbnail_Manager {
      * @return array|null path、size_type
      */
     private function find_legacy_original_source( int $attachment_id, $metadata ): ?array {
-        $entries = libre_compress()->output_processor->get_output_entries( $attachment_id );
+        $entries = local_crush()->output_processor->get_output_entries( $attachment_id );
 
         foreach ( array( 'original_image', 'full' ) as $wanted_type ) {
             foreach ( $entries as $entry ) {
@@ -784,8 +784,8 @@ class Libre_Compress_Thumbnail_Manager {
      * @return array threshold、enabled、main_rel、orig_rel、source_rel、is_scaled
      */
     private function scaled_context( array $metadata ): array {
-        $threshold = Libre_Compress_Settings::image_size_threshold();
-        $enabled   = Libre_Compress_Settings::image_scale_enabled();
+        $threshold = Local_Crush_Settings::image_size_threshold();
+        $enabled   = Local_Crush_Settings::image_scale_enabled();
 
         $main_rel  = isset( $metadata['file'] ) ? ltrim( wp_normalize_path( (string) $metadata['file'] ), '/' ) : '';
         $orig_name = isset( $metadata['original_image'] ) ? (string) $metadata['original_image'] : '';
@@ -815,7 +815,7 @@ class Libre_Compress_Thumbnail_Manager {
      * @param int $attachment_id 附件 ID
      */
     private function forget_main_records( int $attachment_id ): void {
-        $database = libre_compress()->database;
+        $database = local_crush()->database;
 
         foreach ( array( 'full', 'original_image' ) as $size_type ) {
             $record = $database->get_record( $attachment_id, $size_type );
@@ -898,7 +898,7 @@ class Libre_Compress_Thumbnail_Manager {
             $deleted = 1;
 
             // 正文里固化的缩放图地址改回原图
-            libre_compress()->output_processor->update_content_references(
+            local_crush()->output_processor->update_content_references(
                 array(
                     array(
                         'from' => $main_abs,
@@ -944,7 +944,7 @@ class Libre_Compress_Thumbnail_Manager {
      * @return array|null generated、replaced；处理失败返回 null
      */
     private function ensure_scaled( int $attachment_id ): ?array {
-        if ( ! Libre_Compress_Settings::image_scale_enabled() ) {
+        if ( ! Local_Crush_Settings::image_scale_enabled() ) {
             return array( 'generated' => 0, 'replaced' => 0 );
         }
 
@@ -993,7 +993,7 @@ class Libre_Compress_Thumbnail_Manager {
             }
         }
 
-        $scaled = libre_compress()->processor->generate_scaled_file( $source_abs, $context['threshold'] );
+        $scaled = local_crush()->processor->generate_scaled_file( $source_abs, $context['threshold'] );
 
         if ( ! is_array( $scaled ) || empty( $scaled['path'] ) || ! is_file( $scaled['path'] ) ) {
             return null;
@@ -1006,7 +1006,7 @@ class Libre_Compress_Thumbnail_Manager {
 
         // 主文件名变化时，正文里固化的旧地址改到新缩放图
         if ( $this->normalized_path( $scaled_rel ) !== $this->normalized_path( $context['main_rel'] ) ) {
-            libre_compress()->output_processor->update_content_references(
+            local_crush()->output_processor->update_content_references(
                 array(
                     array(
                         'from' => $main_abs,

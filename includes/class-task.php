@@ -1,8 +1,8 @@
 <?php
 /**
- * LibreCompress 后台批量任务
+ * Local Crush 后台批量任务
  *
- * @package LibreCompress
+ * @package LocalCrush
  */
 
 // 防止直接访问
@@ -17,22 +17,22 @@ if ( ! defined( 'ABSPATH' ) ) {
  * 每批只干固定时长就收手，再把接力棒交给下一个请求，所以单个请求永远跑不到
  * 网闸（Nginx、宝塔、CDN）的超时线；浏览器只是看客，关掉页面任务照样继续。
  */
-class Libre_Compress_Task {
+class Local_Crush_Task {
 
     /**
      * 任务状态选项名
      */
-    const OPTION_NAME = 'libre_compress_task';
+    const OPTION_NAME = 'local_crush_task';
 
     /**
      * 后台接力请求的动作名
      */
-    const ASYNC_ACTION = 'libre_compress_task_tick';
+    const ASYNC_ACTION = 'local_crush_task_tick';
 
     /**
      * 定时兜底钩子
      */
-    const WATCHDOG_HOOK = 'libre_compress_task_watchdog_event';
+    const WATCHDOG_HOOK = 'local_crush_task_watchdog_event';
 
     /**
      * 任务正在执行
@@ -91,27 +91,27 @@ class Libre_Compress_Task {
     public function __construct() {
         $this->types = array(
             'compress'            => array(
-                'label'  => __( '批量压缩未压缩的图片', 'libre-compress' ),
+                'label'  => __( '批量压缩未压缩的图片', 'local-crush' ),
                 'source' => 'images',
             ),
             'restore'             => array(
-                'label'  => __( '恢复所有原图备份', 'libre-compress' ),
+                'label'  => __( '恢复所有原图备份', 'local-crush' ),
                 'source' => 'restore',
             ),
             'delete_backups'      => array(
-                'label'  => __( '删除所有原图备份', 'libre-compress' ),
+                'label'  => __( '删除所有原图备份', 'local-crush' ),
                 'source' => 'backups',
             ),
             'delete_fallbacks'    => array(
-                'label'  => __( '删除所有兼容格式回退', 'libre-compress' ),
+                'label'  => __( '删除所有兼容格式回退', 'local-crush' ),
                 'source' => 'fallbacks',
             ),
             'delete_thumbnails'   => array(
-                'label'  => __( '删除未勾选尺寸的缩略图', 'libre-compress' ),
+                'label'  => __( '删除未勾选尺寸的缩略图', 'local-crush' ),
                 'source' => 'images',
             ),
             'generate_thumbnails' => array(
-                'label'  => __( '补生成缺失尺寸的缩略图', 'libre-compress' ),
+                'label'  => __( '补生成缺失尺寸的缩略图', 'local-crush' ),
                 'source' => 'images',
             ),
         );
@@ -121,11 +121,11 @@ class Libre_Compress_Task {
         add_action( 'wp_ajax_nopriv_' . self::ASYNC_ACTION, array( $this, 'handle_async_tick' ) );
 
         // 后台页面用的任务接口
-        add_action( 'wp_ajax_libre_compress_task_start', array( $this, 'ajax_start' ) );
-        add_action( 'wp_ajax_libre_compress_task_status', array( $this, 'ajax_status' ) );
-        add_action( 'wp_ajax_libre_compress_task_stop', array( $this, 'ajax_stop' ) );
-        add_action( 'wp_ajax_libre_compress_task_retry', array( $this, 'ajax_retry' ) );
-        add_action( 'wp_ajax_libre_compress_task_dismiss', array( $this, 'ajax_dismiss' ) );
+        add_action( 'wp_ajax_local_crush_task_start', array( $this, 'ajax_start' ) );
+        add_action( 'wp_ajax_local_crush_task_status', array( $this, 'ajax_status' ) );
+        add_action( 'wp_ajax_local_crush_task_stop', array( $this, 'ajax_stop' ) );
+        add_action( 'wp_ajax_local_crush_task_retry', array( $this, 'ajax_retry' ) );
+        add_action( 'wp_ajax_local_crush_task_dismiss', array( $this, 'ajax_dismiss' ) );
 
         // 接力棒掉了时的定时兜底
         add_action( self::WATCHDOG_HOOK, array( $this, 'run_watchdog' ), 10, 2 );
@@ -198,10 +198,10 @@ class Libre_Compress_Task {
      * 后台页面：开始一个批量任务
      */
     public function ajax_start() {
-        check_ajax_referer( 'libre_compress_nonce', 'nonce' );
+        check_ajax_referer( 'local_crush_nonce', 'nonce' );
 
         if ( ! current_user_can( 'manage_options' ) ) {
-            wp_send_json_error( array( 'message' => __( '权限不足', 'libre-compress' ) ) );
+            wp_send_json_error( array( 'message' => __( '权限不足', 'local-crush' ) ) );
         }
 
         $type  = isset( $_POST['type'] ) ? sanitize_key( wp_unslash( $_POST['type'] ) ) : '';
@@ -221,10 +221,10 @@ class Libre_Compress_Task {
      * 所以只要页面开着，任务就不会真的停住。
      */
     public function ajax_status() {
-        check_ajax_referer( 'libre_compress_nonce', 'nonce' );
+        check_ajax_referer( 'local_crush_nonce', 'nonce' );
 
         if ( ! current_user_can( 'manage_options' ) ) {
-            wp_send_json_error( array( 'message' => __( '权限不足', 'libre-compress' ) ) );
+            wp_send_json_error( array( 'message' => __( '权限不足', 'local-crush' ) ) );
         }
 
         $task = $this->get_task();
@@ -240,10 +240,10 @@ class Libre_Compress_Task {
      * 后台页面：停止任务
      */
     public function ajax_stop() {
-        check_ajax_referer( 'libre_compress_nonce', 'nonce' );
+        check_ajax_referer( 'local_crush_nonce', 'nonce' );
 
         if ( ! current_user_can( 'manage_options' ) ) {
-            wp_send_json_error( array( 'message' => __( '权限不足', 'libre-compress' ) ) );
+            wp_send_json_error( array( 'message' => __( '权限不足', 'local-crush' ) ) );
         }
 
         $this->stop();
@@ -254,22 +254,22 @@ class Libre_Compress_Task {
      * 后台页面：只重跑失败的附件
      */
     public function ajax_retry() {
-        check_ajax_referer( 'libre_compress_nonce', 'nonce' );
+        check_ajax_referer( 'local_crush_nonce', 'nonce' );
 
         if ( ! current_user_can( 'manage_options' ) ) {
-            wp_send_json_error( array( 'message' => __( '权限不足', 'libre-compress' ) ) );
+            wp_send_json_error( array( 'message' => __( '权限不足', 'local-crush' ) ) );
         }
 
         $task = $this->get_task();
 
         if ( ! $task || self::STATUS_RUNNING === $task['status'] ) {
-            wp_send_json_error( array( 'message' => __( '没有可重试的失败记录', 'libre-compress' ) ) );
+            wp_send_json_error( array( 'message' => __( '没有可重试的失败记录', 'local-crush' ) ) );
         }
 
         $failed_ids = isset( $task['failed_ids'] ) ? array_values( (array) $task['failed_ids'] ) : array();
 
         if ( empty( $failed_ids ) ) {
-            wp_send_json_error( array( 'message' => __( '没有可重试的失败记录', 'libre-compress' ) ) );
+            wp_send_json_error( array( 'message' => __( '没有可重试的失败记录', 'local-crush' ) ) );
         }
 
         $start = $this->start( (string) $task['type'], $failed_ids );
@@ -285,17 +285,17 @@ class Libre_Compress_Task {
      * 后台页面：关掉结果面板
      */
     public function ajax_dismiss() {
-        check_ajax_referer( 'libre_compress_nonce', 'nonce' );
+        check_ajax_referer( 'local_crush_nonce', 'nonce' );
 
         if ( ! current_user_can( 'manage_options' ) ) {
-            wp_send_json_error( array( 'message' => __( '权限不足', 'libre-compress' ) ) );
+            wp_send_json_error( array( 'message' => __( '权限不足', 'local-crush' ) ) );
         }
 
         $task = $this->get_task();
 
         // 正在执行的任务不给关：关掉就看不到进度，也找不到停止按钮了
         if ( $task && self::STATUS_RUNNING === $task['status'] ) {
-            wp_send_json_error( array( 'message' => __( '任务还在执行，请先停止再关闭面板', 'libre-compress' ) ) );
+            wp_send_json_error( array( 'message' => __( '任务还在执行，请先停止再关闭面板', 'local-crush' ) ) );
         }
 
         $this->dismiss();
@@ -319,13 +319,13 @@ class Libre_Compress_Task {
      */
     public function start( string $type, array $queue = array() ) {
         if ( ! isset( $this->types[ $type ] ) ) {
-            return new WP_Error( 'invalid_type', __( '无效的操作类型', 'libre-compress' ) );
+            return new WP_Error( 'invalid_type', __( '无效的操作类型', 'local-crush' ) );
         }
 
         $current = $this->get_task();
 
         if ( $current && self::STATUS_RUNNING === $current['status'] && ! $this->is_stalled( $current ) ) {
-            return new WP_Error( 'busy', __( '已有批量任务正在执行，请等它跑完，或先点“停止任务”', 'libre-compress' ) );
+            return new WP_Error( 'busy', __( '已有批量任务正在执行，请等它跑完，或先点“停止任务”', 'local-crush' ) );
         }
 
         $queue  = array_values( array_unique( array_filter( array_map( 'absint', $queue ) ) ) );
@@ -595,7 +595,7 @@ class Libre_Compress_Task {
                 return $this->process_restore( $attachment_id, $outcome );
 
             case 'delete_backups':
-                $deleted = libre_compress()->processor->delete_attachment_backups( $attachment_id );
+                $deleted = local_crush()->processor->delete_attachment_backups( $attachment_id );
 
                 $outcome['success']     = $deleted['ok'] ? 1 : 0;
                 $outcome['failed']      = $deleted['ok'] ? 0 : 1;
@@ -626,7 +626,7 @@ class Libre_Compress_Task {
      * @return array
      */
     private function process_compress( int $attachment_id, array $outcome ): array {
-        $processor = libre_compress()->processor;
+        $processor = local_crush()->processor;
 
         // 已经压过的图不算“处理过”，只是顺路看一眼，否则进度条会虚高
         if ( ! $processor->has_pending_files( $attachment_id ) ) {
@@ -657,8 +657,8 @@ class Libre_Compress_Task {
      * @return array
      */
     private function process_restore( int $attachment_id, array $outcome ): array {
-        $processor = libre_compress()->processor;
-        $backup    = libre_compress()->backup;
+        $processor = local_crush()->processor;
+        $backup    = local_crush()->backup;
 
         // 备份文件没了又没有任何待收尾的恢复：顺手清掉残留索引，别让它每次都失败
         if ( ! $backup->has_backup( $attachment_id ) && ! $processor->has_pending_restore( $attachment_id ) ) {
@@ -685,7 +685,7 @@ class Libre_Compress_Task {
      * @return array
      */
     private function process_delete_fallback( int $attachment_id, array $outcome ): array {
-        $result = libre_compress()->processor->delete_fallback( $attachment_id );
+        $result = local_crush()->processor->delete_fallback( $attachment_id );
 
         $deleted = isset( $result['deleted_files'] ) ? (int) $result['deleted_files'] : 0;
         $failed  = ! empty( $result['failed'] );
@@ -714,7 +714,7 @@ class Libre_Compress_Task {
      * @return array
      */
     private function process_delete_thumbnails( int $attachment_id, array $outcome ): array {
-        $result = libre_compress()->thumbnail_manager->delete_disabled_for_attachment( $attachment_id );
+        $result = local_crush()->thumbnail_manager->delete_disabled_for_attachment( $attachment_id );
 
         if ( null === $result ) {
             $outcome['failed'] = 1;
@@ -753,7 +753,7 @@ class Libre_Compress_Task {
      * @return array
      */
     private function process_generate_thumbnails( int $attachment_id, array $outcome ): array {
-        $result = libre_compress()->thumbnail_manager->generate_missing_thumbnails( $attachment_id );
+        $result = local_crush()->thumbnail_manager->generate_missing_thumbnails( $attachment_id );
 
         if ( null === $result ) {
             $outcome['failed'] = 1;
@@ -965,7 +965,7 @@ class Libre_Compress_Task {
      * @return int[]
      */
     private function fetch_ids( string $source, int $after_id, int $limit ): array {
-        $database = libre_compress()->database;
+        $database = local_crush()->database;
 
         switch ( $source ) {
             case 'restore':
@@ -991,7 +991,7 @@ class Libre_Compress_Task {
      * @return int
      */
     private function count_source( string $source ): int {
-        $database = libre_compress()->database;
+        $database = local_crush()->database;
 
         switch ( $source ) {
             case 'restore':
@@ -1034,7 +1034,7 @@ class Libre_Compress_Task {
      */
     private function build_summary( array $task ): string {
         if ( (int) $task['total'] < 1 ) {
-            return __( '没有需要处理的项目', 'libre-compress' );
+            return __( '没有需要处理的项目', 'local-crush' );
         }
 
         $label  = (string) $this->types[ $task['type'] ]['label'];
@@ -1045,7 +1045,7 @@ class Libre_Compress_Task {
             case 'compress':
                 $summary = sprintf(
                     /* translators: %1$s: 任务名称, %2$d: 成功数, %3$d: 跳过数, %4$d: 失败数 */
-                    __( '%1$s - 成功: %2$d, 跳过: %3$d, 失败: %4$d', 'libre-compress' ),
+                    __( '%1$s - 成功: %2$d, 跳过: %3$d, 失败: %4$d', 'local-crush' ),
                     $label,
                     (int) $task['success'],
                     (int) $task['skipped'],
@@ -1056,7 +1056,7 @@ class Libre_Compress_Task {
             case 'restore':
                 $summary = sprintf(
                     /* translators: %1$s: 任务名称, %2$d: 成功数, %3$d: 失败数 */
-                    __( '%1$s - 成功: %2$d, 失败: %3$d', 'libre-compress' ),
+                    __( '%1$s - 成功: %2$d, 失败: %3$d', 'local-crush' ),
                     $label,
                     (int) $task['success'],
                     (int) $task['failed']
@@ -1066,7 +1066,7 @@ class Libre_Compress_Task {
             case 'delete_backups':
                 $summary = sprintf(
                     /* translators: 1: 涉及的附件数, 2: 删除的备份文件数, 3: 失败的附件数 */
-                    __( '已删除 %1$d 个附件上的 %2$d 个备份文件，失败 %3$d 个', 'libre-compress' ),
+                    __( '已删除 %1$d 个附件上的 %2$d 个备份文件，失败 %3$d 个', 'local-crush' ),
                     (int) $task['success'],
                     $files,
                     (int) $task['failed']
@@ -1076,35 +1076,35 @@ class Libre_Compress_Task {
             case 'delete_fallbacks':
                 $summary = sprintf(
                     /* translators: 1: 涉及的附件数, 2: 删除的回退文件数, 3: 替换的链接数 */
-                    __( '已删除 %1$d 个附件上的 %2$d 个兼容格式回退文件，替换了 %3$d 个图片链接', 'libre-compress' ),
+                    __( '已删除 %1$d 个附件上的 %2$d 个兼容格式回退文件，替换了 %3$d 个图片链接', 'local-crush' ),
                     (int) $task['success'],
                     $files,
                     isset( $detail['replaced'] ) ? (int) $detail['replaced'] : 0
                 );
 
                 if ( ! empty( $detail['content_failed'] ) ) {
-                    $summary .= ' ' . __( '部分正文链接未更新成功，可再次执行本操作继续处理。', 'libre-compress' );
+                    $summary .= ' ' . __( '部分正文链接未更新成功，可再次执行本操作继续处理。', 'local-crush' );
                 }
                 break;
 
             case 'delete_thumbnails':
                 $summary = sprintf(
                     /* translators: 1: 删除的文件数, 2: 影响的附件数, 3: 替换的链接数 */
-                    __( '已删除 %1$d 个未勾选尺寸的缩略图（涉及 %2$d 个附件），替换了 %3$d 个图片链接', 'libre-compress' ),
+                    __( '已删除 %1$d 个未勾选尺寸的缩略图（涉及 %2$d 个附件），替换了 %3$d 个图片链接', 'local-crush' ),
                     $files,
                     (int) $task['success'],
                     isset( $detail['replaced'] ) ? (int) $detail['replaced'] : 0
                 );
 
                 if ( ! empty( $detail['content_failed'] ) ) {
-                    $summary .= ' ' . __( '部分正文链接未更新成功，可再次执行本操作继续处理。', 'libre-compress' );
+                    $summary .= ' ' . __( '部分正文链接未更新成功，可再次执行本操作继续处理。', 'local-crush' );
                 }
                 break;
 
             case 'generate_thumbnails':
                 $summary = sprintf(
                     /* translators: 1: 补生成的附件数, 2: 新增文件数, 3: 跳过的附件数, 4: 失败的附件数 */
-                    __( '已为 %1$d 个附件补生成 %2$d 个缩略图（%3$d 个无需处理或已跳过，%4$d 个失败）', 'libre-compress' ),
+                    __( '已为 %1$d 个附件补生成 %2$d 个缩略图（%3$d 个无需处理或已跳过，%4$d 个失败）', 'local-crush' ),
                     (int) $task['success'],
                     $files,
                     (int) $task['skipped'],
@@ -1122,14 +1122,14 @@ class Libre_Compress_Task {
 
             $summary .= "\n" . sprintf(
                 /* translators: %s: 附件 ID 列表 */
-                __( '失败附件 ID：%s', 'libre-compress' ),
+                __( '失败附件 ID：%s', 'local-crush' ),
                 implode( ', ', array_map( 'strval', $shown ) )
             );
 
             if ( count( $failed_ids ) > count( $shown ) ) {
                 $summary .= sprintf(
                     /* translators: %d: 失败附件总数 */
-                    __( '（共 %d 个，仅显示前 10 个）', 'libre-compress' ),
+                    __( '（共 %d 个，仅显示前 10 个）', 'local-crush' ),
                     count( $failed_ids )
                 );
             }
@@ -1138,7 +1138,7 @@ class Libre_Compress_Task {
         if ( self::STATUS_STOPPED === $task['status'] ) {
             $summary .= "\n" . sprintf(
                 /* translators: %d: 已处理的附件数 */
-                __( '任务已停止：本次共处理 %d 个附件，可以随时再执行一次继续处理剩余部分。', 'libre-compress' ),
+                __( '任务已停止：本次共处理 %d 个附件，可以随时再执行一次继续处理剩余部分。', 'local-crush' ),
                 (int) $task['processed']
             );
         }
@@ -1302,6 +1302,6 @@ class Libre_Compress_Task {
     private function lock_dir(): string {
         $upload_dir = wp_upload_dir();
 
-        return $upload_dir['basedir'] . '/' . Libre_Compress_Processor::LOCK_DIR_NAME;
+        return $upload_dir['basedir'] . '/' . Local_Crush_Processor::LOCK_DIR_NAME;
     }
 }

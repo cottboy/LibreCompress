@@ -1,4 +1,4 @@
-# LibreCompress
+# Local Crush – CLI Image Compressor
 
 免费的纯本地 WordPress 图片压缩插件。所有处理都在服务器本地调用开源命令行工具完成，**不依赖任何第三方云服务**：无需 API Key，图片不会上传到外部服务器。
 
@@ -45,7 +45,7 @@
 - **内容 URL 持久替换**：转换时把文章正文里已固化的旧地址按实际映射改写为新文件，保留查询参数、锚点、`srcset` 与区块 JSON 的转义写法；恢复时反向替换。
 - **缩略图管理**：按尺寸逐个勾选是否生成，并用一个勾选框控制是否自动缩放超尺寸主图；删除未勾选尺寸时可一并清理不符设置的 `-scaled` 缩放图，补生成缺失尺寸时可一并生成或修正缩放图。
 - **SVG 安全上传**：清理脚本、事件属性和危险协议，写入失败时终止上传。
-- **多语言就绪**：界面文字使用翻译域 `libre-compress`。
+- **多语言就绪**：界面文字使用翻译域 `local-crush`。
 
 ## 环境要求
 
@@ -59,16 +59,16 @@
 
 ## 安装插件
 
-1. 将 `LibreCompress` 目录上传到 `/wp-content/plugins/`。
+1. 将 `local-crush` 目录上传到 `/wp-content/plugins/`。
 2. 在 WordPress 后台启用插件。
-3. 进入“设置 → LibreCompress”配置。
+3. 进入“设置 → Local Crush”配置。
 4. 在“压缩工具”页面检查本地工具状态。
 
 ## 安装压缩工具
 
 插件不携带二进制文件，可任选一种方式：
 
-1. 放入 `/wp-content/LibreCompress-bin/`（Windows 下通常需要 `.exe` 后缀）。
+1. 放入 `/wp-content/LocalCrush-bin/`（Windows 下通常需要 `.exe` 后缀）。
 2. 将工具目录加入系统 `PATH`。
 3. 使用系统包管理器安装。
 
@@ -92,7 +92,7 @@
 
 SVG 压缩改用 oxvg（Rust 单文件程序，不再需要 Node.js）：从发布页取 `oxvg.exe` 放进工具目录即可，**Windows x64 请用 v0.0.6 版本**（v0.0.9 的 `oxvg.exe` 是 ARM64，x64 只能自己编译），其他平台可用 `cargo install oxvg`。
 
-Windows 下把 `gif2webp.exe`、`webpmux.exe`、`cjxl.exe` 及对应包内依赖的 `.dll` 放进 `LibreCompress-bin`。
+Windows 下把 `gif2webp.exe`、`webpmux.exe`、`cjxl.exe` 及对应包内依赖的 `.dll` 放进 `LocalCrush-bin`。
 
 APNG 转 WebP 需要支持 `libwebp_anim` 的 FFmpeg；动画 AVIF 需要支持 `libaom-av1`、透明动画 AVIF 输出的新版 FFmpeg，两者均需支持 `-enc_time_base 1:1000` 和 `-fps_mode passthrough`，`ffmpeg.exe` 和 `ffprobe.exe` 放进同一工具目录。仅找到文件不代表该构建具备所有能力；实际处理失败时会保留原图。
 
@@ -452,7 +452,7 @@ JPG 是有损格式，质量 100 只是肉眼看不出差别，不是数学意�
 点下按钮后只会登记一条任务，真正干活的是服务器自己：
 
 - 服务器按附件 ID 游标一个一个处理，每批只干固定时长（默认 20 秒）就收手，把接力棒交给下一个请求，所以单个请求永远不会跑到 Nginx、宝塔、CDN 的超时线；
-- 任务的类型、总数、已处理、成功 / 跳过 / 失败、失败附件 ID、游标和当前文件都写在选项 `libre_compress_task` 里，页面只是每 2 秒来看一眼，**关掉浏览器任务照样继续，重新打开设置页还能接着看进度**；
+- 任务的类型、总数、已处理、成功 / 跳过 / 失败、失败附件 ID、游标和当前文件都写在选项 `local_crush_task` 里，页面只是每 2 秒来看一眼，**关掉浏览器任务照样继续，重新打开设置页还能接着看进度**；
 - 进度条的分母来自数据库计数或图片总数统计，所以是真的百分比，不是转圈动画；面板上另有“已处理 / 总数”“成功 / 跳过 / 失败”“当前文件”“已用时”；
 - 面板上的按钮：**停止任务**（随时叫停，已处理的部分保留）、**继续执行**（接力棒掉了时手动补一棒）、**重试失败的项目**（只把失败名单里的附件重跑一遍）、**完成**（关掉结果面板，服务端会记住，刷新页面也不会再冒出来；任务还在执行时不给关，要先停止）；
 - 接力棒发不出去时（个别服务器禁止网站访问自己），页面轮询会就地补一棒，另有每 2 分钟一次的定时兜底，只要站点有人访问就会接着跑；
@@ -486,28 +486,28 @@ JPG 是有损格式，质量 100 只是肉眼看不出差别，不是数学意�
 
 | 数据 | 位置 |
 | --- | --- |
-| 统一压缩记录 | `{表前缀}libre_compress_records` |
-| 备份记录 | `{表前缀}libre_compress_backups` |
-| 格式转换恢复映射 | 附件 post meta `_libre_compress_output` |
-| 恢复收尾状态 | 附件 post meta `_libre_compress_restore_ready` |
-| 上传待处理标记 | 附件 post meta `_libre_compress_pending` |
-| 原图备份文件 | `/wp-content/uploads/libre-compress-backups/` |
+| 统一压缩记录 | `{表前缀}local_crush_records` |
+| 备份记录 | `{表前缀}local_crush_backups` |
+| 格式转换恢复映射 | 附件 post meta `_local_crush_output` |
+| 恢复收尾状态 | 附件 post meta `_local_crush_restore_ready` |
+| 上传待处理标记 | 附件 post meta `_local_crush_pending` |
+| 原图备份文件 | `/wp-content/uploads/local-crush-backups/` |
 | 兼容格式回退文件 | 与新格式文件同目录，名为新格式名去掉最后一段扩展名，如 `example.jpg` 与 `example.jpg.webp` |
-| 批量任务状态 | 选项 `libre_compress_task`，只保留最近一次任务，关闭浏览器后仍是它 |
-| 批量任务兜底 | 定时任务 `libre_compress_task_watchdog_event`，任务执行期间每 2 分钟一次，结束后自动停排 |
-| 备份到期清理任务 | 定时任务 `libre_compress_backup_prune_event`，每天一次 |
-| 本地工具 | `/wp-content/LibreCompress-bin/` |
-| 附件处理锁 | `/wp-content/uploads/.libre-compress-locks/` |
+| 批量任务状态 | 选项 `local_crush_task`，只保留最近一次任务，关闭浏览器后仍是它 |
+| 批量任务兜底 | 定时任务 `local_crush_task_watchdog_event`，任务执行期间每 2 分钟一次，结束后自动停排 |
+| 备份到期清理任务 | 定时任务 `local_crush_backup_prune_event`，每天一次 |
+| 本地工具 | `/wp-content/LocalCrush-bin/` |
+| 附件处理锁 | `/wp-content/uploads/.local-crush-locks/` |
 
 ## 目录结构
 
 ```text
-LibreCompress/
-├── libre-compress.php
+local-crush/
+├── local-crush.php
 ├── uninstall.php
 ├── compression/                    # 本地压缩工具封装
 ├── includes/
-│   ├── class-libre-compress.php    # 主类和模块协调
+│   ├── class-local-crush.php       # 主类和模块协调
 │   ├── class-processor.php         # 统一压缩入口、状态和附件锁
 │   ├── class-task.php              # 后台批量任务引擎
 │   ├── class-compressor.php        # 同格式压缩底层处理
@@ -519,21 +519,21 @@ LibreCompress/
 │   ├── class-settings.php          # 设置页面
 │   └── class-database.php          # 数据访问
 ├── assets/js/admin.js
-└── languages/libre-compress.pot
+└── languages/local-crush.pot
 ```
 
 ## 接口
 
-自定义同格式压缩工具可继承 `Libre_Compress_Tool_Base`，实现 `get_name()`、`get_supported_formats()`、`get_executable_name()`、`build_command()` 等方法，然后通过以下钩子注册：
+自定义同格式压缩工具可继承 `Local_Crush_Tool_Base`，实现 `get_name()`、`get_supported_formats()`、`get_executable_name()`、`build_command()` 等方法，然后通过以下钩子注册：
 
 ```php
-add_action( 'libre_compress_register_tools', function ( $compressor ) {
+add_action( 'local_crush_register_tools', function ( $compressor ) {
     $compressor->register_tool( new My_Custom_Tool() );
 } );
 ```
 
 可用钩子：
 
-- `libre_compress_register_tools`：注册同格式压缩工具；
-- `libre_compress_before_compress`：每个文件压缩前触发；
-- `libre_compress_after_compress`：每个文件压缩成功后触发。
+- `local_crush_register_tools`：注册同格式压缩工具；
+- `local_crush_before_compress`：每个文件压缩前触发；
+- `local_crush_after_compress`：每个文件压缩成功后触发。

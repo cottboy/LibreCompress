@@ -2,7 +2,7 @@
 /**
  * 备份恢复类
  *
- * @package LibreCompress
+ * @package LocalCrush
  */
 
 // 防止直接访问
@@ -15,14 +15,14 @@ if ( ! defined( 'ABSPATH' ) ) {
  *
  * 负责管理图片备份和恢复功能
  */
-class Libre_Compress_Backup {
+class Local_Crush_Backup {
 
     /**
      * 备份目录名称
      *
      * @var string
      */
-    const BACKUP_DIR_NAME = 'libre-compress-backups';
+    const BACKUP_DIR_NAME = 'local-crush-backups';
 
     /**
      * 构造函数
@@ -230,7 +230,7 @@ class Libre_Compress_Backup {
             return false;
         }
 
-        $database = libre_compress()->database;
+        $database = local_crush()->database;
         $existing = $database->get_backup_by_attachment_and_path( $attachment_id, $relative );
 
         if ( $existing ) {
@@ -293,7 +293,7 @@ class Libre_Compress_Backup {
      * @return array
      */
     public function get_backups( int $attachment_id ): array {
-        $rows   = libre_compress()->database->get_backups_by_attachment( $attachment_id );
+        $rows   = local_crush()->database->get_backups_by_attachment( $attachment_id );
         $result = array();
 
         foreach ( (array) $rows as $row ) {
@@ -408,7 +408,7 @@ class Libre_Compress_Backup {
      * @return bool 是否全部删除成功
      */
     public function delete_backup( int $attachment_id ): bool {
-        $database = libre_compress()->database;
+        $database = local_crush()->database;
         $backups  = $this->get_backups( $attachment_id );
         $success  = true;
 

@@ -9,14 +9,14 @@
  * 插件只选择工具、读取播放参数，不重写透明像素。
  * 工具执行失败时保留原文件。
  *
- * @package LibreCompress
+ * @package LocalCrush
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-class Libre_Compress_Animation {
+class Local_Crush_Animation {
 
     /**
      * 同格式压缩受支持的动画格式
@@ -63,7 +63,7 @@ class Libre_Compress_Animation {
      * @return bool
      */
     public static function apng_enabled(): bool {
-        return Libre_Compress_Settings::param_flag( 'apng_enabled' );
+        return Local_Crush_Settings::param_flag( 'apng_enabled' );
     }
 
     /* ---------------------------------------------------------------------
@@ -120,10 +120,10 @@ class Libre_Compress_Animation {
                 $plan = self::analyze_gif( $file_path );
                 break;
             case 'png':
-                $plan = Libre_Compress_Compressor::is_apng( $file_path ) ? self::analyze_apng( $file_path ) : null;
+                $plan = Local_Crush_Compressor::is_apng( $file_path ) ? self::analyze_apng( $file_path ) : null;
                 break;
             case 'webp':
-                $plan = Libre_Compress_Compressor::is_animated_webp( $file_path ) ? self::analyze_webp( $file_path ) : null;
+                $plan = Local_Crush_Compressor::is_animated_webp( $file_path ) ? self::analyze_webp( $file_path ) : null;
                 break;
             case 'avif':
                 $plan = self::analyze_avif( $file_path );
@@ -357,13 +357,13 @@ class Libre_Compress_Animation {
      * @return array|null
      */
     private static function analyze_webp( string $file_path ): ?array {
-        $webpmux = Libre_Compress_Output::find_local_tool( 'webpmux' );
+        $webpmux = Local_Crush_Output::find_local_tool( 'webpmux' );
 
         if ( false === $webpmux ) {
             return null;
         }
 
-        $result = Libre_Compress_Tool_Base::run_command( array( $webpmux, '-info', $file_path ), 60 );
+        $result = Local_Crush_Tool_Base::run_command( array( $webpmux, '-info', $file_path ), 60 );
 
         if ( empty( $result['success'] ) ) {
             return null;
@@ -421,13 +421,13 @@ class Libre_Compress_Animation {
      * @return array|null
      */
     private static function analyze_avif( string $file_path ): ?array {
-        $decoder = Libre_Compress_Output::find_local_tool( 'avifdec' );
+        $decoder = Local_Crush_Output::find_local_tool( 'avifdec' );
 
         if ( false === $decoder ) {
             return null;
         }
 
-        $result = Libre_Compress_Tool_Base::run_command( array( $decoder, '--info', $file_path ), 60 );
+        $result = Local_Crush_Tool_Base::run_command( array( $decoder, '--info', $file_path ), 60 );
 
         if ( empty( $result['success'] ) ) {
             return null;
@@ -595,11 +595,11 @@ class Libre_Compress_Animation {
 
         // PNG 走无损时 APNG 自然跟着无损；PNG 走有损时，只有勾了“APNG 自动无损压缩”
         // 才绕开 pngquant 单独交给 oxipng，否则宁可不压——pngquant 逐帧挑调色板会把动图压闪。
-        if ( ! Libre_Compress_Settings::png_is_lossless() && ! self::apng_enabled() ) {
+        if ( ! Local_Crush_Settings::png_is_lossless() && ! self::apng_enabled() ) {
             return '';
         }
 
-        $tools = libre_compress()->compressor->get_tools();
+        $tools = local_crush()->compressor->get_tools();
 
         return isset( $tools['oxipng'] ) && $tools['oxipng']->is_tool_available() ? 'oxipng' : '';
     }
@@ -632,7 +632,7 @@ class Libre_Compress_Animation {
      * @return string|false
      */
     private static function tool( string $name ) {
-        return Libre_Compress_Output::find_local_tool( $name );
+        return Local_Crush_Output::find_local_tool( $name );
     }
 
     /* ---------------------------------------------------------------------
@@ -672,14 +672,14 @@ class Libre_Compress_Animation {
 
         if ( ! rename( $output, $file_path ) ) {
             self::cleanup( array( $output ) );
-            return $fail( __( '压缩结果替换失败，已保留原文件', 'libre-compress' ) );
+            return $fail( __( '压缩结果替换失败，已保留原文件', 'local-crush' ) );
         }
 
         clearstatcache( true, $file_path );
 
         return array(
             'success' => true,
-            'message' => __( '压缩成功', 'libre-compress' ),
+            'message' => __( '压缩成功', 'local-crush' ),
             'original_size' => $original,
             'compressed_size' => (int) filesize( $file_path ),
         );
@@ -705,29 +705,29 @@ class Libre_Compress_Animation {
 
         // 调用方必须给出尚不存在的新路径，不能覆盖原图或其他文件。
         if ( file_exists( $output ) || null === $plan || $plan['frames'] < 2 ) {
-            $result['message'] = __( '无法安全处理这张动图，已保留原文件', 'libre-compress' );
+            $result['message'] = __( '无法安全处理这张动图，已保留原文件', 'local-crush' );
             return $result;
         }
 
         $command = self::build_native_command( $source, $target, $output, $plan );
 
         if ( false === $command ) {
-            $result['message'] = __( '当前工具无法完整处理这张动画，已保留原文件', 'libre-compress' );
+            $result['message'] = __( '当前工具无法完整处理这张动画，已保留原文件', 'local-crush' );
             return $result;
         }
 
-        $run = Libre_Compress_Tool_Base::run_command( $command, 300 );
+        $run = Local_Crush_Tool_Base::run_command( $command, 300 );
 
         clearstatcache( true, $output );
         if ( empty( $run['success'] ) || ! file_exists( $output ) || 0 === (int) filesize( $output ) ) {
             self::cleanup( array( $output ) );
-            $result['message'] = __( '动图处理命令执行失败', 'libre-compress' );
+            $result['message'] = __( '动图处理命令执行失败', 'local-crush' );
             return $result;
         }
 
         if ( 'webp' === $target && ! self::restore_webp_playback( $output, $plan ) ) {
             self::cleanup( array( $output ) );
-            $result['message'] = __( '动图处理命令执行失败', 'libre-compress' );
+            $result['message'] = __( '动图处理命令执行失败', 'local-crush' );
             return $result;
         }
 
@@ -745,7 +745,7 @@ class Libre_Compress_Animation {
 
         // 参数按“整条工具链”取：只有工具完全一样的路径才共用一组。
         if ( 'jxl' === $target ) {
-            return Libre_Compress_Cjxl::build_command( $source, $output, 'jxl' );
+            return Local_Crush_Cjxl::build_command( $source, $output, 'jxl' );
         }
 
         if ( 'avif' === $target ) {
@@ -780,9 +780,9 @@ class Libre_Compress_Animation {
     private static function build_webp_command( string $source, string $output, array $plan ): array {
         $same     = 'webp' === $plan['format'];
         $group    = 'webp_anim';
-        $lossless = 'lossless' === Libre_Compress_Settings::param_mode( $group );
-        $quality  = Libre_Compress_Settings::param_int( $group . '_quality' );
-        $method   = Libre_Compress_Settings::param_int( $group . '_method' );
+        $lossless = 'lossless' === Local_Crush_Settings::param_mode( $group );
+        $quality  = Local_Crush_Settings::param_int( $group . '_quality' );
+        $method   = Local_Crush_Settings::param_int( $group . '_method' );
 
         $command = array( self::tool( 'ffmpeg' ), '-nostdin', '-v', 'error' );
 
@@ -808,7 +808,7 @@ class Libre_Compress_Animation {
 
         return array_merge( $command, array(
             '-enc_time_base', '1:1000', '-fps_mode', 'passthrough',
-            '-map_metadata', Libre_Compress_Settings::strips_metadata() ? '-1' : '0',
+            '-map_metadata', Local_Crush_Settings::strips_metadata() ? '-1' : '0',
             '-loop', ! empty( $plan['loop_infinite'] ) ? '0' : (string) ( (int) $plan['loop'] + 1 ),
             '-f', 'webp', $output,
         ) );
@@ -858,7 +858,7 @@ class Libre_Compress_Animation {
 
         self::cleanup( array( $temp ) );
 
-        $run = Libre_Compress_Tool_Base::run_command(
+        $run = Local_Crush_Tool_Base::run_command(
             array_merge( array( self::tool( 'webpmux' ) ), $options, array( $output, '-o', $temp ) ),
             60
         );
@@ -896,16 +896,16 @@ class Libre_Compress_Animation {
         }
 
         // gif2webp 默认保持无损，-lossy 是一个独立开关，不是“模式”。
-        $lossy   = Libre_Compress_Settings::param_flag( $group . '_lossy' );
-        $quality = Libre_Compress_Settings::param_int( $group . '_quality' );
+        $lossy   = Local_Crush_Settings::param_flag( $group . '_lossy' );
+        $quality = Local_Crush_Settings::param_int( $group . '_quality' );
 
-        $command = array( $gif2webp, '-m', (string) Libre_Compress_Settings::param_int( $group . '_method' ) );
+        $command = array( $gif2webp, '-m', (string) Local_Crush_Settings::param_int( $group . '_method' ) );
 
         if ( $lossy ) {
             $command = array_merge( $command, array( '-lossy', '-q', (string) $quality ) );
         }
 
-        $command = array_merge( $command, array( '-metadata', Libre_Compress_Settings::strips_metadata() ? 'icc' : 'all' ) );
+        $command = array_merge( $command, array( '-metadata', Local_Crush_Settings::strips_metadata() ? 'icc' : 'all' ) );
 
         return array_merge( $command, array( $source, '-o', $output ) );
     }
@@ -1023,10 +1023,10 @@ class Libre_Compress_Animation {
         $same     = 'avif' === $plan['format'];
         // 同格式比转格式多 avifdec / ffprobe 两步，工具链不同，参数各用一组。
         $group    = $same ? 'avif_anim' : 'avif_convert_anim';
-        $lossless = 'lossless' === Libre_Compress_Settings::param_mode( $group );
-        $crf      = Libre_Compress_Settings::param_int( $group . '_crf' );
-        $speed    = Libre_Compress_Settings::param_int( $group . '_speed' );
-        $threads  = Libre_Compress_Settings::param_int( $group . '_threads' );
+        $lossless = 'lossless' === Local_Crush_Settings::param_mode( $group );
+        $crf      = Local_Crush_Settings::param_int( $group . '_crf' );
+        $speed    = Local_Crush_Settings::param_int( $group . '_speed' );
+        $threads  = Local_Crush_Settings::param_int( $group . '_threads' );
         $command  = array( self::tool( 'ffmpeg' ), '-nostdin', '-v', 'error' );
 
         if ( 'gif' === $plan['format'] ) {
@@ -1041,7 +1041,7 @@ class Libre_Compress_Animation {
         $alpha_stream = '';
         if ( 'avif' === $plan['format'] ) {
             // AVIF 同时可能有封面图与动画轨道，只选择完整动画，不能误压封面。
-            $probe = Libre_Compress_Tool_Base::run_command( array( self::tool( 'ffprobe' ), '-v', 'error', '-show_streams', '-of', 'json', $source ), 30 );
+            $probe = Local_Crush_Tool_Base::run_command( array( self::tool( 'ffprobe' ), '-v', 'error', '-show_streams', '-of', 'json', $source ), 30 );
             $info = json_decode( (string) $probe['output'], true );
             if ( empty( $probe['success'] ) || empty( $info['streams'] ) ) {
                 return false;
@@ -1106,7 +1106,7 @@ class Libre_Compress_Animation {
 
             // 色彩抽样只存在于有损 YUV：4:4:4 保色最准，4:2:0 体积最小。
             // 只指定颜色轨道（第一条视频轨），透明轨道仍然按 gray 编码。
-            $chroma = Libre_Compress_Settings::param_choice( $group . '_chroma' );
+            $chroma = Local_Crush_Settings::param_choice( $group . '_chroma' );
 
             if ( 'auto' !== $chroma ) {
                 $encoder = array_merge( $encoder, array( '-pix_fmt:v:0', 'yuv' . $chroma . 'p' ) );
@@ -1123,7 +1123,7 @@ class Libre_Compress_Animation {
         }
         $command = array_merge( $command, array(
             '-enc_time_base', '1:1000', '-fps_mode', 'passthrough',
-            '-map_metadata', Libre_Compress_Settings::strips_metadata() ? '-1' : '0',
+            '-map_metadata', Local_Crush_Settings::strips_metadata() ? '-1' : '0',
             '-loop', ! empty( $plan['loop_infinite'] ) ? '0' : (string) ( $plan['loop'] + 1 ),
             '-f', 'avif', $output,
         ) );
@@ -1189,7 +1189,7 @@ class Libre_Compress_Animation {
      */
     public static function skip_reason( string $extension, string $target = '' ): string {
         if ( 'png' === $extension && '' === $target ) {
-            return __( 'APNG 已跳过：PNG 走的是有损模式，且没有勾选“APNG 自动无损压缩”，可在“压缩工具”页勾选，或在基本设置里勾选“APNG”让它转格式', 'libre-compress' );
+            return __( 'APNG 已跳过：PNG 走的是有损模式，且没有勾选“APNG 自动无损压缩”，可在“压缩工具”页勾选，或在基本设置里勾选“APNG”让它转格式', 'local-crush' );
         }
 
         return self::missing_tool_message( $extension, $target );
@@ -1211,7 +1211,7 @@ class Libre_Compress_Animation {
 
         return sprintf(
             /* translators: %s: 工具名称 */
-            __( '动图处理需要 %s 工具，当前环境未配齐，已跳过', 'libre-compress' ),
+            __( '动图处理需要 %s 工具，当前环境未配齐，已跳过', 'local-crush' ),
             implode( ' 或 ', $groups )
         );
     }
@@ -1230,10 +1230,10 @@ class Libre_Compress_Animation {
 /**
  * 动画同格式压缩的处理器
  *
- * 形状与 Libre_Compress_Tool_Base 的压缩入口一致（get_name / get_used_tool_name / compress），
+ * 形状与 Local_Crush_Tool_Base 的压缩入口一致（get_name / get_used_tool_name / compress），
  * 让压缩调度器能用同一套回滚副本与记录流程处理动图。
  */
-class Libre_Compress_Animated_Handler {
+class Local_Crush_Animated_Handler {
 
     /**
      * 处理的扩展名
@@ -1275,6 +1275,6 @@ class Libre_Compress_Animated_Handler {
      * @return array
      */
     public function compress( string $file_path, array $options = array() ): array {
-        return Libre_Compress_Animation::compress_same_format( $file_path, $options );
+        return Local_Crush_Animation::compress_same_format( $file_path, $options );
     }
 }

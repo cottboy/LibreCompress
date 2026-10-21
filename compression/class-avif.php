@@ -2,7 +2,7 @@
 /**
  * Avifenc AVIF 压缩渠道
  *
- * @package LibreCompress
+ * @package LocalCrush
  */
 
 // 防止直接访问
@@ -17,7 +17,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  * avifenc 不能直接读取 AVIF 文件，因此先用 avifdec 无损解码为
  * PNG 中间文件，再重新编码回 AVIF 并替换原文件。
  */
-class Libre_Compress_Avif extends Libre_Compress_Tool_Base {
+class Local_Crush_Avif extends Local_Crush_Tool_Base {
 
     /**
      * 缓存的解码器路径
@@ -56,7 +56,7 @@ class Libre_Compress_Avif extends Libre_Compress_Tool_Base {
     /**
      * 获取解码器（avifdec）路径
      *
-     * 查找逻辑与 get_executable_path() 一致：优先 wp-content/LibreCompress-bin 目录，其次系统 PATH。
+     * 查找逻辑与 get_executable_path() 一致：优先 wp-content/LocalCrush-bin 目录，其次系统 PATH。
      * public 供设置页展示解码器的安装状态与路径。
      *
      * @return string|false 解码器路径或 false
@@ -67,7 +67,7 @@ class Libre_Compress_Avif extends Libre_Compress_Tool_Base {
             return $this->decoder_path;
         }
 
-        $bin_path = LIBRE_COMPRESS_BIN_PATH . 'avifdec';
+        $bin_path = LOCAL_CRUSH_BIN_PATH . 'avifdec';
 
         // Windows 系统添加 .exe 后缀
         if ( $this->is_windows() ) {
@@ -146,17 +146,17 @@ class Libre_Compress_Avif extends Libre_Compress_Tool_Base {
      * @return array 参数数组（不含可执行文件）
      */
     public static function build_encode_args( string $group, string $source, string $output ): array {
-        $lossless = 'lossless' === Libre_Compress_Settings::param_mode( $group );
-        $quality  = Libre_Compress_Settings::param_int( $group . '_quality' );
+        $lossless = 'lossless' === Local_Crush_Settings::param_mode( $group );
+        $quality  = Local_Crush_Settings::param_int( $group . '_quality' );
 
         $args = array(
             '-j',
-            (string) Libre_Compress_Settings::param_int( $group . '_jobs' ),
+            (string) Local_Crush_Settings::param_int( $group . '_jobs' ),
             '-s',
-            (string) Libre_Compress_Settings::param_int( $group . '_speed' ),
+            (string) Local_Crush_Settings::param_int( $group . '_speed' ),
         );
 
-        $depth = Libre_Compress_Settings::param_choice( $group . '_depth' );
+        $depth = Local_Crush_Settings::param_choice( $group . '_depth' );
 
         if ( '8' !== $depth ) {
             $args[] = '-d';
@@ -164,7 +164,7 @@ class Libre_Compress_Avif extends Libre_Compress_Tool_Base {
         }
 
         // avifenc 默认会把输入里的 EXIF/XMP 原样搬进 AVIF，而产物是对外公开访问的文件
-        if ( Libre_Compress_Settings::strips_metadata() ) {
+        if ( Local_Crush_Settings::strips_metadata() ) {
             $args[] = '--ignore-exif';
             $args[] = '--ignore-xmp';
         }
@@ -177,10 +177,10 @@ class Libre_Compress_Avif extends Libre_Compress_Tool_Base {
 
             // 透明通道单独编码；不传时 avifenc 直接套用颜色质量，半透明边缘会被一起压。
             $args[] = '--qalpha';
-            $args[] = (string) Libre_Compress_Settings::param_int( $group . '_alpha_quality' );
+            $args[] = (string) Local_Crush_Settings::param_int( $group . '_alpha_quality' );
 
             // 色度抽样只存在于有损 YUV：4:2:0 更小但边缘颜色会糊，无损模式下不传。
-            $chroma = Libre_Compress_Settings::param_choice( $group . '_chroma' );
+            $chroma = Local_Crush_Settings::param_choice( $group . '_chroma' );
 
             if ( 'auto' !== $chroma ) {
                 $args[] = '-y';
@@ -238,10 +238,10 @@ class Libre_Compress_Avif extends Libre_Compress_Tool_Base {
         return array(
             'ubuntu'  => 'sudo apt-get install libavif-bin',
             'debian'  => 'sudo apt-get install libavif-bin',
-            'centos'  => __( '暂无官方包，建议从 GitHub Releases 下载或自行编译', 'libre-compress' ),
+            'centos'  => __( '暂无官方包，建议从 GitHub Releases 下载或自行编译', 'local-crush' ),
             'fedora'  => 'sudo dnf install libavif-tools',
             'macos'   => 'brew install libavif',
-            'windows' => __( '从 libavif GitHub Releases 下载静态编译的 avifenc.exe 和 avifdec.exe', 'libre-compress' ),
+            'windows' => __( '从 libavif GitHub Releases 下载静态编译的 avifenc.exe 和 avifdec.exe', 'local-crush' ),
         );
     }
 }

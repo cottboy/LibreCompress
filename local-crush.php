@@ -1,19 +1,19 @@
 <?php
 /**
- * Plugin Name: LibreCompress
- * Plugin URI: https://github.com/cottboy/libre-compress
- * Description: 免费的 WordPress 图片压缩插件。
+ * Plugin Name: Local Crush
+ * Plugin URI: https://github.com/cottboy/local-crush
+ * Description: Local Crush – CLI Image Compressor。免费的 WordPress 图片压缩插件。
  * Version: 1.9.0
  * Author: cottboy
  * Author URI: https://github.com/cottboy
  * License: GPL v2 or later
  * License URI: https://www.gnu.org/licenses/gpl-2.0.html
- * Text Domain: libre-compress
+ * Text Domain: local-crush
  * Domain Path: /languages
  * Requires at least: 6.4
  * Requires PHP: 7.4
  *
- * @package LibreCompress
+ * @package LocalCrush
  */
 
 // 防止直接访问
@@ -24,58 +24,58 @@ if ( ! defined( 'ABSPATH' ) ) {
 /**
  * 插件版本号
  */
-define( 'LIBRE_COMPRESS_VERSION', '1.9.0' );
+define( 'LOCAL_CRUSH_VERSION', '1.9.0' );
 
 /**
  * 插件文件路径
  */
-define( 'LIBRE_COMPRESS_FILE', __FILE__ );
+define( 'LOCAL_CRUSH_FILE', __FILE__ );
 
 /**
  * 插件目录路径
  */
-define( 'LIBRE_COMPRESS_PATH', plugin_dir_path( __FILE__ ) );
+define( 'LOCAL_CRUSH_PATH', plugin_dir_path( __FILE__ ) );
 
 /**
  * 插件目录 URL
  */
-define( 'LIBRE_COMPRESS_URL', plugin_dir_url( __FILE__ ) );
+define( 'LOCAL_CRUSH_URL', plugin_dir_url( __FILE__ ) );
 
 /**
  * 插件基础名称
  */
-define( 'LIBRE_COMPRESS_BASENAME', plugin_basename( __FILE__ ) );
+define( 'LOCAL_CRUSH_BASENAME', plugin_basename( __FILE__ ) );
 
 /**
  * 压缩工具二进制文件目录路径
  * 存储在 wp-content 目录下，避免插件更新时被覆盖
  */
-define( 'LIBRE_COMPRESS_BIN_PATH', WP_CONTENT_DIR . '/LibreCompress-bin/' );
+define( 'LOCAL_CRUSH_BIN_PATH', WP_CONTENT_DIR . '/LocalCrush-bin/' );
 
 /**
  * 数据库版本号
  */
-define( 'LIBRE_COMPRESS_DB_VERSION', '1.6.0' );
+define( 'LOCAL_CRUSH_DB_VERSION', '1.6.0' );
 
 /**
  * 加载插件文本域
  */
-function libre_compress_load_textdomain() {
+function local_crush_load_textdomain() {
     load_plugin_textdomain(
-        'libre-compress',
+        'local-crush',
         false,
-        dirname( LIBRE_COMPRESS_BASENAME ) . '/languages'
+        dirname( LOCAL_CRUSH_BASENAME ) . '/languages'
     );
 }
-add_action( 'plugins_loaded', 'libre_compress_load_textdomain' );
+add_action( 'plugins_loaded', 'local_crush_load_textdomain' );
 
 /**
  * 检查设置中是否允许上传 SVG
  *
  * @return bool 是否允许
  */
-function libre_compress_svg_upload_allowed(): bool {
-    $general = get_option( 'libre_compress_general', array() );
+function local_crush_svg_upload_allowed(): bool {
+    $general = get_option( 'local_crush_general', array() );
     return ! empty( $general['allow_svg_upload'] );
 }
 
@@ -85,13 +85,13 @@ function libre_compress_svg_upload_allowed(): bool {
  * @param array $mimes 允许的 MIME 类型
  * @return array 修改后的 MIME 类型
  */
-function libre_compress_allow_svg_upload( $mimes ) {
-    if ( libre_compress_svg_upload_allowed() && ! isset( $mimes['svg'] ) ) {
+function local_crush_allow_svg_upload( $mimes ) {
+    if ( local_crush_svg_upload_allowed() && ! isset( $mimes['svg'] ) ) {
         $mimes['svg'] = 'image/svg+xml';
     }
     return $mimes;
 }
-add_filter( 'upload_mimes', 'libre_compress_allow_svg_upload' );
+add_filter( 'upload_mimes', 'local_crush_allow_svg_upload' );
 
 /**
  * 清理 SVG 内容中的危险代码
@@ -102,7 +102,7 @@ add_filter( 'upload_mimes', 'libre_compress_allow_svg_upload' );
  * @param string $content SVG 文件内容
  * @return string|false 清理后的内容，不合法时返回 false
  */
-function libre_compress_sanitize_svg_content( string $content ) {
+function local_crush_sanitize_svg_content( string $content ) {
     // SVG 图片不需要 DOCTYPE/ENTITY，存在即拒绝，杜绝 XXE 向量
     if ( false !== stripos( $content, '<!DOCTYPE' ) || false !== stripos( $content, '<!ENTITY' ) ) {
         return false;
@@ -200,8 +200,8 @@ function libre_compress_sanitize_svg_content( string $content ) {
  * @param array $file 上传文件信息
  * @return array 修改后的上传文件信息
  */
-function libre_compress_sanitize_svg_upload( $file ) {
-    if ( ! libre_compress_svg_upload_allowed() ) {
+function local_crush_sanitize_svg_upload( $file ) {
+    if ( ! local_crush_svg_upload_allowed() ) {
         return $file;
     }
 
@@ -210,7 +210,7 @@ function libre_compress_sanitize_svg_upload( $file ) {
     }
 
     if ( ! class_exists( 'DOMDocument' ) ) {
-        $file['error'] = __( '服务器缺少 DOM 扩展，无法安全处理 SVG', 'libre-compress' );
+        $file['error'] = __( '服务器缺少 DOM 扩展，无法安全处理 SVG', 'local-crush' );
         return $file;
     }
 
@@ -218,14 +218,14 @@ function libre_compress_sanitize_svg_upload( $file ) {
     $content = file_get_contents( $file['tmp_name'] );
 
     if ( false === $content ) {
-        $file['error'] = __( '无法读取上传的 SVG 文件', 'libre-compress' );
+        $file['error'] = __( '无法读取上传的 SVG 文件', 'local-crush' );
         return $file;
     }
 
-    $clean = libre_compress_sanitize_svg_content( $content );
+    $clean = local_crush_sanitize_svg_content( $content );
 
     if ( false === $clean ) {
-        $file['error'] = __( 'SVG 内容不合法或包含危险代码', 'libre-compress' );
+        $file['error'] = __( 'SVG 内容不合法或包含危险代码', 'local-crush' );
         return $file;
     }
 
@@ -233,65 +233,65 @@ function libre_compress_sanitize_svg_upload( $file ) {
     $written = file_put_contents( $file['tmp_name'], $clean );
 
     if ( false === $written || $written !== strlen( $clean ) ) {
-        $file['error'] = __( '无法安全写入清理后的 SVG 文件', 'libre-compress' );
+        $file['error'] = __( '无法安全写入清理后的 SVG 文件', 'local-crush' );
     }
 
     return $file;
 }
-add_filter( 'wp_handle_upload_prefilter', 'libre_compress_sanitize_svg_upload' );
+add_filter( 'wp_handle_upload_prefilter', 'local_crush_sanitize_svg_upload' );
 
 /**
  * 加载依赖文件
  */
-function libre_compress_load_dependencies() {
+function local_crush_load_dependencies() {
     // 加载压缩工具基类和实现
-    require_once LIBRE_COMPRESS_PATH . 'compression/class-tool-base.php';
-    require_once LIBRE_COMPRESS_PATH . 'compression/class-jpeg.php';
-    require_once LIBRE_COMPRESS_PATH . 'compression/class-pngquant.php';
-    require_once LIBRE_COMPRESS_PATH . 'compression/class-oxipng.php';
-    require_once LIBRE_COMPRESS_PATH . 'compression/class-cwebp.php';
-    require_once LIBRE_COMPRESS_PATH . 'compression/class-avif.php';
-    require_once LIBRE_COMPRESS_PATH . 'compression/class-cjxl.php';
-    require_once LIBRE_COMPRESS_PATH . 'compression/class-gifsicle.php';
-    require_once LIBRE_COMPRESS_PATH . 'compression/class-oxvg.php';
+    require_once LOCAL_CRUSH_PATH . 'compression/class-tool-base.php';
+    require_once LOCAL_CRUSH_PATH . 'compression/class-jpeg.php';
+    require_once LOCAL_CRUSH_PATH . 'compression/class-pngquant.php';
+    require_once LOCAL_CRUSH_PATH . 'compression/class-oxipng.php';
+    require_once LOCAL_CRUSH_PATH . 'compression/class-cwebp.php';
+    require_once LOCAL_CRUSH_PATH . 'compression/class-avif.php';
+    require_once LOCAL_CRUSH_PATH . 'compression/class-cjxl.php';
+    require_once LOCAL_CRUSH_PATH . 'compression/class-gifsicle.php';
+    require_once LOCAL_CRUSH_PATH . 'compression/class-oxvg.php';
 
     // 加载核心类
-    require_once LIBRE_COMPRESS_PATH . 'includes/class-database.php';
-    require_once LIBRE_COMPRESS_PATH . 'includes/class-backup.php';
-    require_once LIBRE_COMPRESS_PATH . 'includes/class-compatible-fallback.php';
-    require_once LIBRE_COMPRESS_PATH . 'includes/class-animation.php';
-    require_once LIBRE_COMPRESS_PATH . 'includes/class-compressor.php';
-    require_once LIBRE_COMPRESS_PATH . 'includes/class-converter.php';
-    require_once LIBRE_COMPRESS_PATH . 'includes/class-processor.php';
-    require_once LIBRE_COMPRESS_PATH . 'includes/class-task.php';
-    require_once LIBRE_COMPRESS_PATH . 'includes/class-media-library.php';
-    require_once LIBRE_COMPRESS_PATH . 'includes/class-thumbnail-manager.php';
-    require_once LIBRE_COMPRESS_PATH . 'includes/class-settings.php';
-    require_once LIBRE_COMPRESS_PATH . 'includes/class-libre-compress.php';
+    require_once LOCAL_CRUSH_PATH . 'includes/class-database.php';
+    require_once LOCAL_CRUSH_PATH . 'includes/class-backup.php';
+    require_once LOCAL_CRUSH_PATH . 'includes/class-compatible-fallback.php';
+    require_once LOCAL_CRUSH_PATH . 'includes/class-animation.php';
+    require_once LOCAL_CRUSH_PATH . 'includes/class-compressor.php';
+    require_once LOCAL_CRUSH_PATH . 'includes/class-converter.php';
+    require_once LOCAL_CRUSH_PATH . 'includes/class-processor.php';
+    require_once LOCAL_CRUSH_PATH . 'includes/class-task.php';
+    require_once LOCAL_CRUSH_PATH . 'includes/class-media-library.php';
+    require_once LOCAL_CRUSH_PATH . 'includes/class-thumbnail-manager.php';
+    require_once LOCAL_CRUSH_PATH . 'includes/class-settings.php';
+    require_once LOCAL_CRUSH_PATH . 'includes/class-local-crush.php';
 }
 
 /**
  * 插件激活时执行
  */
-function libre_compress_activate() {
+function local_crush_activate() {
     // 加载依赖
-    libre_compress_load_dependencies();
+    local_crush_load_dependencies();
 
     // 创建压缩工具二进制文件目录
-    if ( ! file_exists( LIBRE_COMPRESS_BIN_PATH ) ) {
-        wp_mkdir_p( LIBRE_COMPRESS_BIN_PATH );
+    if ( ! file_exists( LOCAL_CRUSH_BIN_PATH ) ) {
+        wp_mkdir_p( LOCAL_CRUSH_BIN_PATH );
 
-        // 添加 .htaccess 保护文件（新旧 Apache 双兼容写法，见 Libre_Compress_Backup）
-        $htaccess_content = Libre_Compress_Backup::protection_htaccess_content();
-        file_put_contents( LIBRE_COMPRESS_BIN_PATH . '.htaccess', $htaccess_content );
+        // 添加 .htaccess 保护文件（新旧 Apache 双兼容写法，见 Local_Crush_Backup）
+        $htaccess_content = Local_Crush_Backup::protection_htaccess_content();
+        file_put_contents( LOCAL_CRUSH_BIN_PATH . '.htaccess', $htaccess_content );
 
         // 添加 index.php 保护文件
         $index_content = "<?php\n// 禁止直接访问\n";
-        file_put_contents( LIBRE_COMPRESS_BIN_PATH . 'index.php', $index_content );
+        file_put_contents( LOCAL_CRUSH_BIN_PATH . 'index.php', $index_content );
     }
 
     // 创建数据库表
-    $database = new Libre_Compress_Database();
+    $database = new Local_Crush_Database();
     $database->create_tables();
 
     // 设置默认选项
@@ -309,65 +309,65 @@ function libre_compress_activate() {
     );
 
     // 压缩参数的默认值只从参数总表取，不再在激活代码里抄第二份。
-    $default_tools = Libre_Compress_Settings::defaults();
+    $default_tools = Local_Crush_Settings::defaults();
 
     // 只在选项不存在时添加默认值
-    if ( false === get_option( 'libre_compress_general' ) ) {
-        add_option( 'libre_compress_general', $default_general );
+    if ( false === get_option( 'local_crush_general' ) ) {
+        add_option( 'local_crush_general', $default_general );
     }
 
-    if ( false === get_option( 'libre_compress_tools' ) ) {
-        add_option( 'libre_compress_tools', $default_tools );
+    if ( false === get_option( 'local_crush_tools' ) ) {
+        add_option( 'local_crush_tools', $default_tools );
     }
 
     // 注册上传待办收尾任务，保证没有后台访问时也会排空队列
-    if ( ! wp_next_scheduled( Libre_Compress_Processor::PENDING_SWEEP_HOOK ) ) {
-        wp_schedule_event( time() + HOUR_IN_SECONDS, 'hourly', Libre_Compress_Processor::PENDING_SWEEP_HOOK );
+    if ( ! wp_next_scheduled( Local_Crush_Processor::PENDING_SWEEP_HOOK ) ) {
+        wp_schedule_event( time() + HOUR_IN_SECONDS, 'hourly', Local_Crush_Processor::PENDING_SWEEP_HOOK );
     }
 
     // 注册原图备份到期清理任务，保留时长为永久时任务本身会直接跳过
-    if ( ! wp_next_scheduled( Libre_Compress_Processor::BACKUP_PRUNE_HOOK ) ) {
-        wp_schedule_event( time() + 2 * HOUR_IN_SECONDS, 'daily', Libre_Compress_Processor::BACKUP_PRUNE_HOOK );
+    if ( ! wp_next_scheduled( Local_Crush_Processor::BACKUP_PRUNE_HOOK ) ) {
+        wp_schedule_event( time() + 2 * HOUR_IN_SECONDS, 'daily', Local_Crush_Processor::BACKUP_PRUNE_HOOK );
     }
 
     // 刷新重写规则
     flush_rewrite_rules();
 }
-register_activation_hook( __FILE__, 'libre_compress_activate' );
+register_activation_hook( __FILE__, 'local_crush_activate' );
 
 /**
  * 插件停用时执行
  */
-function libre_compress_deactivate() {
+function local_crush_deactivate() {
     // 确保常量可用
-    libre_compress_load_dependencies();
+    local_crush_load_dependencies();
 
-    wp_clear_scheduled_hook( Libre_Compress_Processor::PENDING_SWEEP_HOOK );
-    wp_clear_scheduled_hook( Libre_Compress_Processor::BACKUP_PRUNE_HOOK );
-    wp_unschedule_hook( Libre_Compress_Task::WATCHDOG_HOOK );
+    wp_clear_scheduled_hook( Local_Crush_Processor::PENDING_SWEEP_HOOK );
+    wp_clear_scheduled_hook( Local_Crush_Processor::BACKUP_PRUNE_HOOK );
+    wp_unschedule_hook( Local_Crush_Task::WATCHDOG_HOOK );
 
     // 刷新重写规则
     flush_rewrite_rules();
 }
-register_deactivation_hook( __FILE__, 'libre_compress_deactivate' );
+register_deactivation_hook( __FILE__, 'local_crush_deactivate' );
 
 /**
  * 初始化插件
  */
-function libre_compress_init() {
+function local_crush_init() {
     // 加载依赖
-    libre_compress_load_dependencies();
+    local_crush_load_dependencies();
 
     // 初始化主类
-    Libre_Compress::get_instance();
+    Local_Crush::get_instance();
 }
-add_action( 'plugins_loaded', 'libre_compress_init', 20 );
+add_action( 'plugins_loaded', 'local_crush_init', 20 );
 
 /**
  * 获取插件实例
  *
- * @return Libre_Compress
+ * @return Local_Crush
  */
-function libre_compress() {
-    return Libre_Compress::get_instance();
+function local_crush() {
+    return Local_Crush::get_instance();
 }

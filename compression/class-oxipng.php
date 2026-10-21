@@ -2,7 +2,7 @@
 /**
  * Oxipng PNG 无损压缩渠道
  *
- * @package LibreCompress
+ * @package LocalCrush
  */
 
 // 防止直接访问
@@ -15,7 +15,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  *
  * 使用 oxipng 命令行工具进行 PNG 无损压缩
  */
-class Libre_Compress_Oxipng extends Libre_Compress_Tool_Base {
+class Local_Crush_Oxipng extends Local_Crush_Tool_Base {
 
     /**
      * 获取渠道名称
@@ -56,21 +56,21 @@ class Libre_Compress_Oxipng extends Libre_Compress_Tool_Base {
 
         // 静态 PNG 与 APNG 动图共用同一组 oxipng 参数，都走 png_lossless 分组。
         $prefix = 'png_lossless';
-        $level  = Libre_Compress_Settings::param_int( $prefix . '_oxipng_level' );
+        $level  = Local_Crush_Settings::param_int( $prefix . '_oxipng_level' );
 
         // 构建命令：-o 无损级别，--strip 元数据取舍，--alpha 优化透明通道，--quiet 静默
         $command_parts = array(
             $executable,
             sprintf( '-o%d', $level ),
-            Libre_Compress_Settings::strips_metadata() ? '--strip=safe' : '--strip=none',
+            Local_Crush_Settings::strips_metadata() ? '--strip=safe' : '--strip=none',
             '--quiet',
         );
 
-        if ( Libre_Compress_Settings::param_flag( $prefix . '_oxipng_alpha' ) ) {
+        if ( Local_Crush_Settings::param_flag( $prefix . '_oxipng_alpha' ) ) {
             $command_parts[] = '--alpha';
         }
 
-        if ( Libre_Compress_Settings::param_flag( $prefix . '_oxipng_zopfli' ) ) {
+        if ( Local_Crush_Settings::param_flag( $prefix . '_oxipng_zopfli' ) ) {
             $command_parts[] = '--zopfli';
         }
 
@@ -100,7 +100,7 @@ class Libre_Compress_Oxipng extends Libre_Compress_Tool_Base {
             'centos'  => 'cargo install oxipng',
             'fedora'  => 'sudo dnf install oxipng',
             'macos'   => 'brew install oxipng',
-            'windows' => __( '从 GitHub 下载预编译的二进制文件', 'libre-compress' ),
+            'windows' => __( '从 GitHub 下载预编译的二进制文件', 'local-crush' ),
         );
     }
 }

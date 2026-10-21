@@ -2,7 +2,7 @@
 /**
  * 压缩工具基类
  *
- * @package LibreCompress
+ * @package LocalCrush
  */
 
 // 防止直接访问
@@ -15,7 +15,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  *
  * 提供命令行压缩工具的通用功能
  */
-abstract class Libre_Compress_Tool_Base {
+abstract class Local_Crush_Tool_Base {
 
     /**
      * 缓存的可执行文件路径
@@ -165,7 +165,7 @@ abstract class Libre_Compress_Tool_Base {
     /**
      * 获取可执行文件路径
      *
-     * 优先查找 wp-content/LibreCompress-bin 目录，然后查找系统 PATH
+     * 优先查找 wp-content/LocalCrush-bin 目录，然后查找系统 PATH
      *
      * @return string|false 可执行文件路径或 false
      */
@@ -176,8 +176,8 @@ abstract class Libre_Compress_Tool_Base {
 
         $executable_name = $this->get_executable_name();
 
-        // 1. 首先检查 wp-content/LibreCompress-bin 目录
-        $bin_path = LIBRE_COMPRESS_BIN_PATH . $executable_name;
+        // 1. 首先检查 wp-content/LocalCrush-bin 目录
+        $bin_path = LOCAL_CRUSH_BIN_PATH . $executable_name;
 
         // Windows 系统添加 .exe 后缀
         if ( $this->is_windows() ) {
@@ -295,14 +295,14 @@ abstract class Libre_Compress_Tool_Base {
         if ( empty( $command ) ) {
             return array(
                 'success'     => false,
-                'output'      => __( '命令为空', 'libre-compress' ),
+                'output'      => __( '命令为空', 'local-crush' ),
                 'return_code' => -1,
             );
         }
         if ( ! self::is_command_execution_available() ) {
             return array(
                 'success'     => false,
-                'output'      => __( '本地命令执行功能不可用', 'libre-compress' ),
+                'output'      => __( '本地命令执行功能不可用', 'local-crush' ),
                 'return_code' => -1,
             );
         }
@@ -318,7 +318,7 @@ abstract class Libre_Compress_Tool_Base {
             }
             return array(
                 'success'     => false,
-                'output'      => __( '无法创建命令输出缓冲区', 'libre-compress' ),
+                'output'      => __( '无法创建命令输出缓冲区', 'local-crush' ),
                 'return_code' => -1,
             );
         }
@@ -335,7 +335,7 @@ abstract class Libre_Compress_Tool_Base {
             unlink( $stderr_path );
             return array(
                 'success'     => false,
-                'output'      => __( '无法启动本地命令', 'libre-compress' ),
+                'output'      => __( '无法启动本地命令', 'local-crush' ),
                 'return_code' => -1,
             );
         }
@@ -375,7 +375,7 @@ abstract class Libre_Compress_Tool_Base {
         if ( $timedout ) {
             return array(
                 'success'     => false,
-                'output'      => __( '本地命令执行超时', 'libre-compress' ),
+                'output'      => __( '本地命令执行超时', 'local-crush' ),
                 'return_code' => 124,
             );
         }
@@ -452,7 +452,7 @@ abstract class Libre_Compress_Tool_Base {
                 'success'         => false,
                 'message'         => sprintf(
                     /* translators: %s: 工具名称 */
-                    __( '%s 不可用', 'libre-compress' ),
+                    __( '%s 不可用', 'local-crush' ),
                     $this->get_name()
                 ),
                 'original_size'   => 0,
@@ -464,7 +464,7 @@ abstract class Libre_Compress_Tool_Base {
         if ( ! file_exists( $file_path ) ) {
             return array(
                 'success'         => false,
-                'message'         => __( '文件不存在', 'libre-compress' ),
+                'message'         => __( '文件不存在', 'local-crush' ),
                 'original_size'   => 0,
                 'compressed_size' => 0,
             );
@@ -475,7 +475,7 @@ abstract class Libre_Compress_Tool_Base {
         if ( ! in_array( $extension, $this->get_supported_formats(), true ) ) {
             return array(
                 'success'         => false,
-                'message'         => __( '不支持的文件格式', 'libre-compress' ),
+                'message'         => __( '不支持的文件格式', 'local-crush' ),
                 'original_size'   => 0,
                 'compressed_size' => 0,
             );
@@ -513,7 +513,7 @@ abstract class Libre_Compress_Tool_Base {
             if ( ! $this->finalize_temp_output( $temp_output, $file_path ) ) {
                 return array(
                     'success'         => false,
-                    'message'         => __( '压缩结果收尾处理失败，已保留原文件', 'libre-compress' ),
+                    'message'         => __( '压缩结果收尾处理失败，已保留原文件', 'local-crush' ),
                     'original_size'   => $original_size,
                     'compressed_size' => $original_size,
                 );
@@ -522,7 +522,7 @@ abstract class Libre_Compress_Tool_Base {
             if ( '' !== $temp_output && ! $this->replace_with_temp_output( $temp_output, $file_path ) ) {
                 return array(
                     'success'         => false,
-                    'message'         => __( '压缩结果替换失败，已保留原文件', 'libre-compress' ),
+                    'message'         => __( '压缩结果替换失败，已保留原文件', 'local-crush' ),
                     'original_size'   => $original_size,
                     'compressed_size' => $original_size,
                 );
@@ -535,7 +535,7 @@ abstract class Libre_Compress_Tool_Base {
             if ( $compressed_size <= 0 ) {
                 return array(
                     'success'         => false,
-                    'message'         => __( '压缩结果为空文件，已保留原文件', 'libre-compress' ),
+                    'message'         => __( '压缩结果为空文件，已保留原文件', 'local-crush' ),
                     'original_size'   => $original_size,
                     'compressed_size' => $original_size,
                 );
@@ -543,7 +543,7 @@ abstract class Libre_Compress_Tool_Base {
 
             return array(
                 'success'         => true,
-                'message'         => __( '压缩成功', 'libre-compress' ),
+                'message'         => __( '压缩成功', 'local-crush' ),
                 'original_size'   => $original_size,
                 'compressed_size' => $compressed_size,
             );

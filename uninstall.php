@@ -1,10 +1,10 @@
 <?php
 /**
- * LibreCompress 卸载清理脚本
+ * Local Crush 卸载清理脚本
  *
  * 插件卸载时执行，清除所有产生的数据
  *
- * @package LibreCompress
+ * @package LocalCrush
  */
 
 // 如果不是通过 WordPress 卸载，则退出
@@ -15,8 +15,8 @@ if ( ! defined( 'WP_UNINSTALL_PLUGIN' ) ) {
 global $wpdb;
 
 // 删除数据库表
-$records_table = $wpdb->prefix . 'libre_compress_records';
-$backups_table = $wpdb->prefix . 'libre_compress_backups';
+$records_table = $wpdb->prefix . 'local_crush_records';
+$backups_table = $wpdb->prefix . 'local_crush_backups';
 
 // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 $wpdb->query( "DROP TABLE IF EXISTS {$records_table}" );
@@ -24,25 +24,25 @@ $wpdb->query( "DROP TABLE IF EXISTS {$records_table}" );
 $wpdb->query( "DROP TABLE IF EXISTS {$backups_table}" );
 
 // 删除设置项
-delete_option( 'libre_compress_general' );
-delete_option( 'libre_compress_tools' );
-delete_option( 'libre_compress_db_version' );
-delete_option( 'libre_compress_task' );
+delete_option( 'local_crush_general' );
+delete_option( 'local_crush_tools' );
+delete_option( 'local_crush_db_version' );
+delete_option( 'local_crush_task' );
 
 // 删除插件写入的附件处理标记、格式转换映射和恢复中间状态；统一压缩记录已随数据表删除。
 // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
-$wpdb->query( "DELETE FROM {$wpdb->postmeta} WHERE meta_key IN ('_libre_compress_output', '_libre_compress_restore_ready', '_libre_compress_pending')" );
+$wpdb->query( "DELETE FROM {$wpdb->postmeta} WHERE meta_key IN ('_local_crush_output', '_local_crush_restore_ready', '_local_crush_pending')" );
 
-// 停用定时任务并清理限流 transient（钩子名需与 Libre_Compress_Processor、Libre_Compress_Task 常量保持一致）
-wp_clear_scheduled_hook( 'libre_compress_pending_sweep_event' );
-wp_clear_scheduled_hook( 'libre_compress_backup_prune_event' );
-wp_unschedule_hook( 'libre_compress_task_watchdog_event' );
-delete_transient( 'libre_compress_pending_sweep' );
+// 停用定时任务并清理限流 transient（钩子名需与 Local_Crush_Processor、Local_Crush_Task 常量保持一致）
+wp_clear_scheduled_hook( 'local_crush_pending_sweep_event' );
+wp_clear_scheduled_hook( 'local_crush_backup_prune_event' );
+wp_unschedule_hook( 'local_crush_task_watchdog_event' );
+delete_transient( 'local_crush_pending_sweep' );
 
-// 删除备份文件目录和附件锁目录（目录名需与 Libre_Compress_Processor 常量保持一致）
+// 删除备份文件目录和附件锁目录（目录名需与 Local_Crush_Processor 常量保持一致）
 $upload_dir = wp_upload_dir();
 
-foreach ( array( 'libre-compress-backups', '.libre-compress-locks' ) as $dir_name ) {
+foreach ( array( 'local-crush-backups', '.local-crush-locks' ) as $dir_name ) {
     $target_dir = $upload_dir['basedir'] . '/' . $dir_name;
 
     if ( ! is_dir( $target_dir ) ) {
@@ -67,7 +67,7 @@ foreach ( array( 'libre-compress-backups', '.libre-compress-locks' ) as $dir_nam
 }
 
 // 删除压缩工具二进制目录
-$bin_dir = WP_CONTENT_DIR . '/LibreCompress-bin';
+$bin_dir = WP_CONTENT_DIR . '/LocalCrush-bin';
 
 if ( is_dir( $bin_dir ) ) {
     // 递归删除目录中的所有文件

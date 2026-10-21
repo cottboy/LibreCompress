@@ -2,7 +2,7 @@
 /**
  * 压缩调度器类
  *
- * @package LibreCompress
+ * @package LocalCrush
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -14,7 +14,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  *
  * 负责管理压缩工具并执行压缩流程。
  */
-class Libre_Compress_Compressor {
+class Local_Crush_Compressor {
 
     /**
      * 压缩工具列表
@@ -34,24 +34,24 @@ class Libre_Compress_Compressor {
      * 注册默认压缩工具
      */
     private function register_default_tools() {
-        $this->register_tool( new Libre_Compress_Jpeg() );
-        $this->register_tool( new Libre_Compress_Pngquant() );
-        $this->register_tool( new Libre_Compress_Oxipng() );
-        $this->register_tool( new Libre_Compress_Cwebp() );
-        $this->register_tool( new Libre_Compress_Avif() );
-        $this->register_tool( new Libre_Compress_Cjxl() );
-        $this->register_tool( new Libre_Compress_Gifsicle() );
-        $this->register_tool( new Libre_Compress_Oxvg() );
+        $this->register_tool( new Local_Crush_Jpeg() );
+        $this->register_tool( new Local_Crush_Pngquant() );
+        $this->register_tool( new Local_Crush_Oxipng() );
+        $this->register_tool( new Local_Crush_Cwebp() );
+        $this->register_tool( new Local_Crush_Avif() );
+        $this->register_tool( new Local_Crush_Cjxl() );
+        $this->register_tool( new Local_Crush_Gifsicle() );
+        $this->register_tool( new Local_Crush_Oxvg() );
 
-        do_action( 'libre_compress_register_tools', $this );
+        do_action( 'local_crush_register_tools', $this );
     }
 
     /**
      * 注册压缩工具
      *
-     * @param Libre_Compress_Tool_Base $tool 工具实例
+     * @param Local_Crush_Tool_Base $tool 工具实例
      */
-    public function register_tool( Libre_Compress_Tool_Base $tool ) {
+    public function register_tool( Local_Crush_Tool_Base $tool ) {
         $this->tools[ $tool->get_name() ] = $tool;
     }
 
@@ -68,14 +68,14 @@ class Libre_Compress_Compressor {
      * 根据文件格式获取可用的压缩工具
      *
      * @param string $extension 文件扩展名
-     * @return Libre_Compress_Tool_Base|null 工具实例或 null
+     * @return Local_Crush_Tool_Base|null 工具实例或 null
      */
-    public function get_tool_for_format( string $extension ): ?Libre_Compress_Tool_Base {
+    public function get_tool_for_format( string $extension ): ?Local_Crush_Tool_Base {
         $extension = strtolower( $extension );
 
         if ( 'png' === $extension ) {
             // PNG 走哪条路径只从参数总表读，缺失或非法时与设置页显示的一致
-            $tool_name = Libre_Compress_Settings::png_is_lossless() ? 'oxipng' : 'pngquant';
+            $tool_name = Local_Crush_Settings::png_is_lossless() ? 'oxipng' : 'pngquant';
 
             if ( isset( $this->tools[ $tool_name ] ) && $this->tools[ $tool_name ]->is_tool_available() ) {
                 return $this->tools[ $tool_name ];
@@ -399,7 +399,7 @@ class Libre_Compress_Compressor {
         if ( ! file_exists( $file_path ) ) {
             return array(
                 'success' => false,
-                'message' => __( '文件不存在', 'libre-compress' ),
+                'message' => __( '文件不存在', 'local-crush' ),
                 'status'  => 'failed',
             );
         }
@@ -407,7 +407,7 @@ class Libre_Compress_Compressor {
         if ( ! $this->is_safe_path( $file_path ) ) {
             return array(
                 'success' => false,
-                'message' => __( '文件路径不安全', 'libre-compress' ),
+                'message' => __( '文件路径不安全', 'local-crush' ),
                 'status'  => 'failed',
             );
         }
@@ -417,35 +417,35 @@ class Libre_Compress_Compressor {
         // 动图不能交给只认第一帧的单文件工具：pngquant、cwebp、avifenc 都会把动图压成静图。
         // APNG 由 oxipng 整只无损优化（见 APNG 自动无损压缩开关），其余动图直接交给支持完整动画的工具。
         $plan   = in_array( $extension, array( 'gif', 'png', 'webp', 'avif' ), true )
-            ? Libre_Compress_Animation::analyze( $file_path )
+            ? Local_Crush_Animation::analyze( $file_path )
             : null;
         $tool   = null;
 
         if ( null === $plan && ( ( 'gif' === $extension && self::is_animated_gif( $file_path ) )
             || ( 'webp' === $extension && self::is_animated_webp( $file_path ) ) ) ) {
-            $message = __( '无法读取动图信息，已停止压缩以保护内容', 'libre-compress' );
+            $message = __( '无法读取动图信息，已停止压缩以保护内容', 'local-crush' );
             $this->record_skipped_file( $attachment_id, $file_path, $size_type, $message );
             return array( 'success' => false, 'message' => $message, 'status' => 'skipped' );
         }
 
         // 已确认是 APNG 但读不出完整帧信息时，宁可跳过，也不能把它当普通 PNG 交给有损工具。
-        if ( 'png' === $extension && Libre_Compress_Compressor::is_apng( $file_path ) && null === $plan ) {
-            $message = __( '无法读取 APNG 动画信息，已跳过以保护动画内容', 'libre-compress' );
+        if ( 'png' === $extension && Local_Crush_Compressor::is_apng( $file_path ) && null === $plan ) {
+            $message = __( '无法读取 APNG 动画信息，已跳过以保护动画内容', 'local-crush' );
             $this->record_skipped_file( $attachment_id, $file_path, $size_type, $message );
             return array( 'success' => false, 'message' => $message, 'status' => 'skipped' );
         }
 
         if ( null !== $plan && $plan['frames'] > 1 ) {
             $message = '';
-            $native  = Libre_Compress_Animation::native_tool_for( $extension );
+            $native  = Local_Crush_Animation::native_tool_for( $extension );
 
             if ( '' !== $native && isset( $this->tools[ $native ] ) ) {
                 // APNG 整只交给 oxipng：实测它能保住帧结构与每帧时长，不必拆帧
                 $tool = $this->tools[ $native ];
-            } elseif ( Libre_Compress_Animation::same_format_supported( $extension ) ) {
-                $tool = new Libre_Compress_Animated_Handler( $extension );
+            } elseif ( Local_Crush_Animation::same_format_supported( $extension ) ) {
+                $tool = new Local_Crush_Animated_Handler( $extension );
             } else {
-                $message = Libre_Compress_Animation::skip_reason( $extension );
+                $message = Local_Crush_Animation::skip_reason( $extension );
             }
 
             if ( null === $tool ) {
@@ -462,7 +462,7 @@ class Libre_Compress_Compressor {
         }
 
         if ( ! $tool ) {
-            $message = __( '没有可用的压缩工具', 'libre-compress' );
+            $message = __( '没有可用的压缩工具', 'local-crush' );
             $this->record_skipped_file( $attachment_id, $file_path, $size_type, $message );
 
             return array(
@@ -477,7 +477,7 @@ class Libre_Compress_Compressor {
 
         // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_copy
         if ( ! copy( $file_path, $rollback_path ) ) {
-            $message = __( '无法创建回滚副本，已跳过压缩', 'libre-compress' );
+            $message = __( '无法创建回滚副本，已跳过压缩', 'local-crush' );
             $this->record_skipped_file( $attachment_id, $file_path, $size_type, $message );
 
             return array(
@@ -495,7 +495,7 @@ class Libre_Compress_Compressor {
             $rolled_back = $this->rollback_file( $rollback_path, $file_path );
             $message     = $rolled_back
                 ? $result['message']
-                : __( '压缩失败且回滚失败，请保留回滚副本并检查磁盘状态', 'libre-compress' );
+                : __( '压缩失败且回滚失败，请保留回滚副本并检查磁盘状态', 'local-crush' );
 
             $this->save_compression_record(
                 $attachment_id,
@@ -525,7 +525,7 @@ class Libre_Compress_Compressor {
             $rolled_back = $this->rollback_file( $rollback_path, $file_path );
 
             if ( ! $rolled_back ) {
-                $message = __( '压缩结果无效且回滚失败，请保留回滚副本并检查磁盘状态', 'libre-compress' );
+                $message = __( '压缩结果无效且回滚失败，请保留回滚副本并检查磁盘状态', 'local-crush' );
                 $this->save_compression_record(
                     $attachment_id,
                     $file_path,
@@ -547,7 +547,7 @@ class Libre_Compress_Compressor {
             }
 
             // 没有压缩收益同样视为已处理：文件已回到原状，重复压缩只会得到相同结果。
-            $message = __( '压缩后体积没有变小，已保留原图', 'libre-compress' );
+            $message = __( '压缩后体积没有变小，已保留原图', 'local-crush' );
 
             if ( ! $this->save_compression_record(
                 $attachment_id,
@@ -560,7 +560,7 @@ class Libre_Compress_Compressor {
             ) ) {
                 return array(
                     'success'         => false,
-                    'message'         => __( '压缩记录保存失败，请重新压缩', 'libre-compress' ),
+                    'message'         => __( '压缩记录保存失败，请重新压缩', 'local-crush' ),
                     'status'          => 'failed',
                     'original_size'   => $original_size,
                     'compressed_size' => $original_size,
@@ -594,8 +594,8 @@ class Libre_Compress_Compressor {
         if ( ! $record_saved ) {
             $rolled_back = $this->rollback_file( $rollback_path, $file_path );
             $message     = $rolled_back
-                ? __( '压缩记录保存失败，已恢复原文件', 'libre-compress' )
-                : __( '压缩记录保存失败且回滚失败，请保留回滚副本并检查数据库状态', 'libre-compress' );
+                ? __( '压缩记录保存失败，已恢复原文件', 'local-crush' )
+                : __( '压缩记录保存失败且回滚失败，请保留回滚副本并检查数据库状态', 'local-crush' );
 
             return array(
                 'success'         => false,
@@ -610,7 +610,7 @@ class Libre_Compress_Compressor {
 
         return array(
             'success'         => true,
-            'message'         => __( '压缩成功', 'libre-compress' ),
+            'message'         => __( '压缩成功', 'local-crush' ),
             'status'          => 'success',
             'original_size'   => $original_size,
             'compressed_size' => $compressed_size,
@@ -683,7 +683,7 @@ class Libre_Compress_Compressor {
         string $status,
         string $error_message = ''
     ): bool {
-        $database = libre_compress()->database;
+        $database = local_crush()->database;
 
         $upload_dir    = wp_upload_dir();
         $base_dir      = untrailingslashit( wp_normalize_path( $upload_dir['basedir'] ) );

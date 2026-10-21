@@ -2,7 +2,7 @@
 /**
  * oxvg SVG 压缩渠道
  *
- * @package LibreCompress
+ * @package LocalCrush
  */
 
 // 防止直接访问
@@ -16,7 +16,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  * 用 Rust 写的 oxvg 压缩 SVG：单文件可执行程序，不需要 Node.js。
  * 命令行与 svgo 完全不同——oxvg 用子命令，优化力度靠 -e 预设指定。
  */
-class Libre_Compress_Oxvg extends Libre_Compress_Tool_Base {
+class Local_Crush_Oxvg extends Local_Crush_Tool_Base {
 
     /**
      * 获取渠道名称
@@ -55,7 +55,7 @@ class Libre_Compress_Oxvg extends Libre_Compress_Tool_Base {
     protected function build_command_chain( string $file_path, array $options ): array {
         $executable  = $this->get_executable_path();
         $temp_output = $this->get_temp_output_path( $file_path );
-        $preset      = Libre_Compress_Settings::param_choice( 'svg_preset' );
+        $preset      = Local_Crush_Settings::param_choice( 'svg_preset' );
 
         // default 是常规优化预设；safe 更保守，几乎不改视觉。
         return array(
@@ -84,7 +84,7 @@ class Libre_Compress_Oxvg extends Libre_Compress_Tool_Base {
      * @return bool 是否清理成功
      */
     protected function finalize_temp_output( string $temp_output, string $file_path ): bool {
-        if ( '' === $temp_output || ! Libre_Compress_Settings::strips_metadata() ) {
+        if ( '' === $temp_output || ! Local_Crush_Settings::strips_metadata() ) {
             return true;
         }
 
@@ -144,7 +144,7 @@ class Libre_Compress_Oxvg extends Libre_Compress_Tool_Base {
             'centos'  => 'cargo install oxvg',
             'fedora'  => 'cargo install oxvg',
             'macos'   => 'brew install oxvg',
-            'windows' => __( '从发布页下载 oxvg.exe 放进工具目录（x64 请用 v0.0.6，之后的版本只发了 ARM64）', 'libre-compress' ),
+            'windows' => __( '从发布页下载 oxvg.exe 放进工具目录（x64 请用 v0.0.6，之后的版本只发了 ARM64）', 'local-crush' ),
         );
     }
 }

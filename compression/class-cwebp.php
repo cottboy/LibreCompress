@@ -2,7 +2,7 @@
 /**
  * Cwebp WEBP 压缩渠道
  *
- * @package LibreCompress
+ * @package LocalCrush
  */
 
 // 防止直接访问
@@ -15,7 +15,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  *
  * 使用 cwebp 命令行工具压缩 WebP 图片
  */
-class Libre_Compress_Cwebp extends Libre_Compress_Tool_Base {
+class Local_Crush_Cwebp extends Local_Crush_Tool_Base {
 
     /**
      * 获取渠道名称
@@ -71,12 +71,12 @@ class Libre_Compress_Cwebp extends Libre_Compress_Tool_Base {
      * @return array 参数数组（不含可执行文件）
      */
     public static function build_encode_args( string $group, string $source, string $output ): array {
-        $lossless = 'lossless' === Libre_Compress_Settings::param_mode( $group );
-        $quality  = Libre_Compress_Settings::param_int( $group . '_quality' );
+        $lossless = 'lossless' === Local_Crush_Settings::param_mode( $group );
+        $quality  = Local_Crush_Settings::param_int( $group . '_quality' );
 
         $args = array(
             '-preset',
-            Libre_Compress_Settings::param_choice( $group . '_preset' ),
+            Local_Crush_Settings::param_choice( $group . '_preset' ),
             '-quiet',
             '-mt',
         );
@@ -84,12 +84,12 @@ class Libre_Compress_Cwebp extends Libre_Compress_Tool_Base {
         if ( $lossless ) {
             $args[] = '-lossless';
             $args[] = '-z';
-            $args[] = (string) Libre_Compress_Settings::param_int( $group . '_lossless_level' );
+            $args[] = (string) Local_Crush_Settings::param_int( $group . '_lossless_level' );
         } else {
             $args[] = '-q';
             $args[] = (string) $quality;
             $args[] = '-m';
-            $args[] = (string) Libre_Compress_Settings::param_int( $group . '_method' );
+            $args[] = (string) Local_Crush_Settings::param_int( $group . '_method' );
         }
 
         // 分区、噪点整形、滤波强度/锐度、锐利色彩转换这些 cwebp 高级项一律不传，
@@ -97,16 +97,16 @@ class Libre_Compress_Cwebp extends Libre_Compress_Tool_Base {
 
         // 透明通道单独编码，100 即 alpha 无损；始终显式传入，省得默认值变化时悄悄掉画质。
         $args[] = '-alpha_q';
-        $args[] = (string) Libre_Compress_Settings::param_int( $group . '_alpha_quality' );
+        $args[] = (string) Local_Crush_Settings::param_int( $group . '_alpha_quality' );
 
         // 透明区域的 RGB 默认会被压平，开源图或要再做透明处理时把它保下来。
-        if ( Libre_Compress_Settings::param_flag( $group . '_exact' ) ) {
+        if ( Local_Crush_Settings::param_flag( $group . '_exact' ) ) {
             $args[] = '-exact';
         }
 
         // cwebp 默认不复制任何元数据；删除元数据时只保留 ICC，避免广色域图偏色。
         $args[] = '-metadata';
-        $args[] = Libre_Compress_Settings::strips_metadata() ? 'icc' : 'all';
+        $args[] = Local_Crush_Settings::strips_metadata() ? 'icc' : 'all';
 
         $args[] = $source;
         $args[] = '-o';
@@ -146,7 +146,7 @@ class Libre_Compress_Cwebp extends Libre_Compress_Tool_Base {
             'centos'  => 'sudo yum install libwebp-tools',
             'fedora'  => 'sudo dnf install libwebp-tools',
             'macos'   => 'brew install webp',
-            'windows' => __( '从 Google 官网下载预编译的二进制文件', 'libre-compress' ),
+            'windows' => __( '从 Google 官网下载预编译的二进制文件', 'local-crush' ),
         );
     }
 }

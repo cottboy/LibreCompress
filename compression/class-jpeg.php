@@ -2,7 +2,7 @@
 /**
  * JPEG 压缩渠道
  *
- * @package LibreCompress
+ * @package LocalCrush
  */
 
 // 防止直接访问
@@ -18,7 +18,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  * 有损：--max 设定允许的最高质量；
  * 无损：不传任何质量参数，jpegoptim 只重排压缩数据，画面像素不变。
  */
-class Libre_Compress_Jpeg extends Libre_Compress_Tool_Base {
+class Local_Crush_Jpeg extends Local_Crush_Tool_Base {
 
     /**
      * 获取渠道名称
@@ -61,11 +61,11 @@ class Libre_Compress_Jpeg extends Libre_Compress_Tool_Base {
             return array();
         }
 
-        $lossless = 'lossless' === Libre_Compress_Settings::param_mode( 'jpeg' );
+        $lossless = 'lossless' === Local_Crush_Settings::param_mode( 'jpeg' );
         $command  = array( $executable, '--quiet' );
 
         // 渐进式、顺序式与自动挑选直接对应 jpegoptim 的三个开关。
-        $progressive = Libre_Compress_Settings::param_choice( 'jpeg_progressive' );
+        $progressive = Local_Crush_Settings::param_choice( 'jpeg_progressive' );
 
         if ( 'normal' === $progressive ) {
             $command[] = '--all-normal';
@@ -76,7 +76,7 @@ class Libre_Compress_Jpeg extends Libre_Compress_Tool_Base {
         }
 
         // 只删隐私类元数据；ICC 色彩配置留着，删掉会让广色域图偏色。
-        if ( Libre_Compress_Settings::strips_metadata() ) {
+        if ( Local_Crush_Settings::strips_metadata() ) {
             $command[] = '--strip-exif';
             $command[] = '--strip-xmp';
             $command[] = '--strip-iptc';
@@ -87,7 +87,7 @@ class Libre_Compress_Jpeg extends Libre_Compress_Tool_Base {
 
         if ( ! $lossless ) {
             // 有损压缩设置最大质量；无损下不传质量参数，jpegoptim 默认就是无损的
-            $command[] = '--max=' . Libre_Compress_Settings::param_int( 'jpeg_quality' );
+            $command[] = '--max=' . Local_Crush_Settings::param_int( 'jpeg_quality' );
         }
 
         $command[] = $file_path;
@@ -116,7 +116,7 @@ class Libre_Compress_Jpeg extends Libre_Compress_Tool_Base {
             'centos'  => 'sudo yum install jpegoptim',
             'fedora'  => 'sudo dnf install jpegoptim',
             'macos'   => 'brew install jpegoptim',
-            'windows' => __( '从 GitHub 下载预编译的 jpegoptim.exe', 'libre-compress' ),
+            'windows' => __( '从 GitHub 下载预编译的 jpegoptim.exe', 'local-crush' ),
         );
     }
 }

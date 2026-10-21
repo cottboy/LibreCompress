@@ -2,7 +2,7 @@
 /**
  * 统一图片压缩处理器
  *
- * @package LibreCompress
+ * @package LocalCrush
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -15,17 +15,17 @@ if ( ! defined( 'ABSPATH' ) ) {
  * 根据设置为每个文件选择同格式压缩或目标格式输出，两种路径都写入同一
  * 压缩记录表，并统一提供批量、媒体库单项和上传自动处理入口。
  */
-class Libre_Compress_Processor {
+class Local_Crush_Processor {
 
     /**
      * 锁目录名称
      */
-    const LOCK_DIR_NAME = '.libre-compress-locks';
+    const LOCK_DIR_NAME = '.local-crush-locks';
 
     /**
      * 待自动处理标记
      */
-    const PENDING_META_KEY = '_libre_compress_pending';
+    const PENDING_META_KEY = '_local_crush_pending';
 
     /**
      * 单个请求在结束前最多处理的上传待办数量
@@ -45,12 +45,12 @@ class Libre_Compress_Processor {
     /**
      * 后台收尾限流使用的 transient 名
      */
-    const PENDING_SWEEP_TRANSIENT = 'libre_compress_pending_sweep';
+    const PENDING_SWEEP_TRANSIENT = 'local_crush_pending_sweep';
 
     /**
      * 后台收尾定时任务的钩子名
      */
-    const PENDING_SWEEP_HOOK = 'libre_compress_pending_sweep_event';
+    const PENDING_SWEEP_HOOK = 'local_crush_pending_sweep_event';
 
     /**
      * 恢复中间状态标记
@@ -58,12 +58,12 @@ class Libre_Compress_Processor {
      * 原图已写回、其余文件已删除，但缩略图还没重新生成、正文链接还没还原时写入，
      * 让中断后的恢复可以从收尾阶段继续，而不是重复改动文件与引用。
      */
-    const RESTORE_STATE_META_KEY = '_libre_compress_restore_ready';
+    const RESTORE_STATE_META_KEY = '_local_crush_restore_ready';
 
     /**
      * 原图备份到期清理任务的钩子名
      */
-    const BACKUP_PRUNE_HOOK = 'libre_compress_backup_prune_event';
+    const BACKUP_PRUNE_HOOK = 'local_crush_backup_prune_event';
 
     /**
      * 备份到期清理单批处理的附件数量
@@ -185,7 +185,7 @@ class Libre_Compress_Processor {
             $state['total_files']++;
 
             $record_size_type = isset( $file['record_size_type'] ) ? $file['record_size_type'] : $file['size_type'];
-            $record            = libre_compress()->database->get_record( $attachment_id, $record_size_type );
+            $record            = local_crush()->database->get_record( $attachment_id, $record_size_type );
             $complete = $this->is_complete_record( $file['file_path'], $record );
 
             if ( $complete ) {
@@ -242,19 +242,19 @@ class Libre_Compress_Processor {
      * @return array
      */
     private function get_processing_files( int $attachment_id, ?array $metadata = null ): array {
-        $files = libre_compress()->compressor->get_attachment_files( $attachment_id, $metadata );
+        $files = local_crush()->compressor->get_attachment_files( $attachment_id, $metadata );
 
         foreach ( $files as $index => $file ) {
             $files[ $index ]['is_fallback']      = false;
             $files[ $index ]['record_size_type'] = $file['size_type'];
         }
 
-        foreach ( libre_compress()->output_processor->get_fallback_entries( $attachment_id ) as $entry ) {
+        foreach ( local_crush()->output_processor->get_fallback_entries( $attachment_id ) as $entry ) {
             $size_type = isset( $entry['size_type'] ) ? (string) $entry['size_type'] : 'full';
 
             $files[] = array(
                 'size_type'        => $size_type,
-                'record_size_type' => libre_compress()->output_processor->get_fallback_record_size_type( $size_type ),
+                'record_size_type' => local_crush()->output_processor->get_fallback_record_size_type( $size_type ),
                 'file_path'        => $entry['from'],
                 'is_fallback'      => true,
                 'fallback_to'      => $entry['to'],
@@ -287,7 +287,7 @@ class Libre_Compress_Processor {
             $exists            = '' !== $path && is_file( $path );
             $current_size      = $exists ? (int) filesize( $path ) : 0;
             $record_size_type  = isset( $file['record_size_type'] ) ? (string) $file['record_size_type'] : (string) $file['size_type'];
-            $record            = libre_compress()->database->get_record( $attachment_id, $record_size_type );
+            $record            = local_crush()->database->get_record( $attachment_id, $record_size_type );
             $complete          = $exists && $this->is_complete_record( $path, $record );
             $status            = $this->detail_file_status( $exists, $record, $complete );
             $record_original   = is_array( $record ) ? max( 0, (int) $record['original_size'] ) : 0;
@@ -307,7 +307,7 @@ class Libre_Compress_Processor {
             }
 
             $items[] = array(
-                'group'         => $is_fallback ? __( '旧兼容格式', 'libre-compress' ) : __( '当前文件', 'libre-compress' ),
+                'group'         => $is_fallback ? __( '旧兼容格式', 'local-crush' ) : __( '当前文件', 'local-crush' ),
                 'name'          => $this->detail_size_label( $size_type, $metadata ),
                 'size_type'     => $size_type,
                 'format'        => $this->detail_file_format( $path ),
@@ -320,7 +320,7 @@ class Libre_Compress_Processor {
             );
         }
 
-        foreach ( libre_compress()->backup->get_backup_info( $attachment_id ) as $backup ) {
+        foreach ( local_crush()->backup->get_backup_info( $attachment_id ) as $backup ) {
             $backup_path  = isset( $backup['backup_path'] ) ? (string) $backup['backup_path'] : '';
             $backup_size  = isset( $backup['backup_size'] ) ? max( 0, (int) $backup['backup_size'] ) : 0;
             $backup_exists = $backup_size > 0 && is_file( $backup_path );
@@ -334,11 +334,11 @@ class Libre_Compress_Processor {
             }
 
             $items[] = array(
-                'group'         => __( '原图备份', 'libre-compress' ),
-                'name'          => __( '备份文件', 'libre-compress' ),
+                'group'         => __( '原图备份', 'local-crush' ),
+                'name'          => __( '备份文件', 'local-crush' ),
                 'size_type'     => 'backup',
                 'format'        => $this->detail_file_format( $backup_path ),
-                'status'        => $backup_exists ? __( '备份中', 'libre-compress' ) : __( '文件不存在', 'libre-compress' ),
+                'status'        => $backup_exists ? __( '备份中', 'local-crush' ) : __( '文件不存在', 'local-crush' ),
                 'original_size' => $backup_size,
                 'current_size'  => $backup_size,
                 'saved_size'    => 0,
@@ -364,22 +364,22 @@ class Libre_Compress_Processor {
      */
     private function detail_file_status( bool $exists, $record, bool $complete ): string {
         if ( ! $exists ) {
-            return __( '文件不存在', 'libre-compress' );
+            return __( '文件不存在', 'local-crush' );
         }
 
         if ( $complete ) {
-            return __( '已压缩', 'libre-compress' );
+            return __( '已压缩', 'local-crush' );
         }
 
         if ( is_array( $record ) && 'failed' === (string) $record['status'] ) {
-            return __( '压缩失败', 'libre-compress' );
+            return __( '压缩失败', 'local-crush' );
         }
 
         if ( is_array( $record ) && 'skipped' === (string) $record['status'] ) {
-            return __( '已跳过', 'libre-compress' );
+            return __( '已跳过', 'local-crush' );
         }
 
-        return __( '未压缩', 'libre-compress' );
+        return __( '未压缩', 'local-crush' );
     }
 
     /**
@@ -391,11 +391,11 @@ class Libre_Compress_Processor {
      */
     private function detail_size_label( string $size_type, array $metadata ): string {
         if ( 'full' === $size_type ) {
-            return __( '主图', 'libre-compress' );
+            return __( '主图', 'local-crush' );
         }
 
         if ( 'original_image' === $size_type ) {
-            return __( '未缩放原图', 'libre-compress' );
+            return __( '未缩放原图', 'local-crush' );
         }
 
         $size = isset( $metadata['sizes'][ $size_type ] ) && is_array( $metadata['sizes'][ $size_type ] )
@@ -407,7 +407,7 @@ class Libre_Compress_Processor {
         if ( $width > 0 && $height > 0 ) {
             return sprintf(
                 /* translators: 1: 缩略图尺寸名, 2: 宽度, 3: 高度 */
-                __( '缩略图 %1$s（%2$d × %3$d）', 'libre-compress' ),
+                __( '缩略图 %1$s（%2$d × %3$d）', 'local-crush' ),
                 $size_type,
                 $width,
                 $height
@@ -416,7 +416,7 @@ class Libre_Compress_Processor {
 
         return sprintf(
             /* translators: %s: 缩略图尺寸名 */
-            __( '缩略图 %s', 'libre-compress' ),
+            __( '缩略图 %s', 'local-crush' ),
             $size_type
         );
     }
@@ -430,7 +430,7 @@ class Libre_Compress_Processor {
     private function detail_file_format( string $path ): string {
         $extension = strtolower( (string) pathinfo( $path, PATHINFO_EXTENSION ) );
 
-        return '' === $extension ? __( '未知', 'libre-compress' ) : strtoupper( $extension );
+        return '' === $extension ? __( '未知', 'local-crush' ) : strtoupper( $extension );
     }
 
     /**
@@ -456,7 +456,7 @@ class Libre_Compress_Processor {
      */
     public function compress_attachment( int $attachment_id ): array {
         if ( ! $this->is_valid_attachment( $attachment_id ) ) {
-            return $this->empty_result( __( '无效的图片附件', 'libre-compress' ), 'failed' );
+            return $this->empty_result( __( '无效的图片附件', 'local-crush' ), 'failed' );
         }
 
         $lock = $this->acquire_attachment_lock( $attachment_id );
@@ -474,7 +474,7 @@ class Libre_Compress_Processor {
             $metadata = wp_get_attachment_metadata( $attachment_id );
             $files    = $this->get_processing_files( $attachment_id, is_array( $metadata ) ? $metadata : null );
             if ( empty( $files ) ) {
-                return $this->empty_result( __( '未找到可压缩的图片文件', 'libre-compress' ), 'failed' );
+                return $this->empty_result( __( '未找到可压缩的图片文件', 'local-crush' ), 'failed' );
             }
 
             $pending = $this->collect_pending_files( $attachment_id, $files );
@@ -482,7 +482,7 @@ class Libre_Compress_Processor {
             // 只对待压缩的图片生效：已全部压缩的附件在这里直接返回，
             // 不会对同一张图反复处理，也不会动已压缩文件的大小。
             if ( empty( $pending ) ) {
-                return $this->empty_result( __( '图片已经压缩', 'libre-compress' ), 'skipped' );
+                return $this->empty_result( __( '图片已经压缩', 'local-crush' ), 'skipped' );
             }
 
             // 只要附件已有一个成功记录，后续补压缩就只能保持当前格式，
@@ -490,7 +490,7 @@ class Libre_Compress_Processor {
             $allow_target_conversion = true;
             foreach ( $files as $candidate ) {
                 $candidate_record_type = isset( $candidate['record_size_type'] ) ? $candidate['record_size_type'] : $candidate['size_type'];
-                $candidate_record      = libre_compress()->database->get_record( $attachment_id, $candidate_record_type );
+                $candidate_record      = local_crush()->database->get_record( $attachment_id, $candidate_record_type );
 
                 if ( is_file( $candidate['file_path'] ) && $this->is_complete_record( $candidate['file_path'], $candidate_record ) ) {
                     $allow_target_conversion = false;
@@ -500,10 +500,10 @@ class Libre_Compress_Processor {
 
             // 智能备份：压缩前只备份一份主图像（未缩放原图优先），恢复时据此重建缩略图。
             if ( ! $this->backup_original_if_needed( $attachment_id, $metadata ) ) {
-                return $this->empty_result( __( '无法创建原图备份，已停止压缩', 'libre-compress' ), 'failed' );
+                return $this->empty_result( __( '无法创建原图备份，已停止压缩', 'local-crush' ), 'failed' );
             }
 
-            $output_settings = libre_compress()->output_processor->get_output_settings();
+            $output_settings = local_crush()->output_processor->get_output_settings();
             $target          = $output_settings['target'];
             $output_map   = array();
             $result          = array(
@@ -519,19 +519,19 @@ class Libre_Compress_Processor {
             );
 
             foreach ( $pending as $file ) {
-                do_action( 'libre_compress_before_compress', $attachment_id, $file['file_path'], $file['size_type'] );
+                do_action( 'local_crush_before_compress', $attachment_id, $file['file_path'], $file['size_type'] );
 
                 if ( empty( $file['is_fallback'] )
                     && $allow_target_conversion
-                    && libre_compress()->output_processor->should_output_target( $file['file_path'] ) ) {
-                    $file_result = libre_compress()->output_processor->compress_to_target_format(
+                    && local_crush()->output_processor->should_output_target( $file['file_path'] ) ) {
+                    $file_result = local_crush()->output_processor->compress_to_target_format(
                         $attachment_id,
                         $file['file_path'],
                         $file['size_type'],
                         $target
                     );
                 } else {
-                    $file_result = libre_compress()->compressor->compress_file(
+                    $file_result = local_crush()->compressor->compress_file(
                         $attachment_id,
                         $file['file_path'],
                         $file['size_type']
@@ -555,7 +555,7 @@ class Libre_Compress_Processor {
                         );
                     }
 
-                    do_action( 'libre_compress_after_compress', $attachment_id, $file['file_path'], $file['size_type'], $file_result );
+                    do_action( 'local_crush_after_compress', $attachment_id, $file['file_path'], $file['size_type'], $file_result );
                 } elseif ( 'failed' === $file_result['status'] ) {
                     $result['failed']++;
                 } else {
@@ -564,14 +564,14 @@ class Libre_Compress_Processor {
             }
 
             // 引用、文章链接与源文件清理必须一起提交成功，否则退回原文件引用等待重试。
-            if ( ! empty( $output_map ) && ! libre_compress()->output_processor->commit_attachment_format( $attachment_id, $output_map ) ) {
+            if ( ! empty( $output_map ) && ! local_crush()->output_processor->commit_attachment_format( $attachment_id, $output_map ) ) {
                 foreach ( $result['details'] as $index => $detail ) {
                     if ( empty( $detail['to'] ) || ! isset( $output_map[ $detail['size_type'] ] ) ) {
                         continue;
                     }
 
                     $result['details'][ $index ]['status']  = 'failed';
-                    $result['details'][ $index ]['message'] = __( '附件引用更新失败，已退回原文件', 'libre-compress' );
+                    $result['details'][ $index ]['message'] = __( '附件引用更新失败，已退回原文件', 'local-crush' );
                     $result['saved_bytes']                 -= max( 0, (int) $detail['original_size'] - (int) $detail['compressed_size'] );
                     $result['saved_bytes']                  = max( 0, $result['saved_bytes'] );
                     $result['success']--;
@@ -579,7 +579,7 @@ class Libre_Compress_Processor {
                 }
 
                 $result['status']  = 'failed';
-                $result['message'] = __( '压缩结果已生成，但附件引用或文章链接更新失败，图片仍指向原文件，可重新压缩继续提交', 'libre-compress' );
+                $result['message'] = __( '压缩结果已生成，但附件引用或文章链接更新失败，图片仍指向原文件，可重新压缩继续提交', 'local-crush' );
 
                 return $result;
             }
@@ -589,16 +589,16 @@ class Libre_Compress_Processor {
             if ( empty( $result['message'] ) ) {
                 if ( $result['success'] === $result['total'] ) {
                     $result['status']  = 'success';
-                    $result['message'] = __( '图片压缩完成', 'libre-compress' );
+                    $result['message'] = __( '图片压缩完成', 'local-crush' );
                 } elseif ( $result['success'] > 0 ) {
                     $result['status']  = 'partial';
-                    $result['message'] = __( '图片仅部分压缩完成，仍有文件需要重试', 'libre-compress' );
+                    $result['message'] = __( '图片仅部分压缩完成，仍有文件需要重试', 'local-crush' );
                 } elseif ( $result['failed'] > 0 ) {
                     $result['status']  = 'failed';
-                    $result['message'] = __( '图片压缩失败', 'libre-compress' );
+                    $result['message'] = __( '图片压缩失败', 'local-crush' );
                 } else {
                     $result['status']  = 'skipped';
-                    $result['message'] = __( '没有可用的压缩结果', 'libre-compress' );
+                    $result['message'] = __( '没有可用的压缩结果', 'local-crush' );
                 }
             }
 
@@ -621,7 +621,7 @@ class Libre_Compress_Processor {
 
         foreach ( $files as $file ) {
             $record_size_type = isset( $file['record_size_type'] ) ? $file['record_size_type'] : $file['size_type'];
-            $record            = libre_compress()->database->get_record( $attachment_id, $record_size_type );
+            $record            = local_crush()->database->get_record( $attachment_id, $record_size_type );
 
             if ( ! $this->is_complete_record( $file['file_path'], $record ) ) {
                 $pending[] = $file;
@@ -642,7 +642,7 @@ class Libre_Compress_Processor {
      * @return bool 是否允许继续压缩
      */
     private function backup_original_if_needed( int $attachment_id, $metadata ): bool {
-        $settings       = get_option( 'libre_compress_general', array() );
+        $settings       = get_option( 'local_crush_general', array() );
         $backup_enabled = isset( $settings['backup_enabled'] ) ? (bool) $settings['backup_enabled'] : true;
 
         if ( ! $backup_enabled ) {
@@ -657,11 +657,11 @@ class Libre_Compress_Processor {
 
         // 主文件已经是格式转换产物时不再备份：它的原图在第一轮压缩时就存过了，
         // 把 photo.jpg.webp 这类结果存进备份目录，只会多出一个被误当原图的压缩文件。
-        if ( libre_compress()->output_processor->is_conversion_output( $attachment_id, $original_path ) ) {
+        if ( local_crush()->output_processor->is_conversion_output( $attachment_id, $original_path ) ) {
             return true;
         }
 
-        return libre_compress()->backup->create_backup( $attachment_id, $original_path );
+        return local_crush()->backup->create_backup( $attachment_id, $original_path );
     }
 
     /**
@@ -815,7 +815,7 @@ class Libre_Compress_Processor {
      * @return bool
      */
     private function restore_original_and_refs( int $attachment_id ): bool {
-        $backups = libre_compress()->backup->get_backups( $attachment_id );
+        $backups = local_crush()->backup->get_backups( $attachment_id );
 
         // 没有备份就没有可恢复的东西。
         if ( empty( $backups ) ) {
@@ -825,7 +825,7 @@ class Libre_Compress_Processor {
         $backup   = $backups[0];
         $original = (string) $backup['original_path'];
 
-        if ( '' === $original || ! libre_compress()->backup->restore_backup_file( $backup, true ) ) {
+        if ( '' === $original || ! local_crush()->backup->restore_backup_file( $backup, true ) ) {
             return false;
         }
 
@@ -865,7 +865,7 @@ class Libre_Compress_Processor {
             }
         }
 
-        foreach ( libre_compress()->output_processor->get_output_entries( $attachment_id ) as $entry ) {
+        foreach ( local_crush()->output_processor->get_output_entries( $attachment_id ) as $entry ) {
             $to_delete[] = $entry['from'];
             $to_delete[] = $entry['to'];
         }
@@ -948,7 +948,7 @@ class Libre_Compress_Processor {
         $links = array();
         $seen  = array();
 
-        foreach ( libre_compress()->output_processor->get_output_entries( $attachment_id ) as $entry ) {
+        foreach ( local_crush()->output_processor->get_output_entries( $attachment_id ) as $entry ) {
             $from = isset( $entry['to'] ) ? wp_normalize_path( (string) $entry['to'] ) : '';
             $to   = isset( $entry['from'] ) ? wp_normalize_path( (string) $entry['from'] ) : '';
             $size_type = isset( $entry['size_type'] ) ? (string) $entry['size_type'] : 'full';
@@ -1147,15 +1147,15 @@ class Libre_Compress_Processor {
             return false;
         }
 
-        if ( ! libre_compress()->backup->delete_backup( $attachment_id ) ) {
+        if ( ! local_crush()->backup->delete_backup( $attachment_id ) ) {
             return false;
         }
 
-        if ( ! libre_compress()->database->delete_records_by_attachment( $attachment_id ) ) {
+        if ( ! local_crush()->database->delete_records_by_attachment( $attachment_id ) ) {
             return false;
         }
 
-        if ( ! libre_compress()->output_processor->forget_output_entries( $attachment_id ) ) {
+        if ( ! local_crush()->output_processor->forget_output_entries( $attachment_id ) ) {
             return false;
         }
 
@@ -1199,7 +1199,7 @@ class Libre_Compress_Processor {
                     $to = get_attached_file( $attachment_id );
                     $to = $to ? wp_normalize_path( $to ) : '';
                 } else {
-                    $nearest = libre_compress()->thumbnail_manager->nearest_replacement(
+                    $nearest = local_crush()->thumbnail_manager->nearest_replacement(
                         array(
                             'file'   => $to,
                             'width'  => isset( $link['width'] ) ? (int) $link['width'] : 0,
@@ -1229,7 +1229,7 @@ class Libre_Compress_Processor {
 
         $replaced = 0;
 
-        return libre_compress()->output_processor->update_content_references( $replacements, $replaced );
+        return local_crush()->output_processor->update_content_references( $replacements, $replaced );
     }
 
     /**
@@ -1290,15 +1290,15 @@ class Libre_Compress_Processor {
      * @return bool 是否全部清除成功
      */
     private function clear_attachment_history( int $attachment_id ): bool {
-        if ( ! libre_compress()->backup->delete_backup( $attachment_id ) ) {
+        if ( ! local_crush()->backup->delete_backup( $attachment_id ) ) {
             return false;
         }
 
-        if ( ! libre_compress()->database->delete_records_by_attachment( $attachment_id ) ) {
+        if ( ! local_crush()->database->delete_records_by_attachment( $attachment_id ) ) {
             return false;
         }
 
-        if ( ! libre_compress()->output_processor->forget_output_entries( $attachment_id ) ) {
+        if ( ! local_crush()->output_processor->forget_output_entries( $attachment_id ) ) {
             return false;
         }
 
@@ -1316,12 +1316,12 @@ class Libre_Compress_Processor {
         // 备份文件还会一直占磁盘，所以放在永久保留的判断之前。
         $this->prune_orphan_history();
 
-        $settings = get_option( 'libre_compress_general', array() );
-        $days     = Libre_Compress_Settings::normalize_retention_days(
+        $settings = get_option( 'local_crush_general', array() );
+        $days     = Local_Crush_Settings::normalize_retention_days(
             isset( $settings['backup_retention_days'] ) ? $settings['backup_retention_days'] : null
         );
 
-        if ( Libre_Compress_Settings::RETENTION_PERMANENT === $days ) {
+        if ( Local_Crush_Settings::RETENTION_PERMANENT === $days ) {
             return;
         }
 
@@ -1391,7 +1391,7 @@ class Libre_Compress_Processor {
      * @return array removed_ids、failed_ids、next_after、has_more
      */
     public function prune_orphan_history_page( int $after_id = 0 ): array {
-        $ids      = libre_compress()->database->get_orphan_history_attachment_ids_after( $after_id, self::BACKUP_PRUNE_PAGE_SIZE + 1 );
+        $ids      = local_crush()->database->get_orphan_history_attachment_ids_after( $after_id, self::BACKUP_PRUNE_PAGE_SIZE + 1 );
         $has_more = count( $ids ) > self::BACKUP_PRUNE_PAGE_SIZE;
 
         if ( $has_more ) {
@@ -1443,7 +1443,7 @@ class Libre_Compress_Processor {
      * @return array pruned_ids、failed_ids、next_after、has_more
      */
     public function prune_expired_backup_page( int $days, int $after_id = 0 ): array {
-        $ids      = libre_compress()->database->get_expired_backup_attachment_ids_after( $days, $after_id, self::BACKUP_PRUNE_PAGE_SIZE + 1 );
+        $ids      = local_crush()->database->get_expired_backup_attachment_ids_after( $days, $after_id, self::BACKUP_PRUNE_PAGE_SIZE + 1 );
         $has_more = count( $ids ) > self::BACKUP_PRUNE_PAGE_SIZE;
 
         if ( $has_more ) {
@@ -1468,7 +1468,7 @@ class Libre_Compress_Processor {
             }
 
             try {
-                if ( libre_compress()->backup->delete_backup( $attachment_id ) ) {
+                if ( local_crush()->backup->delete_backup( $attachment_id ) ) {
                     $pruned[] = $attachment_id;
                 } else {
                     $failed[] = $attachment_id;
@@ -1597,7 +1597,7 @@ class Libre_Compress_Processor {
             $entries = array();
             $pairs   = array();
 
-            foreach ( libre_compress()->output_processor->get_fallback_entries( $attachment_id ) as $entry ) {
+            foreach ( local_crush()->output_processor->get_fallback_entries( $attachment_id ) as $entry ) {
                 // 回退文件必须位于 uploads 内且不是符号链接，否则一律不动。
                 if ( ! $this->is_inside_upload_dir( $entry['from'] ) || is_link( $entry['from'] ) ) {
                     $result['failed'] = true;
@@ -1617,7 +1617,7 @@ class Libre_Compress_Processor {
 
             // 先把正文里固化的旧格式地址改到仍存在的新格式，成功后才删除旧文件。
             $replaced              = 0;
-            $updated               = libre_compress()->output_processor->update_content_references( $pairs, $replaced );
+            $updated               = local_crush()->output_processor->update_content_references( $pairs, $replaced );
             $result['replaced']    = $replaced;
             if ( ! $updated ) {
                 $result['failed'] = true;
@@ -1639,7 +1639,7 @@ class Libre_Compress_Processor {
 
             // 回退文件已删除，指向它的压缩记录不再描述任何真实文件。
             if ( ! empty( $deleted ) ) {
-                libre_compress()->output_processor->forget_fallback_records( $attachment_id, $deleted );
+                local_crush()->output_processor->forget_fallback_records( $attachment_id, $deleted );
             }
 
             return $result;
@@ -1673,8 +1673,8 @@ class Libre_Compress_Processor {
         }
 
         try {
-            $result['files'] = count( libre_compress()->database->get_backups_by_attachment( $attachment_id ) );
-            $result['ok']    = libre_compress()->backup->delete_backup( $attachment_id );
+            $result['files'] = count( local_crush()->database->get_backups_by_attachment( $attachment_id ) );
+            $result['ok']    = local_crush()->backup->delete_backup( $attachment_id );
         } finally {
             $this->release_attachment_lock( $global_lock );
             $this->release_attachment_lock( $lock );
@@ -1690,7 +1690,7 @@ class Libre_Compress_Processor {
      */
     public function queue_upload_for_compression( $attachment_id ): void {
         $attachment_id = absint( $attachment_id );
-        $settings      = get_option( 'libre_compress_general', array() );
+        $settings      = get_option( 'local_crush_general', array() );
 
         if ( $this->auto_compress_suppressed
             || empty( $settings['auto_compress'] )
@@ -1713,7 +1713,7 @@ class Libre_Compress_Processor {
             return;
         }
 
-        $settings = get_option( 'libre_compress_general', array() );
+        $settings = get_option( 'local_crush_general', array() );
         if ( $this->auto_compress_suppressed || empty( $settings['auto_compress'] ) ) {
             foreach ( array_keys( $this->queued_uploads ) as $attachment_id ) {
                 delete_post_meta( $attachment_id, self::PENDING_META_KEY );
@@ -1758,7 +1758,7 @@ class Libre_Compress_Processor {
      * 单次限量并按最小间隔限流，避免长时间外部命令拖慢后台。
      */
     public function run_pending_sweep(): void {
-        $settings = get_option( 'libre_compress_general', array() );
+        $settings = get_option( 'local_crush_general', array() );
         if ( $this->auto_compress_suppressed || empty( $settings['auto_compress'] ) ) {
             // 自动压缩关闭时待办标记没有意义，按限流节奏清理即可。
             if ( $this->acquire_pending_sweep_token() ) {
@@ -1863,7 +1863,7 @@ class Libre_Compress_Processor {
      * @return array
      */
     public function auto_compress_on_upload( $metadata, $attachment_id, $context = null ) {
-        $settings = get_option( 'libre_compress_general', array() );
+        $settings = get_option( 'local_crush_general', array() );
 
         if ( $this->auto_compress_suppressed
             || empty( $settings['auto_compress'] )
@@ -1920,7 +1920,7 @@ class Libre_Compress_Processor {
 
         try {
             // 旧格式回退文件不写进附件元数据，WordPress 删附件时不会带走它们，先按映射删掉。
-            libre_compress()->output_processor->delete_fallback_files( $attachment_id );
+            local_crush()->output_processor->delete_fallback_files( $attachment_id );
 
             $this->clear_attachment_history( $attachment_id );
         } finally {
@@ -2203,11 +2203,11 @@ class Libre_Compress_Processor {
     private function get_lock_error_message( bool $global = false ): string {
         if ( 'busy' === $this->lock_error ) {
             return $global
-                ? __( '插件正在执行维护操作，请稍后重试', 'libre-compress' )
-                : __( '该图片正在处理中，请稍后重试', 'libre-compress' );
+                ? __( '插件正在执行维护操作，请稍后重试', 'local-crush' )
+                : __( '该图片正在处理中，请稍后重试', 'local-crush' );
         }
 
-        return __( '无法创建锁文件，请检查上传目录的写入权限', 'libre-compress' );
+        return __( '无法创建锁文件，请检查上传目录的写入权限', 'local-crush' );
     }
 
     /**
