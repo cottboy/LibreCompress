@@ -710,37 +710,6 @@ class Libre_Compress_Processor {
     }
 
     /**
-     * 判断文件能否安全缩放
-     *
-     * SVG 没有栅格尺寸；动画 GIF、动画 WebP 与 APNG 用 WP 编辑器缩放只会留下第一帧，
-     * 与压缩、格式转换流程的取舍保持一致——宁可不动，也不能毁文件。
-     *
-     * @param string $file_path 文件绝对路径
-     * @return bool 是否允许缩放
-     */
-    public function is_scalable_image( string $file_path ): bool {
-        $extension = strtolower( pathinfo( $file_path, PATHINFO_EXTENSION ) );
-
-        if ( 'svg' === $extension ) {
-            return false;
-        }
-
-        if ( 'gif' === $extension && Libre_Compress_Compressor::is_animated_gif( $file_path ) ) {
-            return false;
-        }
-
-        if ( 'webp' === $extension && Libre_Compress_Compressor::is_animated_webp( $file_path ) ) {
-            return false;
-        }
-
-        if ( 'png' === $extension && Libre_Compress_Compressor::is_apng( $file_path ) ) {
-            return false;
-        }
-
-        return true;
-    }
-
-    /**
      * 用 WordPress 图片编辑器生成 -scaled 缩放文件
      *
      * 与核心上传流程一致：resize 到阈值内、按 EXIF 方向旋转、另存为 xxx-scaled 文件。

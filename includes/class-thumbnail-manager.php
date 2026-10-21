@@ -960,7 +960,7 @@ class Libre_Compress_Thumbnail_Manager {
         $source_abs = $base_dir . '/' . ltrim( wp_normalize_path( $context['source_rel'] ), '/' );
         $main_abs   = $base_dir . '/' . ltrim( wp_normalize_path( $context['main_rel'] ), '/' );
 
-        if ( ! is_file( $source_abs ) || ! libre_compress()->processor->is_scalable_image( $source_abs ) ) {
+        if ( ! is_file( $source_abs ) ) {
             return array( 'generated' => 0, 'replaced' => 0 );
         }
 
