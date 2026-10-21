@@ -66,6 +66,21 @@ class Local_Crush_Processor {
     const BACKUP_PRUNE_HOOK = 'local_crush_backup_prune_event';
 
     /**
+     * 孤儿数据与压缩临时文件清理任务的钩子名
+     */
+    const CLEANUP_HOOK = 'local_crush_cleanup_event';
+
+    /**
+     * 临时文件/回滚副本保留时长：超过这个时间的才算垃圾
+     */
+    const TEMP_CLEANUP_AGE = DAY_IN_SECONDS;
+
+    /**
+     * 扫描临时文件的时间预算（秒），超时留到下次清理
+     */
+    const TEMP_SCAN_BUDGET = 10;
+
+    /**
      * 备份到期清理单批处理的附件数量
      */
     const BACKUP_PRUNE_PAGE_SIZE = 20;
@@ -110,6 +125,7 @@ class Local_Crush_Processor {
         add_action( 'admin_init', array( $this, 'process_pending_uploads' ), 20 );
         add_action( self::PENDING_SWEEP_HOOK, array( $this, 'run_pending_sweep' ) );
         add_action( self::BACKUP_PRUNE_HOOK, array( $this, 'prune_expired_backups' ) );
+        add_action( self::CLEANUP_HOOK, array( $this, 'run_cleanup' ) );
     }
 
     /**
@@ -1354,16 +1370,22 @@ class Local_Crush_Processor {
     }
 
     /**
+     * 定时清理入口：孤儿数据 + 压缩临时文件/回滚副本
+     *
+     * 与原图备份保留期无关，单独每天跑一次；备份到期清理只负责备份。
+     */
+    public function run_cleanup(): void {
+        $this->prune_orphan_history();
+        $this->prune_temp_files();
+    }
+
+    /**
      * 定时清理超过保留时长的原图备份
      *
      * 只删备份文件和备份索引：图片与正文保持压缩、转换后的状态，压缩记录和格式转换
      * 映射一并保留，否则下一轮批量会把这批图重新压一遍。代价是从这一刻起无法再恢复原图。
      */
     public function prune_expired_backups(): void {
-        // 无主数据与保留期无关：附件都没了，它的备份和记录已经无人认领，
-        // 备份文件还会一直占磁盘，所以放在永久保留的判断之前。
-        $this->prune_orphan_history();
-
         $settings = get_option( 'local_crush_general', array() );
         $days     = Local_Crush_Settings::normalize_retention_days(
             isset( $settings['backup_retention_days'] ) ? $settings['backup_retention_days'] : null
@@ -1416,7 +1438,7 @@ class Local_Crush_Processor {
         } while ( $has_more && $processed < self::BACKUP_PRUNE_LIMIT );
 
         if ( $has_more ) {
-            wp_schedule_single_event( time() + 5 * MINUTE_IN_SECONDS, self::BACKUP_PRUNE_HOOK );
+            wp_schedule_single_event( time() + 5 * MINUTE_IN_SECONDS, self::CLEANUP_HOOK );
         }
 
         return array(
@@ -1426,6 +1448,94 @@ class Local_Crush_Processor {
             'failed_count'  => count( $failed ),
             'has_more'      => $has_more,
         );
+    }
+
+    /**
+     * 清理压缩过程中被硬杀留下的临时文件和回滚副本
+     *
+     * 只删插件自己命名的中间产物，且必须超过保留时长；正常结束的压缩会自己清理，
+     * 这里只兜底 PHP/网关超时或进程被杀的情况。扫描有 10 秒预算，扫不完下次继续。
+     */
+    public function prune_temp_files(): void {
+        $upload_dir = wp_upload_dir();
+
+        if ( ! empty( $upload_dir['error'] ) || empty( $upload_dir['basedir'] ) ) {
+            return;
+        }
+
+        $base = realpath( $upload_dir['basedir'] );
+
+        if ( false === $base ) {
+            return;
+        }
+
+        $base    = untrailingslashit( wp_normalize_path( $base ) );
+        $cutoff  = time() - self::TEMP_CLEANUP_AGE;
+        $deadline = microtime( true ) + self::TEMP_SCAN_BUDGET;
+        $regex   = '/\.(?:lc-rollback-[A-Za-z0-9]+|tmp\.(?:webp|gif|jxl|svg)|lc-avif\.(?:png|avif)|lc-compress-[A-Za-z0-9]+\.[A-Za-z0-9]+|lc-source-[A-Za-z0-9]+\.png|lc-anim-[A-Za-z0-9]+\.[A-Za-z0-9]+|lc-webp-tmp)$/';
+        $timed_out = false;
+
+        $iterator = new RecursiveIteratorIterator(
+            new RecursiveDirectoryIterator( $base, FilesystemIterator::SKIP_DOTS ),
+            RecursiveIteratorIterator::LEAVES_ONLY
+        );
+
+        foreach ( $iterator as $file ) {
+            if ( microtime( true ) > $deadline ) {
+                $timed_out = true;
+                break;
+            }
+
+            $raw_path = $file->getPathname();
+
+            if ( ! is_file( $raw_path ) || is_link( $raw_path ) ) {
+                continue;
+            }
+
+            $path = wp_normalize_path( $raw_path );
+
+            if ( false !== strpos( $path, '/' . Local_Crush_Backup::BACKUP_DIR_NAME . '/' )
+                || false !== strpos( $path, '/' . self::LOCK_DIR_NAME . '/' ) ) {
+                continue;
+            }
+
+            $mtime = @filemtime( $raw_path );
+
+            if ( false === $mtime || $mtime > $cutoff || ! preg_match( $regex, $file->getFilename() ) ) {
+                continue;
+            }
+
+            $real_path = realpath( $raw_path );
+
+            if ( false === $real_path || 0 !== strpos( wp_normalize_path( $real_path ), $base . '/' ) ) {
+                continue;
+            }
+
+            // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
+            unlink( $real_path );
+        }
+
+        // 系统临时目录里的方向文件、webpmux 中间文件、命令输出缓冲。
+        foreach ( array( 'lc_orient_*', 'lc_webp_mux_*', 'lc_webp_raw_*', 'lc_stdout_*', 'lc_stderr_*' ) as $pattern ) {
+            $paths = glob( sys_get_temp_dir() . '/' . $pattern );
+
+            if ( ! is_array( $paths ) ) {
+                continue;
+            }
+
+            foreach ( $paths as $path ) {
+                if ( ! is_file( $path ) || is_link( $path ) || filemtime( $path ) > $cutoff ) {
+                    continue;
+                }
+
+                // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
+                unlink( $path );
+            }
+        }
+
+        if ( $timed_out ) {
+            wp_schedule_single_event( time() + 5 * MINUTE_IN_SECONDS, self::CLEANUP_HOOK );
+        }
     }
 
     /**

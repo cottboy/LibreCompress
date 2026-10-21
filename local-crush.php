@@ -344,6 +344,11 @@ function local_crush_activate() {
         wp_schedule_event( time() + 2 * HOUR_IN_SECONDS, 'daily', Local_Crush_Processor::BACKUP_PRUNE_HOOK );
     }
 
+    // 注册孤儿数据与压缩临时文件清理任务
+    if ( ! wp_next_scheduled( Local_Crush_Processor::CLEANUP_HOOK ) ) {
+        wp_schedule_event( time() + 3 * HOUR_IN_SECONDS, 'daily', Local_Crush_Processor::CLEANUP_HOOK );
+    }
+
     // 刷新重写规则
     flush_rewrite_rules();
 }
@@ -358,6 +363,7 @@ function local_crush_deactivate() {
 
     wp_clear_scheduled_hook( Local_Crush_Processor::PENDING_SWEEP_HOOK );
     wp_clear_scheduled_hook( Local_Crush_Processor::BACKUP_PRUNE_HOOK );
+    wp_clear_scheduled_hook( Local_Crush_Processor::CLEANUP_HOOK );
     wp_unschedule_hook( Local_Crush_Task::WATCHDOG_HOOK );
 
     // 刷新重写规则

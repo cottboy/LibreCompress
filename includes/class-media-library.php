@@ -274,7 +274,7 @@ class Local_Crush_Media_Library {
                 <span class="status-text" style="color: #dba617;"><?php esc_html_e( '已跳过', 'local-crush' ); ?></span>
                 <?php $this->render_storage_summary( $attachment_id ); ?>
             </div>
-            <?php $this->render_action_buttons( $attachment_id, 'compress', __( '重试压缩', 'local-crush' ), $can_restore, $has_backup, $has_fallback ); ?>
+            <?php $this->render_action_buttons( $attachment_id, 'compress', __( '重试', 'local-crush' ), $can_restore, $has_backup, $has_fallback ); ?>
         </div>
         <?php
     }

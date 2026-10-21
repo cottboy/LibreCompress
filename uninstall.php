@@ -36,6 +36,7 @@ $wpdb->query( "DELETE FROM {$wpdb->postmeta} WHERE meta_key IN ('_local_crush_ou
 // 停用定时任务并清理限流 transient（钩子名需与 Local_Crush_Processor、Local_Crush_Task 常量保持一致）
 wp_clear_scheduled_hook( 'local_crush_pending_sweep_event' );
 wp_clear_scheduled_hook( 'local_crush_backup_prune_event' );
+wp_clear_scheduled_hook( 'local_crush_cleanup_event' );
 wp_unschedule_hook( 'local_crush_task_watchdog_event' );
 delete_transient( 'local_crush_pending_sweep' );
 
