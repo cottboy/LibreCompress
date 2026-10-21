@@ -418,11 +418,6 @@ class Libre_Compress_Thumbnail_Manager {
                 return null;
             }
 
-            // APNG 生成缩略图只会取第一帧，与“APNG 不处理”保持一致
-            if ( Libre_Compress_Compressor::is_apng( $file ) ) {
-                return 'apng';
-            }
-
             // 转换后的附件主文件是 WebP/AVIF，生成缺失尺寸时要回到 uploads 中
             // 的未缩放旧格式原图。不能使用备份文件，也不能拿 -scaled 图当原图。
             $legacy_source = $this->find_legacy_original_source( $attachment_id, wp_get_attachment_metadata( $attachment_id ) );
