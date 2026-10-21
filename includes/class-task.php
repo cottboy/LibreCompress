@@ -77,7 +77,7 @@ class Libre_Compress_Task {
     /**
      * 任务类型表
      *
-     * source 决定要处理的附件从哪来：images 扫全部图片，history 扫有处理痕迹的，
+     * source 决定要处理的附件从哪来：images 扫全部图片，
      * restore 扫需要恢复的，backups 扫还有备份索引的，fallbacks 扫有兼容格式回退的，
      * queue 是“重试失败”专用的固定名单。
      *
@@ -93,10 +93,6 @@ class Libre_Compress_Task {
             'compress'            => array(
                 'label'  => __( '批量压缩未压缩的图片', 'libre-compress' ),
                 'source' => 'images',
-            ),
-            'clear'               => array(
-                'label'  => __( '清除压缩记录与原图备份', 'libre-compress' ),
-                'source' => 'history',
             ),
             'restore'             => array(
                 'label'  => __( '恢复所有原图备份', 'libre-compress' ),
@@ -595,14 +591,6 @@ class Libre_Compress_Task {
             case 'compress':
                 return $this->process_compress( $attachment_id, $outcome );
 
-            case 'clear':
-                $cleared = libre_compress()->processor->clear_attachment( $attachment_id );
-
-                $outcome['success'] = $cleared ? 1 : 0;
-                $outcome['failed']  = $cleared ? 0 : 1;
-
-                return $outcome;
-
             case 'restore':
                 return $this->process_restore( $attachment_id, $outcome );
 
@@ -980,9 +968,6 @@ class Libre_Compress_Task {
         $database = libre_compress()->database;
 
         switch ( $source ) {
-            case 'history':
-                return $database->get_history_attachment_ids_after( $after_id, $limit );
-
             case 'restore':
                 return $database->get_restore_attachment_ids_after( $after_id, $limit );
 
@@ -1009,9 +994,6 @@ class Libre_Compress_Task {
         $database = libre_compress()->database;
 
         switch ( $source ) {
-            case 'history':
-                return $database->count_history_attachments();
-
             case 'restore':
                 return $database->count_restore_attachments();
 
@@ -1071,7 +1053,6 @@ class Libre_Compress_Task {
                 );
                 break;
 
-            case 'clear':
             case 'restore':
                 $summary = sprintf(
                     /* translators: %1$s: 任务名称, %2$d: 成功数, %3$d: 失败数 */

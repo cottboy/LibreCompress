@@ -1337,32 +1337,6 @@ class Libre_Compress_Processor {
     }
 
     /**
-     * 给单个附件清除处理痕迹（拿锁的对外入口）
-     *
-     * @param int $attachment_id 附件 ID
-     * @return bool 是否全部清除成功
-     */
-    public function clear_attachment( int $attachment_id ): bool {
-        $lock = $this->acquire_attachment_lock( $attachment_id );
-        if ( false === $lock ) {
-            return false;
-        }
-
-        $global_lock = $this->acquire_global_lock( false );
-        if ( false === $global_lock ) {
-            $this->release_attachment_lock( $lock );
-            return false;
-        }
-
-        try {
-            return $this->clear_attachment_history( $attachment_id );
-        } finally {
-            $this->release_attachment_lock( $global_lock );
-            $this->release_attachment_lock( $lock );
-        }
-    }
-
-    /**
      * 定时清理超过保留时长的原图备份
      *
      * 只删备份文件和备份索引：图片与正文保持压缩、转换后的状态，压缩记录和格式转换

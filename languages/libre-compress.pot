@@ -953,10 +953,6 @@ msgstr ""
 msgid "没有需要处理的项目"
 msgstr ""
 
-#: includes/class-settings.php:1214 includes/class-task.php:98
-msgid "清除压缩记录与原图备份"
-msgstr ""
-
 #: includes/class-settings.php:428
 msgid "渐进式编码"
 msgstr ""
@@ -999,10 +995,6 @@ msgstr ""
 
 #: includes/class-libre-compress.php:242
 msgid "确定要恢复所有原图备份吗？此操作不可撤销。"
-msgstr ""
-
-#: includes/class-libre-compress.php:241
-msgid "确定要清除所有压缩记录和原图备份吗？清除后无法恢复到本轮压缩前的原图。"
 msgstr ""
 
 #: includes/class-settings.php:1172
@@ -1493,10 +1485,6 @@ msgstr ""
 
 #: includes/class-settings.php:1188
 msgid "取消勾选的尺寸在上传图片时不再生成；已经存在的文件用下方“删除未勾选尺寸的缩略图”清理。以后新注册的尺寸默认勾选。"
-msgstr ""
-
-#: includes/class-settings.php:1218
-msgid "同时删除备份文件、备份索引和格式转换映射，之后所有图片都可重新压缩；此操作不可撤销。"
 msgstr ""
 
 #: includes/class-settings.php:1248

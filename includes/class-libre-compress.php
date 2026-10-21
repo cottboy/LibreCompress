@@ -238,7 +238,6 @@ class Libre_Compress {
                     'detailsSavedSize'        => __( '节省大小', 'libre-compress' ),
                     'detailsEmpty'            => __( '没有可显示的文件', 'libre-compress' ),
                     'confirmBulkCompress'     => __( '确定要批量压缩媒体库中所有未压缩的图片吗？任务在后台执行，可能需要一些时间。', 'libre-compress' ),
-                    'confirmClear'            => __( '确定要清除所有压缩记录和原图备份吗？清除后无法恢复到本轮压缩前的原图。', 'libre-compress' ),
                     'confirmRestoreAll'       => __( '确定要恢复所有原图备份吗？此操作不可撤销。', 'libre-compress' ),
                     'confirmDeleteThumbnails'   => __( '确定要删除未勾选尺寸的缩略图吗？文章里指向这些尺寸的链接会改到面积最接近的现有尺寸；关闭了自动缩放或缩放图与阈值不符时，也会删除缩放图让主图退回原图。此操作不可撤销。', 'libre-compress' ),
                     'confirmGenerateThumbnails' => __( '确定要为已勾选但缺失的尺寸补生成缩略图吗？开启了自动缩放且主图超过阈值时，还会生成或修正 -scaled 缩放图。这可能需要一些时间。', 'libre-compress' ),

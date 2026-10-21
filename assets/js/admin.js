@@ -28,7 +28,6 @@
          */
         batchButtons: {
             '#libre-compress-bulk-compress': { type: 'compress', confirm: 'confirmBulkCompress' },
-            '#libre-compress-clear-records': { type: 'clear', confirm: 'confirmClear' },
             '#libre-compress-restore-all': { type: 'restore', confirm: 'confirmRestoreAll' },
             '#libre-compress-delete-all-backups': { type: 'delete_backups', confirm: 'confirmDeleteAllBackups' },
             '#libre-compress-delete-all-fallbacks': { type: 'delete_fallbacks', confirm: 'confirmDeleteAllFallbacks' },
