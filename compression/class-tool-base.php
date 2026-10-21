@@ -165,7 +165,7 @@ abstract class Local_Crush_Tool_Base {
     /**
      * 获取可执行文件路径
      *
-     * 优先查找 wp-content/LocalCrush-bin 目录，然后查找系统 PATH
+     * 优先查找 wp-content/local-crush-bin 目录，然后查找系统 PATH
      *
      * @return string|false 可执行文件路径或 false
      */
@@ -176,7 +176,7 @@ abstract class Local_Crush_Tool_Base {
 
         $executable_name = $this->get_executable_name();
 
-        // 1. 首先检查 wp-content/LocalCrush-bin 目录
+        // 1. 首先检查 wp-content/local-crush-bin 目录
         $bin_path = LOCAL_CRUSH_BIN_PATH . $executable_name;
 
         // Windows 系统添加 .exe 后缀

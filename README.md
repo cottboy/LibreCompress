@@ -68,7 +68,7 @@
 
 插件不携带二进制文件，可任选一种方式：
 
-1. 放入 `/wp-content/LocalCrush-bin/`（Windows 下通常需要 `.exe` 后缀）。
+1. 放入 `/wp-content/local-crush-bin/`（Windows 下通常需要 `.exe` 后缀）。
 2. 将工具目录加入系统 `PATH`。
 3. 使用系统包管理器安装。
 
@@ -92,7 +92,7 @@
 
 SVG 压缩改用 oxvg（Rust 单文件程序，不再需要 Node.js）：从发布页取 `oxvg.exe` 放进工具目录即可，**Windows x64 请用 v0.0.6 版本**（v0.0.9 的 `oxvg.exe` 是 ARM64，x64 只能自己编译），其他平台可用 `cargo install oxvg`。
 
-Windows 下把 `gif2webp.exe`、`webpmux.exe`、`cjxl.exe` 及对应包内依赖的 `.dll` 放进 `LocalCrush-bin`。
+Windows 下把 `gif2webp.exe`、`webpmux.exe`、`cjxl.exe` 及对应包内依赖的 `.dll` 放进 `local-crush-bin`。
 
 APNG 转 WebP 需要支持 `libwebp_anim` 的 FFmpeg；动画 AVIF 需要支持 `libaom-av1`、透明动画 AVIF 输出的新版 FFmpeg，两者均需支持 `-enc_time_base 1:1000` 和 `-fps_mode passthrough`，`ffmpeg.exe` 和 `ffprobe.exe` 放进同一工具目录。仅找到文件不代表该构建具备所有能力；实际处理失败时会保留原图。
 
@@ -496,7 +496,7 @@ JPG 是有损格式，质量 100 只是肉眼看不出差别，不是数学意�
 | 批量任务状态 | 选项 `local_crush_task`，只保留最近一次任务，关闭浏览器后仍是它 |
 | 批量任务兜底 | 定时任务 `local_crush_task_watchdog_event`，任务执行期间每 2 分钟一次，结束后自动停排 |
 | 备份到期清理任务 | 定时任务 `local_crush_backup_prune_event`，每天一次 |
-| 本地工具 | `/wp-content/LocalCrush-bin/` |
+| 本地工具 | `/wp-content/local-crush-bin/` |
 | 附件处理锁 | `/wp-content/uploads/.local-crush-locks/` |
 
 ## 目录结构

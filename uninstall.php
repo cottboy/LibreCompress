@@ -67,7 +67,7 @@ foreach ( array( 'local-crush-backups', '.local-crush-locks' ) as $dir_name ) {
 }
 
 // 删除压缩工具二进制目录
-$bin_dir = WP_CONTENT_DIR . '/LocalCrush-bin';
+$bin_dir = WP_CONTENT_DIR . '/local-crush-bin';
 
 if ( is_dir( $bin_dir ) ) {
     // 递归删除目录中的所有文件

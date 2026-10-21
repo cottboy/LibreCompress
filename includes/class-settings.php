@@ -1400,7 +1400,7 @@ class Local_Crush_Settings {
         </table>
 
         <p class="description" style="max-width: 900px; margin-top: 10px;">
-            <?php esc_html_e( '安装方式：① 把可执行文件直接放进 /wp-content/LocalCrush-bin 目录；② 把工具所在文件夹加入系统 Path 环境变量；③ 使用包管理器安装。', 'local-crush' ); ?>
+            <?php esc_html_e( '安装方式：① 把可执行文件直接放进 /wp-content/local-crush-bin 目录；② 把工具所在文件夹加入系统 Path 环境变量；③ 使用包管理器安装。', 'local-crush' ); ?>
         </p>
 
         <h2 style="margin-top: 30px;"><?php esc_html_e( '路径支持状态', 'local-crush' ); ?></h2>

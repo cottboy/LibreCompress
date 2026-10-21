@@ -50,7 +50,7 @@ define( 'LOCAL_CRUSH_BASENAME', plugin_basename( __FILE__ ) );
  * 压缩工具二进制文件目录路径
  * 存储在 wp-content 目录下，避免插件更新时被覆盖
  */
-define( 'LOCAL_CRUSH_BIN_PATH', WP_CONTENT_DIR . '/LocalCrush-bin/' );
+define( 'LOCAL_CRUSH_BIN_PATH', WP_CONTENT_DIR . '/local-crush-bin/' );
 
 /**
  * 数据库版本号

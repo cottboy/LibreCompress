@@ -1,5 +1,5 @@
-# Copyright (C) 2026 LocalCrush
-# This file is distributed under the same license as the LocalCrush package.
+# Copyright (C) 2026 Local Crush
+# This file is distributed under the same license as the Local Crush package.
 #
 msgid ""
 msgstr ""
@@ -1164,7 +1164,7 @@ msgid "（共 %d 个，仅显示前 10 个）"
 msgstr ""
 
 #: compression/class-cjxl.php:141
-msgid "从 libjxl GitHub Releases 下载 jxl-x64-windows.zip，把 bin 目录里的 cjxl.exe 与其依赖的 dll 一起放进 LocalCrush-bin"
+msgid "从 libjxl GitHub Releases 下载 jxl-x64-windows.zip，把 bin 目录里的 cjxl.exe 与其依赖的 dll 一起放进 local-crush-bin"
 msgstr ""
 
 #: compression/class-tool-base.php:516
@@ -1500,7 +1500,7 @@ msgid "为已勾选但缺失的尺寸补生成缩略图；若开启了自动缩�
 msgstr ""
 
 #: includes/class-settings.php:1423
-msgid "安装方式：① 把可执行文件直接放进 /wp-content/LocalCrush-bin 目录；② 把工具所在文件夹加入系统 Path 环境变量；③ 使用包管理器安装。"
+msgid "安装方式：① 把可执行文件直接放进 /wp-content/local-crush-bin 目录；② 把工具所在文件夹加入系统 Path 环境变量；③ 使用包管理器安装。"
 msgstr ""
 
 #: includes/class-settings.php:442

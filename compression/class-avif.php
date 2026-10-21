@@ -56,7 +56,7 @@ class Local_Crush_Avif extends Local_Crush_Tool_Base {
     /**
      * 获取解码器（avifdec）路径
      *
-     * 查找逻辑与 get_executable_path() 一致：优先 wp-content/LocalCrush-bin 目录，其次系统 PATH。
+     * 查找逻辑与 get_executable_path() 一致：优先 wp-content/local-crush-bin 目录，其次系统 PATH。
      * public 供设置页展示解码器的安装状态与路径。
      *
      * @return string|false 解码器路径或 false

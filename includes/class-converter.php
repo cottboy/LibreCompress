@@ -2094,7 +2094,7 @@ class Local_Crush_Output {
     /**
      * 查找本地辅助工具（gif2webp、ffmpeg 等）
      *
-     * 优先 wp-content/LocalCrush-bin 目录，其次系统 PATH。
+     * 优先 wp-content/local-crush-bin 目录，其次系统 PATH。
      * 设置页复用此方法展示辅助工具的安装状态与路径。
      *
      * @param string $name 可执行文件名
