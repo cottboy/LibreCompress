@@ -3,7 +3,7 @@
  * Plugin Name: Local Crush
  * Plugin URI: https://github.com/cottboy/local-crush
  * Description: Local Crush – CLI Image Compressor。免费的 WordPress 图片压缩插件。
- * Version: 1.9.0
+ * Version: 1.0.0
  * Author: cottboy
  * Author URI: https://github.com/cottboy
  * License: GPL v2 or later
@@ -24,7 +24,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 /**
  * 插件版本号
  */
-define( 'LOCAL_CRUSH_VERSION', '1.9.0' );
+define( 'LOCAL_CRUSH_VERSION', '1.0.0' );
 
 /**
  * 插件文件路径

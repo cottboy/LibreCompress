@@ -4,7 +4,7 @@ Tags: image compression, webp, avif, jpeg xl, local
 Requires at least: 6.4
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 1.9.0
+Stable tag: 1.0.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -80,7 +80,7 @@ JPEG、PNG、GIF、WebP、AVIF、JPEG XL 和 SVG，包含 GIF、APNG、动画 We
 
 == Changelog ==
 
-= 1.9.0 =
+= 1.0.0 =
 
 * 纯本地压缩，不依赖第三方云服务。
 * 支持常用图片格式、动图与格式转换。
@@ -90,6 +90,6 @@ JPEG、PNG、GIF、WebP、AVIF、JPEG XL 和 SVG，包含 GIF、APNG、动画 We
 
 == Upgrade Notice ==
 
-= 1.9.0 =
+= 1.0.0 =
 
 建议更新：修复 SVG 上传安全、照片方向、APNG 设置和批量跳过文件重试等问题。
