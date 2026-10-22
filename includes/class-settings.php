@@ -452,7 +452,7 @@ class Local_Crush_Settings {
                     'png_lossy_quality_min' => array(
                         'type'    => 'int',
                         'label'   => __( '有损质量下限', 'local-crush' ),
-                        'flag'    => 'pngquant --quality 下限',
+                        'flag'    => __( 'pngquant --quality 下限', 'local-crush' ),
                         'min'     => 0,
                         'max'     => 100,
                         'default' => 60,
@@ -461,7 +461,7 @@ class Local_Crush_Settings {
                     'png_lossy_quality_max' => array(
                         'type'    => 'int',
                         'label'   => __( '有损质量上限', 'local-crush' ),
-                        'flag'    => 'pngquant --quality 上限',
+                        'flag'    => __( 'pngquant --quality 上限', 'local-crush' ),
                         'min'     => 0,
                         'max'     => 100,
                         'default' => 80,
@@ -479,7 +479,7 @@ class Local_Crush_Settings {
                     'png_lossy_dither'     => array(
                         'type'    => 'bool',
                         'label'   => __( '抖动', 'local-crush' ),
-                        'flag'    => 'pngquant（取消勾选时加 --nofs）',
+                        'flag'    => __( 'pngquant（取消勾选时加 --nofs）', 'local-crush' ),
                         'default' => true,
                         'desc'    => __( '勾选：减少颜色后用抖动过渡，照片类渐变更自然；取消：色块更干净、体积更小，适合扁平图标。', 'local-crush' ),
                     ),
@@ -493,7 +493,7 @@ class Local_Crush_Settings {
                         'apng_enabled' => array(
                             'type'    => 'bool',
                             'label'   => __( 'APNG 自动无损压缩', 'local-crush' ),
-                            'flag'    => 'APNG 走 oxipng',
+                            'flag'    => __( 'APNG 走 oxipng', 'local-crush' ),
                             'default' => true,
                             'desc'    => __( 'PNG 走有损模式时，勾上这一项会让 APNG 绕开 pngquant、单独用 oxipng 整只无损压缩；不勾则 PNG 有损时不压 APNG。PNG 本身选的就是无损时，APNG 总是走无损压缩。它不控制 APNG 转格式，那个在基本设置里单独勾。', 'local-crush' ),
                         ),

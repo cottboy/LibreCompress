@@ -1019,7 +1019,7 @@ class Local_Crush_Output {
     private function sanitize_relative_path( string $path ): string {
         $normalized = ltrim( wp_normalize_path( $path ), '/' );
 
-        if ( '' === $normalized || false !== strpos( $normalized, '..' ) || false !== strpos( $normalized, ':' ) ) {
+        if ( '' === $normalized || false !== strpos( $normalized, '..' ) || false !== strpos( $normalized, ':' ) || false !== strpos( $normalized, "\0" ) ) {
             return '';
         }
 
@@ -1846,7 +1846,16 @@ class Local_Crush_Output {
                 continue;
             }
 
-            $count += max( 0, substr_count( $after, $needle ) - substr_count( $before, $needle ) );
+            $needles = array( $needle );
+            $encoded = $this->encode_url_path( $needle );
+
+            if ( $encoded !== $needle ) {
+                $needles[] = $encoded;
+            }
+
+            foreach ( $needles as $current ) {
+                $count += max( 0, substr_count( $after, $current ) - substr_count( $before, $current ) );
+            }
         }
 
         return $count;
@@ -1928,7 +1937,39 @@ class Local_Crush_Output {
     private function replace_reference_in_content( string $content, string $from, string $to ): string {
         $needle = $this->content_path_of( $from );
 
-        if ( '' === $needle || false === strpos( str_replace( '\\', '', $content ), str_replace( '\\', '', $needle ) ) ) {
+        if ( '' === $needle ) {
+            return $content;
+        }
+
+        $new_name = basename( $this->content_path_of( $to ) );
+
+        if ( '' === $new_name ) {
+            return $content;
+        }
+
+        $content = $this->replace_reference_needle( $content, $needle, $new_name );
+
+        // 编辑器或浏览器可能把中文等非 ASCII 文件名存成百分号编码，
+        // 只匹配原始路径会让这些链接在源文件删除后变成死链。
+        $encoded_needle = $this->encode_url_path( $needle );
+
+        if ( $encoded_needle !== $needle ) {
+            $content = $this->replace_reference_needle( $content, $encoded_needle, rawurlencode( $new_name ) );
+        }
+
+        return $content;
+    }
+
+    /**
+     * 把内容里的一个 URL 路径文件名替换成新文件名
+     *
+     * @param string $content  文章内容
+     * @param string $needle   uploads 内的 URL 路径
+     * @param string $new_name 新文件名（已按 needle 的编码方式处理）
+     * @return string
+     */
+    private function replace_reference_needle( string $content, string $needle, string $new_name ): string {
+        if ( false === strpos( str_replace( '\\', '', $content ), str_replace( '\\', '', $needle ) ) ) {
             return $content;
         }
 
@@ -1954,8 +1995,6 @@ class Local_Crush_Output {
             return $content;
         }
 
-        $new_name = basename( $this->content_path_of( $to ) );
-
         // 从后往前替换，避免前面的替换让后面的偏移失效。
         for ( $index = count( $matches ) - 1; $index >= 0; $index-- ) {
             if ( ! isset( $matches[ $index ][0][1], $matches[ $index ]['file'][1] ) ) {
@@ -1973,6 +2012,16 @@ class Local_Crush_Output {
         }
 
         return $content;
+    }
+
+    /**
+     * 按 URL 路径逐段做百分号编码，保留目录分隔符
+     *
+     * @param string $path URL 路径
+     * @return string
+     */
+    private function encode_url_path( string $path ): string {
+        return implode( '/', array_map( 'rawurlencode', explode( '/', $path ) ) );
     }
 
     /**

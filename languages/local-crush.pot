@@ -5,7 +5,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Local Crush 1.0.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-22 16:47+0800\n"
+"POT-Creation-Date: 2026-10-22 17:26+0800\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -15,11 +15,11 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "X-Domain: local-crush\n"
 
-#: compression/class-avif.php:248
+#: compression/class-avif.php:256
 msgid "暂无官方包，建议从 GitHub Releases 下载或自行编译"
 msgstr ""
 
-#: compression/class-avif.php:251
+#: compression/class-avif.php:259
 msgid "从 libavif GitHub Releases 下载静态编译的 avifenc.exe 和 avifdec.exe"
 msgstr ""
 
@@ -51,11 +51,11 @@ msgstr ""
 msgid "从发布页下载 oxvg.exe 放进工具目录（x64 请用 v0.0.6，之后的版本只发了 ARM64）"
 msgstr ""
 
-#: compression/class-pngquant.php:104
 #: compression/class-pngquant.php:90
-#: compression/class-tool-base.php:590
-#: includes/class-animation.php:802
-#: includes/class-compressor.php:621
+#: compression/class-pngquant.php:104
+#: compression/class-tool-base.php:604
+#: includes/class-animation.php:807
+#: includes/class-compressor.php:632
 #: includes/class-converter.php:499
 #: includes/class-converter.php:539
 msgid "压缩成功"
@@ -90,10 +90,10 @@ msgid "%s 不可用"
 msgstr ""
 
 #: compression/class-tool-base.php:499
-#: includes/class-compressor.php:402
+#: includes/class-compressor.php:413
 #: includes/class-converter.php:195
-#: includes/class-processor.php:360
-#: includes/class-processor.php:386
+#: includes/class-processor.php:361
+#: includes/class-processor.php:387
 msgid "文件不存在"
 msgstr ""
 
@@ -105,90 +105,91 @@ msgstr ""
 msgid "压缩结果文件写入失败，已保留原文件"
 msgstr ""
 
-#: compression/class-tool-base.php:560
+#: compression/class-tool-base.php:574
 msgid "压缩结果收尾处理失败，已保留原文件"
 msgstr ""
 
-#: compression/class-tool-base.php:569
-#: includes/class-animation.php:795
+#: compression/class-tool-base.php:583
+#: includes/class-animation.php:800
 msgid "压缩结果替换失败，已保留原文件"
 msgstr ""
 
-#: compression/class-tool-base.php:582
+#: compression/class-tool-base.php:596
 msgid "压缩结果为空文件，已保留原文件"
 msgstr ""
 
-#: includes/class-animation.php:828
+#: includes/class-animation.php:833
 msgid "无法安全处理这张动图，已保留原文件"
 msgstr ""
 
-#: includes/class-animation.php:835
+#: includes/class-animation.php:840
 msgid "当前工具无法完整处理这张动画，已保留原文件"
 msgstr ""
 
-#: includes/class-animation.php:846
-#: includes/class-animation.php:852
+#: includes/class-animation.php:851
+#: includes/class-animation.php:857
 msgid "动图处理命令执行失败"
 msgstr ""
 
-#: includes/class-animation.php:1359
+#: includes/class-animation.php:1367
 msgid "APNG 已跳过：PNG 走的是有损模式，且没有勾选“APNG 自动无损压缩”，可在“压缩工具”页勾选，或在基本设置里勾选“APNG”让它转格式"
 msgstr ""
 
-#: includes/class-animation.php:1381
+#: includes/class-animation.php:1372
+#: includes/class-animation.php:1396
 msgid "动图处理需要 %s 工具，当前环境未配齐，已跳过"
 msgstr ""
 
-#: includes/class-compressor.php:410
+#: includes/class-compressor.php:421
 #: includes/class-converter.php:200
 msgid "文件路径不安全"
 msgstr ""
 
-#: includes/class-compressor.php:419
+#: includes/class-compressor.php:430
 #: includes/class-converter.php:211
 msgid "文件后缀与内容不符（内容是 APNG 动画），已跳过以保护动画内容"
 msgstr ""
 
-#: includes/class-compressor.php:434
+#: includes/class-compressor.php:445
 msgid "无法读取动图信息，已停止压缩以保护内容"
 msgstr ""
 
-#: includes/class-compressor.php:441
+#: includes/class-compressor.php:452
 #: includes/class-converter.php:227
 msgid "无法读取 APNG 动画信息，已跳过以保护动画内容"
 msgstr ""
 
-#: includes/class-compressor.php:473
+#: includes/class-compressor.php:484
 #: includes/class-converter.php:358
 msgid "没有可用的压缩工具"
 msgstr ""
 
-#: includes/class-compressor.php:488
+#: includes/class-compressor.php:499
 msgid "无法创建回滚副本，已跳过压缩"
 msgstr ""
 
-#: includes/class-compressor.php:506
+#: includes/class-compressor.php:517
 msgid "压缩失败且回滚失败，请保留回滚副本并检查磁盘状态"
 msgstr ""
 
-#: includes/class-compressor.php:536
+#: includes/class-compressor.php:547
 msgid "压缩结果无效且回滚失败，请保留回滚副本并检查磁盘状态"
 msgstr ""
 
-#: includes/class-compressor.php:558
+#: includes/class-compressor.php:569
 msgid "压缩后体积没有变小，已保留原图"
 msgstr ""
 
-#: includes/class-compressor.php:571
+#: includes/class-compressor.php:582
 #: includes/class-converter.php:420
 msgid "压缩记录保存失败，请重新压缩"
 msgstr ""
 
-#: includes/class-compressor.php:605
+#: includes/class-compressor.php:616
 msgid "压缩记录保存失败，已恢复原文件"
 msgstr ""
 
-#: includes/class-compressor.php:606
+#: includes/class-compressor.php:617
 msgid "压缩记录保存失败且回滚失败，请保留回滚副本并检查数据库状态"
 msgstr ""
 
@@ -223,7 +224,7 @@ msgstr ""
 #: includes/class-converter.php:378
 #: includes/class-converter.php:387
 #: includes/class-media-library.php:254
-#: includes/class-processor.php:394
+#: includes/class-processor.php:395
 msgid "压缩失败"
 msgstr ""
 
@@ -411,12 +412,12 @@ msgid "设置"
 msgstr ""
 
 #: includes/class-media-library.php:234
-#: includes/class-processor.php:401
+#: includes/class-processor.php:402
 msgid "未压缩"
 msgstr ""
 
-#: includes/class-media-library.php:237
 #: includes/class-media-library.php:51
+#: includes/class-media-library.php:237
 msgid "压缩"
 msgstr ""
 
@@ -426,7 +427,7 @@ msgid "重试"
 msgstr ""
 
 #: includes/class-media-library.php:274
-#: includes/class-processor.php:398
+#: includes/class-processor.php:399
 msgid "已跳过"
 msgstr ""
 
@@ -470,7 +471,7 @@ msgstr ""
 #: includes/class-media-library.php:434
 #: includes/class-media-library.php:452
 #: includes/class-media-library.php:551
-#: includes/class-processor.php:481
+#: includes/class-processor.php:482
 msgid "无效的图片附件"
 msgstr ""
 
@@ -516,95 +517,95 @@ msgstr ""
 msgid "兼容格式回退已删除"
 msgstr ""
 
-#: includes/class-processor.php:329
+#: includes/class-processor.php:330
 msgid "旧兼容格式"
 msgstr ""
 
-#: includes/class-processor.php:329
+#: includes/class-processor.php:330
 msgid "当前文件"
 msgstr ""
 
-#: includes/class-processor.php:356
+#: includes/class-processor.php:357
 msgid "原图备份"
 msgstr ""
 
-#: includes/class-processor.php:357
+#: includes/class-processor.php:358
 msgid "备份文件"
 msgstr ""
 
-#: includes/class-processor.php:360
+#: includes/class-processor.php:361
 msgid "备份中"
 msgstr ""
 
-#: includes/class-processor.php:390
+#: includes/class-processor.php:391
 msgid "已压缩"
 msgstr ""
 
-#: includes/class-processor.php:413
+#: includes/class-processor.php:414
 msgid "主图"
 msgstr ""
 
-#: includes/class-processor.php:417
+#: includes/class-processor.php:418
 msgid "未缩放原图"
 msgstr ""
 
-#: includes/class-processor.php:429
+#: includes/class-processor.php:430
 msgid "缩略图 %1$s（%2$d × %3$d）"
 msgstr ""
 
-#: includes/class-processor.php:438
+#: includes/class-processor.php:439
 msgid "缩略图 %s"
 msgstr ""
 
-#: includes/class-processor.php:452
+#: includes/class-processor.php:453
 msgid "未知"
 msgstr ""
 
-#: includes/class-processor.php:499
+#: includes/class-processor.php:500
 msgid "未找到可压缩的图片文件"
 msgstr ""
 
-#: includes/class-processor.php:507
+#: includes/class-processor.php:518
 msgid "图片已经压缩"
 msgstr ""
 
-#: includes/class-processor.php:525
+#: includes/class-processor.php:538
 msgid "无法创建原图备份，已停止压缩"
 msgstr ""
 
-#: includes/class-processor.php:596
+#: includes/class-processor.php:609
 msgid "附件引用更新失败，已退回原文件"
 msgstr ""
 
-#: includes/class-processor.php:604
+#: includes/class-processor.php:617
 msgid "压缩结果已生成，但附件引用或文章链接更新失败，图片仍指向原文件，可重新压缩继续提交"
 msgstr ""
 
-#: includes/class-processor.php:614
+#: includes/class-processor.php:627
 msgid "图片压缩完成"
 msgstr ""
 
-#: includes/class-processor.php:617
+#: includes/class-processor.php:630
 msgid "图片仅部分压缩完成，仍有文件需要重试"
 msgstr ""
 
-#: includes/class-processor.php:620
+#: includes/class-processor.php:633
 msgid "图片压缩失败"
 msgstr ""
 
-#: includes/class-processor.php:623
+#: includes/class-processor.php:636
 msgid "没有可用的压缩结果"
 msgstr ""
 
-#: includes/class-processor.php:2363
+#: includes/class-processor.php:2407
 msgid "插件正在执行维护操作，请稍后重试"
 msgstr ""
 
-#: includes/class-processor.php:2364
+#: includes/class-processor.php:2408
 msgid "该图片正在处理中，请稍后重试"
 msgstr ""
 
-#: includes/class-processor.php:2367
+#: includes/class-processor.php:2411
 msgid "无法创建锁文件，请检查上传目录的写入权限"
 msgstr ""
 
@@ -680,12 +681,12 @@ msgstr ""
 msgid "默认会把全透明像素的 RGB 抹平；勾选则原样保留，代价是体积约多 16%。"
 msgstr ""
 
+#: includes/class-settings.php:67
 #: includes/class-settings.php:137
 #: includes/class-settings.php:262
 #: includes/class-settings.php:292
 #: includes/class-settings.php:330
 #: includes/class-settings.php:420
-#: includes/class-settings.php:67
 msgid "有损质量"
 msgstr ""
 
@@ -693,8 +694,8 @@ msgstr ""
 msgid "填多少就传给 -q 多少，100 为无损、0 最省体积。只有有损模式有效。"
 msgstr ""
 
-#: includes/class-settings.php:146
 #: includes/class-settings.php:94
+#: includes/class-settings.php:146
 msgid "透明通道质量"
 msgstr ""
 
@@ -1502,6 +1503,7 @@ msgstr ""
 msgid "动画 GIF / APNG 转 AVIF"
 msgstr ""
 
+#: includes/class-animation.php:1397
 #: includes/class-settings.php:1631
 msgid "或"
 msgstr ""
@@ -1568,18 +1570,42 @@ msgstr ""
 msgid "任务已停止：本次共处理 %d 个附件，可以随时再执行一次继续处理剩余部分。"
 msgstr ""
 
-#: local-crush.php:224
+#: local-crush.php:236
 msgid "服务器缺少 DOM 扩展，无法安全处理 SVG"
 msgstr ""
 
-#: local-crush.php:232
+#: local-crush.php:244
 msgid "无法读取上传的 SVG 文件"
 msgstr ""
 
-#: local-crush.php:239
+#: local-crush.php:251
 msgid "SVG 内容不合法或包含危险代码"
 msgstr ""
 
-#: local-crush.php:247
+#: local-crush.php:259
 msgid "无法安全写入清理后的 SVG 文件"
+msgstr ""
+
+#: compression/class-tool-base.php:543
+msgid "无法清理上次中断留下的临时文件"
+msgstr ""
+
+#: includes/class-processor.php:518
+msgid "没有可处理的图片文件"
+msgstr ""
+
+#: includes/class-settings.php:455
+msgid "pngquant --quality 下限"
+msgstr ""
+
+#: includes/class-settings.php:464
+msgid "pngquant --quality 上限"
+msgstr ""
+
+#: includes/class-settings.php:482
+msgid "pngquant（取消勾选时加 --nofs）"
+msgstr ""
+
+#: includes/class-settings.php:496
+msgid "APNG 走 oxipng"
 msgstr ""

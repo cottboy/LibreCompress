@@ -422,6 +422,12 @@ class Local_Crush_Thumbnail_Manager {
             // 的未缩放旧格式原图。不能使用备份文件，也不能拿 -scaled 图当原图。
             $legacy_source = $this->find_legacy_original_source( $attachment_id, wp_get_attachment_metadata( $attachment_id ) );
 
+            // SVG 和 JXL 没有 WordPress 能解码的栅格源（JXL 只有转换后保留的旧格式源
+            // 才可能生成），这不是失败，只是这张图没有可补的尺寸。
+            if ( null === $legacy_source && in_array( get_post_mime_type( $attachment_id ), array( 'image/svg+xml', 'image/jxl' ), true ) ) {
+                return 'unsupported_format';
+            }
+
             // 先按当前缩放设置补建/修正 -scaled 缩放图（与缩略图缺失无关）
             $scaled = $this->ensure_scaled( $attachment_id );
 

@@ -131,7 +131,7 @@ function local_crush_sanitize_svg_content( string $content ) {
     $xpath = new DOMXPath( $doc );
 
     // 移除可执行外部文档或插件内容的元素：脚本、外部 HTML 容器、内嵌框架与嵌入对象
-    foreach ( array( 'script', 'foreignObject', 'iframe', 'embed', 'object' ) as $tag ) {
+    foreach ( array( 'script', 'foreignObject', 'iframe', 'embed', 'object', 'handler' ) as $tag ) {
         $nodes = $xpath->query( '//*[local-name()="' . $tag . '"]' );
 
         if ( $nodes ) {
@@ -177,15 +177,27 @@ function local_crush_sanitize_svg_content( string $content ) {
                 // 浏览器会忽略 URL 协议中的 ASCII 控制字符，清理后再判断协议。
                 $value = preg_replace( '/[\x00-\x20\x7F]+/', '', $value );
 
-                // data:image/svg+xml 等可嵌套脚本的数据协议与 data:text/html 同等危险
-                $is_script_protocol = (bool) preg_match( '/^(javascript|vbscript):|^data:(text\/html|image\/svg\+xml|text\/xml|application\/(xhtml\+xml|xml))/', $value );
-                $is_style_attack    = 'style' === $name && (
-                    false !== strpos( $value, 'javascript:' ) || false !== strpos( $value, 'vbscript:' )
-                    || false !== strpos( $value, 'data:text/html' ) || false !== strpos( $value, 'data:image/svg+xml' )
-                );
+                // 危险协议必须整段扫描：SMIL 的 values 用分号分隔多个值，
+                // 只检查开头会放过 values="https://safe;javascript:..."。
+                $is_script_protocol = (bool) preg_match( '/(javascript|vbscript):|data:(text\/html|image\/svg\+xml|text\/xml|application\/(xhtml\+xml|xml))/', $value );
 
-                if ( 0 === strpos( $name, 'on' ) || $is_script_protocol || $is_style_attack ) {
+                if ( 0 === strpos( $name, 'on' ) || $is_script_protocol ) {
                     $element->removeAttributeNode( $attribute );
+                }
+            }
+
+            // SMIL 动画可以把目标属性改成事件处理器，例如
+            // <set attributeName="onload" to="alert(1)">；整只动画元素删掉。
+            $tag_name = strtolower( (string) $element->localName );
+
+            if ( in_array( $tag_name, array( 'animate', 'set', 'animatemotion', 'animatetransform', 'animatecolor' ), true ) ) {
+                $target_attribute = strtolower( trim( (string) $element->getAttribute( 'attributeName' ) ) );
+                $target_attribute = (string) preg_replace( '/^[a-z0-9]+:/', '', $target_attribute );
+
+                if ( 0 === strpos( $target_attribute, 'on' ) ) {
+                    if ( null !== $element->parentNode ) {
+                        $element->parentNode->removeChild( $element );
+                    }
                 }
             }
         }

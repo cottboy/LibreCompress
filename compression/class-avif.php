@@ -224,7 +224,15 @@ class Local_Crush_Avif extends Local_Crush_Tool_Base {
      * @return string[]
      */
     protected function get_extra_temp_paths( string $file_path ): array {
-        return array( $file_path . '.lc-avif.png' );
+        $temp_png = $file_path . '.lc-avif.png';
+
+        // avifdec 拒绝覆盖已存在的输出：上次中断留下的中间 PNG 必须先删掉。
+        if ( is_file( $temp_png ) && ! is_link( $temp_png ) ) {
+            // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
+            unlink( $temp_png );
+        }
+
+        return array( $temp_png );
     }
 
     /**

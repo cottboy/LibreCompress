@@ -626,6 +626,11 @@ class Local_Crush_Animation {
         $readers = array( 'webp' => 'webpmux', 'avif' => 'avifdec' );
         $group   = array();
 
+        // 动画 GIF 同格式压缩直接交给 gifsicle，和其他 GIF 路径一样。
+        if ( 'gif' === $source && 'gif' === $target ) {
+            return array( array( 'gifsicle' ) );
+        }
+
         if ( isset( $readers[ $source ] ) ) {
             $group[] = $readers[ $source ];
         }
@@ -1356,7 +1361,17 @@ class Local_Crush_Animation {
      */
     public static function skip_reason( string $extension, string $target = '' ): string {
         if ( 'png' === $extension && '' === $target ) {
-            return __( 'APNG 已跳过：PNG 走的是有损模式，且没有勾选“APNG 自动无损压缩”，可在“压缩工具”页勾选，或在基本设置里勾选“APNG”让它转格式', 'local-crush' );
+            // 只有“有损模式且没开 APNG 自动无损”才是主动不压；
+            // 走无损或开了 APNG 自动无损却走到这里，实际原因是 oxipng 缺失。
+            if ( ! Local_Crush_Settings::png_is_lossless() && ! self::apng_enabled() ) {
+                return __( 'APNG 已跳过：PNG 走的是有损模式，且没有勾选“APNG 自动无损压缩”，可在“压缩工具”页勾选，或在基本设置里勾选“APNG”让它转格式', 'local-crush' );
+            }
+
+            return sprintf(
+                /* translators: %s: 工具名称 */
+                __( '动图处理需要 %s 工具，当前环境未配齐，已跳过', 'local-crush' ),
+                'oxipng'
+            );
         }
 
         return self::missing_tool_message( $extension, $target );
@@ -1379,7 +1394,7 @@ class Local_Crush_Animation {
         return sprintf(
             /* translators: %s: 工具名称 */
             __( '动图处理需要 %s 工具，当前环境未配齐，已跳过', 'local-crush' ),
-            implode( ' 或 ', $groups )
+            implode( ' ' . __( '或', 'local-crush' ) . ' ', $groups )
         );
     }
 

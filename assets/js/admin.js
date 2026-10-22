@@ -649,6 +649,8 @@
                 if (this.$panel) {
                     this.$panel.hide();
                 }
+                // 任务被另一个标签页关掉后，这里的批量按钮也要恢复可用。
+                this.lockBatchButtons(false);
                 return;
             }
 

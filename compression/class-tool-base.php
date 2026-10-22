@@ -533,6 +533,20 @@ abstract class Local_Crush_Tool_Base {
             }
         }
 
+        // 上次中断留下的确定性输出文件必须先清掉：部分工具（如 avifdec）拒绝覆盖
+        // 已存在的输出，留着会让这张图每次重试都失败，直到定时清理把它删掉。
+        if ( '' !== $temp_output && is_file( $temp_output ) && ! is_link( $temp_output ) ) {
+            // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
+            if ( ! unlink( $temp_output ) ) {
+                return array(
+                    'success'         => false,
+                    'message'         => __( '无法清理上次中断留下的临时文件', 'local-crush' ),
+                    'original_size'   => $original_size,
+                    'compressed_size' => $original_size,
+                );
+            }
+        }
+
         // 按顺序执行命令链，任一条失败即整体失败且不再执行后续命令
         $result = array( 'success' => false, 'output' => '', 'return_code' => -1 );
 

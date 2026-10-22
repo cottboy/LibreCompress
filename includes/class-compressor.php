@@ -287,12 +287,23 @@ class Local_Crush_Compressor {
                 if ( $frames > 1 ) {
                     return true;
                 }
+
+                // 截断的文件不能让后面的 ord() 读到字符串外。
+                if ( $pos + 9 >= $length ) {
+                    break;
+                }
+
                 $pos += 9;
                 $local_flags = ord( $data[ $pos ] );
                 $pos++;
                 if ( $local_flags & 0x80 ) {
                     $pos += 3 * ( 2 << ( $local_flags & 0x07 ) );
                 }
+
+                if ( $pos >= $length ) {
+                    break;
+                }
+
                 // LZW 最小码长字节，其后才是数据子块序列
                 $pos++;
                 while ( $pos < $length ) {

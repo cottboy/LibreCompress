@@ -193,7 +193,8 @@ class Local_Crush_Processor {
         foreach ( $files as $file ) {
             // 元数据声明但磁盘上已不存在的尺寸不是待处理项：重试多少次都不会变，
             // 计入 pending 会让整个附件永远显示"待压缩"并被反复重试。
-            if ( ! is_file( $file['file_path'] ) ) {
+            // 符号链接与 uploads 外的路径同样按缺失处理，绝不去碰。
+            if ( ! $this->is_safe_processing_path( $file['file_path'] ) ) {
                 $state['missing_count']++;
                 continue;
             }
@@ -303,7 +304,7 @@ class Local_Crush_Processor {
 
         foreach ( $files as $file ) {
             $path              = isset( $file['file_path'] ) ? (string) $file['file_path'] : '';
-            $exists            = '' !== $path && is_file( $path );
+            $exists            = '' !== $path && $this->is_safe_processing_path( $path );
             $current_size      = $exists ? (int) filesize( $path ) : 0;
             $record_size_type  = isset( $file['record_size_type'] ) ? (string) $file['record_size_type'] : (string) $file['size_type'];
             $record            = local_crush()->database->get_record( $attachment_id, $record_size_type );
@@ -504,7 +505,19 @@ class Local_Crush_Processor {
             // 只对待压缩的图片生效：已全部压缩的附件在这里直接返回，
             // 不会对同一张图反复处理，也不会动已压缩文件的大小。
             if ( empty( $pending ) ) {
-                return $this->empty_result( __( '图片已经压缩', 'local-crush' ), 'skipped' );
+                $has_safe_file = false;
+
+                foreach ( $files as $candidate ) {
+                    if ( $this->is_safe_processing_path( (string) $candidate['file_path'] ) ) {
+                        $has_safe_file = true;
+                        break;
+                    }
+                }
+
+                return $this->empty_result(
+                    $has_safe_file ? __( '图片已经压缩', 'local-crush' ) : __( '没有可处理的图片文件', 'local-crush' ),
+                    'skipped'
+                );
             }
 
             // 只要附件已有一个成功记录，后续补压缩就只能保持当前格式，
@@ -642,6 +655,12 @@ class Local_Crush_Processor {
         $pending = array();
 
         foreach ( $files as $file ) {
+            // 不在 uploads 内或是符号链接的文件永远处理不了，不放进待办队列，
+            // 否则每一轮批量都会重试同一张图却永远没有结果。
+            if ( ! $this->is_safe_processing_path( (string) $file['file_path'] ) ) {
+                continue;
+            }
+
             $record_size_type = isset( $file['record_size_type'] ) ? $file['record_size_type'] : $file['size_type'];
             $record            = local_crush()->database->get_record( $attachment_id, $record_size_type );
 
@@ -716,7 +735,7 @@ class Local_Crush_Processor {
         if ( '' !== $main_rel ) {
             $main_path = $base_dir . '/' . $main_rel;
 
-            return is_file( $main_path ) ? $main_path : '';
+            return is_file( $main_path ) && $this->is_inside_upload_dir( $main_path ) ? $main_path : '';
         }
 
         // get_attached_file() 已把 uploads 相对路径补成绝对路径。
@@ -728,7 +747,7 @@ class Local_Crush_Processor {
 
         $attached_path = wp_normalize_path( $attached );
 
-        return is_file( $attached_path ) ? $attached_path : '';
+        return is_file( $attached_path ) && $this->is_inside_upload_dir( $attached_path ) ? $attached_path : '';
     }
 
     /**
@@ -1468,7 +1487,7 @@ class Local_Crush_Processor {
         $base    = untrailingslashit( wp_normalize_path( $base ) );
         $cutoff  = time() - self::TEMP_CLEANUP_AGE;
         $deadline = microtime( true ) + self::TEMP_SCAN_BUDGET;
-        $regex   = '/\.(?:lc-rollback-[A-Za-z0-9]+|tmp\.(?:webp|gif|jxl|svg)|lc-avif\.(?:png|avif)|lc-compress-[A-Za-z0-9]+\.[A-Za-z0-9]+|lc-source-[A-Za-z0-9]+\.png|lc-anim-[A-Za-z0-9]+\.[A-Za-z0-9]+|lc-webp-tmp)$/';
+        $regex   = '/\.(?:lc-rollback-[A-Za-z0-9]+|lc-restore-[A-Za-z0-9]+|tmp\.(?:webp|gif|jxl|svg)|lc-avif\.(?:png|avif)|lc-compress-[A-Za-z0-9]+\.[A-Za-z0-9]+|lc-source-[A-Za-z0-9]+\.png|lc-anim-[A-Za-z0-9]+\.[A-Za-z0-9]+|lc-webp-tmp)$/';
         $timed_out = false;
 
         $iterator = new RecursiveIteratorIterator(
@@ -2268,6 +2287,31 @@ class Local_Crush_Processor {
         $target['filesize'] = $filesize;
 
         return true;
+    }
+
+    /**
+     * 判断文件是否可安全处理：真实存在、不是符号链接、且位于上传目录内
+     *
+     * @param string $path 文件路径
+     * @return bool
+     */
+    private function is_safe_processing_path( string $path ): bool {
+        if ( '' === $path || is_link( $path ) || ! is_file( $path ) ) {
+            return false;
+        }
+
+        $upload_dir = wp_upload_dir();
+        $base_dir   = realpath( $upload_dir['basedir'] );
+        $real_path  = realpath( $path );
+
+        if ( false === $base_dir || false === $real_path ) {
+            return false;
+        }
+
+        $base_dir  = untrailingslashit( $this->normalized_path( $base_dir ) );
+        $real_path = $this->normalized_path( $real_path );
+
+        return 0 === strpos( $real_path, $base_dir . '/' );
     }
 
     /**

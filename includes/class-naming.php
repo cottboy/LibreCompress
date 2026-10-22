@@ -124,9 +124,25 @@ class Local_Crush_Naming {
         }
 
         for ( $attempt = 1; $attempt <= self::MAX_NAME_ATTEMPTS; $attempt++ ) {
-            $candidate = $directory . '/' . $name . '-' . $attempt . '.' . $extension;
+            $candidate_name = $name . '-' . $attempt . '.' . $extension;
+            $candidate      = $directory . '/' . $candidate_name;
 
             if ( file_exists( $candidate ) || is_link( $candidate ) ) {
+                continue;
+            }
+
+            // 转换产物是“源文件名.目标格式”，只避开源名不够：
+            // 若 photo-1.jpg.webp 已存在，选中 photo-1.jpg 会让产物覆盖掉它。
+            $target_taken = false;
+
+            foreach ( self::TARGET_FORMATS as $target ) {
+                if ( $this->upload_file_exists( $directory, $candidate_name . '.' . $target ) ) {
+                    $target_taken = true;
+                    break;
+                }
+            }
+
+            if ( $target_taken ) {
                 continue;
             }
 
