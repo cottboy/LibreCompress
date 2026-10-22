@@ -6,8 +6,8 @@
  * Version: 1.0.0
  * Author: cottboy
  * Author URI: https://github.com/cottboy
- * License: GPL v2 or later
- * License URI: https://www.gnu.org/licenses/gpl-2.0.html
+ * License: GPLv3 or later
+ * License URI: https://www.gnu.org/licenses/gpl-3.0.html
  * Text Domain: local-crush
  * Domain Path: /languages
  * Requires at least: 6.4
