@@ -42,7 +42,7 @@ class Local_Crush_Settings {
             'label'   => __( '压缩模式', 'local-crush' ),
             'flag'    => '',
             'default' => 'lossy',
-            'desc'    => __( '有损会丢掉部分画面细节来换更小体积；无损只重排压缩数据，画面一个像素都不变。', 'local-crush' ),
+            'desc'    => __( '有损：丢掉一部分画面细节，换更小的文件，压完能明显看出文件变小；无损：只重新整理压缩数据，画面一个像素都不变，但文件也小得有限。拿不准就选有损。', 'local-crush' ),
         );
     }
 
@@ -68,8 +68,8 @@ class Local_Crush_Settings {
                 'flag'    => 'cwebp -q',
                 'min'     => 0,
                 'max'     => 100,
-                'default' => 80,
-                'desc'    => __( '填多少就传给 -q 多少，0 最省体积、100 最好。只有有损模式有效。', 'local-crush' ),
+                'default' => 75,
+                'desc'    => __( '数越大画质越好、文件越大；数越小画质越差、文件越小。0 是最糊的档，100 是最好的档。默认 75 是 cwebp 自己的默认值，日常够用；想更清楚可以调到 80 左右（cwebp 帮助里也把 80 称为典型值），再高基本只是文件变大。只有选“有损压缩”时才看这个数。', 'local-crush' ),
             ),
             $group . '_method'         => array(
                 'type'    => 'int',
@@ -78,7 +78,7 @@ class Local_Crush_Settings {
                 'min'     => 0,
                 'max'     => 6,
                 'default' => 4,
-                'desc'    => __( '0 最快、6 最慢但最小。方法只影响耗时和体积，不影响画质。', 'local-crush' ),
+                'desc'    => __( '数越大压缩越慢、文件越小；数越小压缩越快、文件越大。这个数只影响速度和体积，不影响画质。默认 4 是 cwebp 自己的默认值。只有选“有损压缩”时才看这个数。', 'local-crush' ),
             ),
             $group . '_lossless_level' => array(
                 'type'    => 'int',
@@ -87,7 +87,7 @@ class Local_Crush_Settings {
                 'min'     => 0,
                 'max'     => 9,
                 'default' => 6,
-                'desc'    => __( '只有无损模式有效，0 最快、9 最小。', 'local-crush' ),
+                'desc'    => __( '数越大压缩越慢、文件越小；数越小压缩越快、文件越大。只影响速度和体积，不影响画质。默认 6 是 cwebp 自己的默认值。只有选“无损压缩”时才看这个数。', 'local-crush' ),
             ),
             $group . '_alpha_quality'  => array(
                 'type'    => 'int',
@@ -96,7 +96,7 @@ class Local_Crush_Settings {
                 'min'     => 0,
                 'max'     => 100,
                 'default' => 100,
-                'desc'    => __( '透明通道单独编码，100 表示透明通道无损。', 'local-crush' ),
+                'desc'    => __( '只管图片里半透明部分的清晰程度：数越大透明边缘越保真、文件越大；数越小透明边缘越毛、文件越小。默认 100 表示透明部分完全无损，也是 cwebp 自己的默认值；没有半透明边缘的图调它没有意义。', 'local-crush' ),
             ),
             $group . '_preset'         => array(
                 'type'    => 'choice',
@@ -111,14 +111,14 @@ class Local_Crush_Settings {
                     'text'    => __( '文字截图', 'local-crush' ),
                 ),
                 'default' => 'default',
-                'desc'    => __( '按内容类型预调参数。预设会重置质量和压缩方法，所以它排在命令行最前面，后面的显式值仍然生效。', 'local-crush' ),
+                'desc'    => __( '按图片内容替你预调好一套内部参数，省得自己一个个试：“照片”适合风景人像，“室内人像”适合室内合影，“绘图 / 线稿”适合卡通和截图，“图标 / 小彩图”适合 logo 和小图，“文字截图”适合界面截图。预设会重置质量和压缩方法，所以排在命令行最前面，你下面显式填的值仍然生效。拿不准就选默认。', 'local-crush' ),
             ),
             $group . '_exact'          => array(
                 'type'    => 'bool',
                 'label'   => __( '保留透明区域颜色', 'local-crush' ),
                 'flag'    => 'cwebp -exact',
                 'default' => false,
-                'desc'    => __( '默认会把全透明像素的 RGB 抹平；勾选则原样保留，代价是体积约多 16%。', 'local-crush' ),
+                'desc'    => __( '默认会把全透明像素的底色抹掉，文件更小；勾选后原样保留这些像素的底色，文件大约大 16%。只有还要保留透明区域颜色信息（比如图还要再拿去加工）才需要勾。', 'local-crush' ),
             ),
         );
     }
@@ -138,8 +138,8 @@ class Local_Crush_Settings {
                 'flag'    => 'avifenc -q',
                 'min'     => 0,
                 'max'     => 100,
-                'default' => 80,
-                'desc'    => __( '填多少就传给 -q 多少，100 为无损、0 最省体积。只有有损模式有效。', 'local-crush' ),
+                'default' => 60,
+                'desc'    => __( '数越大画质越好、文件越大；数越小画质越差、文件越小。0 是最糊的档，100 是无损。默认 60 是 avifenc 自己的默认值（官方称典型区间是 60-80），AVIF 本身压缩效率高，60 已经很清楚；嫌画质不够可以往 80 调。只有选“有损压缩”时才看这个数。', 'local-crush' ),
             ),
             $group . '_alpha_quality' => array(
                 'type'    => 'int',
@@ -147,8 +147,8 @@ class Local_Crush_Settings {
                 'flag'    => 'avifenc --qalpha',
                 'min'     => 0,
                 'max'     => 100,
-                'default' => 80,
-                'desc'    => __( '100 为透明通道无损；半透明边缘多的图建议调高。', 'local-crush' ),
+                'default' => 60,
+                'desc'    => __( '只管图片里半透明部分的清晰程度：数越大透明边缘越保真、文件越大；数越小透明边缘越毛、文件越小。默认 60 与上面的颜色质量保持一致，这也是 avifenc 不单独指定时的行为；半透明边缘特别多的图建议调高。', 'local-crush' ),
             ),
             $group . '_speed'         => array(
                 'type'    => 'int',
@@ -157,7 +157,7 @@ class Local_Crush_Settings {
                 'min'     => 0,
                 'max'     => 10,
                 'default' => 6,
-                'desc'    => __( '0 最慢最小、10 最快最大，avifenc 自己的范围就是 0-10。', 'local-crush' ),
+                'desc'    => __( '数越大编码越快、文件越大；数越小编码越慢、文件越小。默认 6 是 avifenc 自己的默认值。有损和无损都看这个数。', 'local-crush' ),
             ),
             $group . '_chroma'        => array(
                 'type'    => 'choice',
@@ -170,7 +170,7 @@ class Local_Crush_Settings {
                     '420'  => __( '4:2:0 + sharpyuv（最小，边缘略糊）', 'local-crush' ),
                 ),
                 'default' => 'auto',
-                'desc'    => __( '只有有损模式有效。选 4:2:0 会额外带上 avifenc 的 --sharpyuv，选自动时不传这个参数。', 'local-crush' ),
+                'desc'    => __( '决定颜色信息记得有多细：4:4:4 色彩最准、文件最大；4:2:2 横向减半；4:2:0 最小，但彩色边缘会略糊。自动表示按原图情况让 avifenc 自己决定，日常推荐。只有选“有损压缩”时才看这个选项。', 'local-crush' ),
             ),
             $group . '_depth'         => array(
                 'type'    => 'choice',
@@ -182,7 +182,7 @@ class Local_Crush_Settings {
                     '12' => __( '12 位（几乎用不到）', 'local-crush' ),
                 ),
                 'default' => '8',
-                'desc'    => __( '位深越高渐变越平滑，但 10/12 位文件更大、老设备可能不支持。8 位时不传这个参数。', 'local-crush' ),
+                'desc'    => __( '位深越高，渐变过渡越平滑，但文件更大、部分老设备可能不支持。8 位是所有浏览器都能显示的标准档；只有对渐变质量极其敏感时才值得选 10 / 12 位。', 'local-crush' ),
             ),
             $group . '_jobs'          => array(
                 'type'    => 'int',
@@ -191,7 +191,7 @@ class Local_Crush_Settings {
                 'min'     => 1,
                 'max'     => 256,
                 'default' => 4,
-                'desc'    => __( '同时开几个编码线程，填多少传多少。开太多会和网站抢 CPU。', 'local-crush' ),
+                'desc'    => __( '同时用几个 CPU 核心来编码：数越大编码越快，但会和网站前台抢资源，服务器上别贪多。avifenc 自己默认用满所有核心，插件默认 4 是稳妥值。', 'local-crush' ),
             ),
         );
     }
@@ -212,7 +212,7 @@ class Local_Crush_Settings {
                 'min'     => 0,
                 'max'     => 63,
                 'default' => 20,
-                'desc'    => __( '直接对应 libaom 的 -crf：数值越小画质越好、体积越大，0 接近无损，63 最差。只有有损模式有效。', 'local-crush' ),
+                'desc'    => __( '注意这个数和别处相反：数越小画质越好、文件越大，数越大画质越差、文件越小。0 接近无损，63 最糊。默认 20 是插件推荐的高画质档；觉得文件太大可以往 25-30 调。只有选“有损压缩”时才看这个数。', 'local-crush' ),
             ),
             $group . '_speed'   => array(
                 'type'    => 'int',
@@ -221,7 +221,7 @@ class Local_Crush_Settings {
                 'min'     => 0,
                 'max'     => 8,
                 'default' => 6,
-                'desc'    => __( '直接对应 libaom 的 -cpu-used：0 最慢最小、8 最快最大。', 'local-crush' ),
+                'desc'    => __( '数越大编码越快、文件越大；数越小编码越慢、文件越小。FFmpeg 自己的默认值是 1，服务器上跑太慢；插件默认 6，与 avifenc 的默认速度一致，是速度与画质的折中。', 'local-crush' ),
             ),
             $group . '_threads' => array(
                 'type'    => 'int',
@@ -230,7 +230,7 @@ class Local_Crush_Settings {
                 'min'     => 1,
                 'max'     => 256,
                 'default' => 4,
-                'desc'    => __( '直接对应 FFmpeg 的 -threads，填多少传多少。开太多会和网站抢 CPU。', 'local-crush' ),
+                'desc'    => __( '同时用几个 CPU 核心来编码：数越大编码越快，但会和网站前台抢资源。FFmpeg 自己默认用满所有核心，插件默认 4 是稳妥值。', 'local-crush' ),
             ),
             $group . '_chroma'  => array(
                 'type'    => 'choice',
@@ -243,7 +243,7 @@ class Local_Crush_Settings {
                     '420'  => __( '4:2:0（yuv420p，最小，边缘略糊）', 'local-crush' ),
                 ),
                 'default' => 'auto',
-                'desc'    => __( '只有有损模式有效，直接对应 FFmpeg 的 -pix_fmt。选自动时不传这个参数，由编码器按输入决定。', 'local-crush' ),
+                'desc'    => __( '决定颜色信息记得有多细：4:4:4 色彩最准、文件最大；4:2:2 横向减半；4:2:0 最小，但彩色边缘会略糊。自动表示交给 FFmpeg 按原图决定，日常推荐。只有选“有损压缩”时才看这个选项。', 'local-crush' ),
             ),
         );
     }
@@ -263,8 +263,8 @@ class Local_Crush_Settings {
                 'flag'    => 'FFmpeg -quality',
                 'min'     => 0,
                 'max'     => 100,
-                'default' => 80,
-                'desc'    => __( '填多少就传给 -quality 多少。FFmpeg 自己的默认值是 75。只有有损模式有效。', 'local-crush' ),
+                'default' => 75,
+                'desc'    => __( '数越大画质越好、文件越大；数越小画质越差、文件越小。0 是最糊的档，100 是最好的档。默认 75 是 FFmpeg 自己的默认值；想更清楚可以调到 80 左右。只有选“有损压缩”时才看这个数。', 'local-crush' ),
             ),
             $group . '_method'  => array(
                 'type'    => 'int',
@@ -273,7 +273,7 @@ class Local_Crush_Settings {
                 'min'     => 0,
                 'max'     => 6,
                 'default' => 4,
-                'desc'    => __( '0 最快、6 最慢但最小，就是 libwebp 的 method 范围，有损与无损都生效。', 'local-crush' ),
+                'desc'    => __( '数越大压缩越慢、文件越小；数越小压缩越快、文件越大。只影响速度和体积，不影响画质。默认 4 与 libwebp 的默认方法一致，有损和无损都生效。', 'local-crush' ),
             ),
         );
     }
@@ -294,7 +294,7 @@ class Local_Crush_Settings {
                 'min'     => 0,
                 'max'     => 100,
                 'default' => 80,
-                'desc'    => __( '填多少就传给 -q 多少，100 等于数学无损、90 已经是视觉无损。只有有损模式有效。', 'local-crush' ),
+                'desc'    => __( '数越大画质越好、文件越大；数越小画质越差、文件越小。100 是数学上的无损，90 起肉眼基本看不出差别。默认 80 是插件推荐值，落在官方建议的 68-96 区间内。只有选“有损压缩”时才看这个数。', 'local-crush' ),
             ),
             $group . '_effort'  => array(
                 'type'    => 'int',
@@ -303,7 +303,7 @@ class Local_Crush_Settings {
                 'min'     => 1,
                 'max'     => 10,
                 'default' => 7,
-                'desc'    => __( '级别越高越慢、同样画质体积越小，7 是 cjxl 默认值。', 'local-crush' ),
+                'desc'    => __( '数越大压缩越慢、同样画质下文件越小；数越小压缩越快、文件越大。只影响速度和体积，不影响画质。默认 7 是 cjxl 自己的默认值。', 'local-crush' ),
             ),
         );
     }
@@ -323,7 +323,7 @@ class Local_Crush_Settings {
                 'label'   => __( '启用有损', 'local-crush' ),
                 'flag'    => 'gif2webp -lossy',
                 'default' => true,
-                'desc'    => __( '勾选时带上 -lossy 并按下面的质量重新量化；取消则只重排数据，画面不变、体积也降得少。', 'local-crush' ),
+                'desc'    => __( '勾选：按下面的有损质量重新量化，文件明显更小；取消：只重排数据，画面一个像素都不变，但体积也降得有限。', 'local-crush' ),
             ),
             $group . '_quality' => array(
                 'type'    => 'int',
@@ -332,7 +332,7 @@ class Local_Crush_Settings {
                 'min'     => 0,
                 'max'     => 100,
                 'default' => 80,
-                'desc'    => __( '只有勾上“启用有损”才传，填多少传多少，0 最省体积、100 最好。', 'local-crush' ),
+                'desc'    => __( '数越大画质越好、文件越大；数越小画质越差、文件越小。默认 80 是插件推荐值。只有勾上“启用有损”时才看这个数。', 'local-crush' ),
             ),
             $group . '_method'  => array(
                 'type'    => 'int',
@@ -341,7 +341,7 @@ class Local_Crush_Settings {
                 'min'     => 0,
                 'max'     => 6,
                 'default' => 4,
-                'desc'    => __( '0 最快、6 最慢但最小。', 'local-crush' ),
+                'desc'    => __( '数越大压缩越慢、文件越小；数越小压缩越快、文件越大。只影响速度和体积，不影响画质。默认 4 是 gif2webp 自己的默认值。', 'local-crush' ),
             ),
         );
     }
@@ -361,21 +361,21 @@ class Local_Crush_Settings {
                 'min'     => 0,
                 'max'     => 6,
                 'default' => 2,
-                'desc'    => __( '数值越大压得越小、越慢（6 非常慢）。2 是 oxipng 默认值，日常够用。', 'local-crush' ),
+                'desc'    => __( '数越大压得越狠、文件越小，但耗时越长（6 非常慢）；数越小越快、文件越大。只影响速度和体积，不影响画质。默认 2 是 oxipng 自己的默认值，日常够用。', 'local-crush' ),
             ),
             $prefix . '_oxipng_alpha'  => array(
                 'type'    => 'bool',
                 'label'   => __( '优化透明通道', 'local-crush' ),
                 'flag'    => 'oxipng --alpha',
                 'default' => false,
-                'desc'    => __( '把完全透明的像素颜色改写成可压缩的值，带透明的大图能再小一截。画面看起来不变。', 'local-crush' ),
+                'desc'    => __( '把完全透明的像素改写成更容易压缩的值，带透明区域的大图能再小一截，看起来没有任何变化。纯不透明的图勾了也没有效果。', 'local-crush' ),
             ),
             $prefix . '_oxipng_zopfli' => array(
                 'type'    => 'bool',
                 'label'   => __( 'Zopfli 极限压缩', 'local-crush' ),
                 'flag'    => 'oxipng --zopfli',
                 'default' => false,
-                'desc'    => __( '更慢更狠的压缩算法，通常还能再省几个百分点，大图或帧多的动图容易跑到超时。', 'local-crush' ),
+                'desc'    => __( '换一种更狠的无损压缩算法，通常还能再小几个百分点，但耗时明显更长；大图或帧特别多的动图容易跑到超时，所以默认关闭。', 'local-crush' ),
             ),
         );
     }
@@ -422,7 +422,7 @@ class Local_Crush_Settings {
                         'min'     => 0,
                         'max'     => 100,
                         'default' => 80,
-                        'desc'    => __( '填多少就传给 --max 多少，0 最省体积、100 最好。只有有损模式有效。', 'local-crush' ),
+                        'desc'    => __( '数越大画质越好、文件越大；数越小画质越差、文件越小。jpegoptim 不设上限时只做无损整理，这个数是插件推荐的质量上限，80 是照片类图片的常用平衡点。只有选“有损压缩”时才看这个数。', 'local-crush' ),
                     ),
                     'jpeg_progressive' => array(
                         'type'    => 'choice',
@@ -434,7 +434,7 @@ class Local_Crush_Settings {
                             'progressive' => __( '渐进式（--all-progressive，先糊后清）', 'local-crush' ),
                         ),
                         'default' => 'progressive',
-                        'desc'    => __( '渐进式通常体积更小、加载观感更好；个别老软件不认渐进式就选顺序式。', 'local-crush' ),
+                        'desc'    => __( '渐进式：图片由糊到清逐段加载，观感更好、文件通常也更小，推荐；顺序式：整张图一次性显示，只有很老的软件不认渐进式时才需要选；自动：让 jpegoptim 自己挑更小的那种。', 'local-crush' ),
                     ),
                 ),
             ),
@@ -447,7 +447,7 @@ class Local_Crush_Settings {
                         'label'   => __( 'PNG 走哪条路径', 'local-crush' ),
                         'flag'    => '',
                         'default' => 'lossy',
-                        'desc'    => __( '有损：走本节 pngquant 的参数；无损：走下一节 oxipng 的参数。两条路径只能二选一，不会同时执行。', 'local-crush' ),
+                        'desc'    => __( '有损：走本节 pngquant 的参数，文件小得多但颜色会精简；无损：走下一节 oxipng 的参数，画面一个像素都不变。两条路径只能二选一，不会同时执行。', 'local-crush' ),
                     ),
                     'png_lossy_quality_min' => array(
                         'type'    => 'int',
@@ -456,7 +456,7 @@ class Local_Crush_Settings {
                         'min'     => 0,
                         'max'     => 100,
                         'default' => 60,
-                        'desc'    => __( '低于这个质量就不保存、直接保留原图，用来防止压得太糊。0 表示不设下限。', 'local-crush' ),
+                        'desc'    => __( '压完的质量低于这个数就不保存、直接保留原图，防止压得太糊。数越小，越多图会被压小（哪怕画质变差）；数越大越保守。0 表示不设下限。', 'local-crush' ),
                     ),
                     'png_lossy_quality_max' => array(
                         'type'    => 'int',
@@ -465,7 +465,7 @@ class Local_Crush_Settings {
                         'min'     => 0,
                         'max'     => 100,
                         'default' => 80,
-                        'desc'    => __( '追求的最高质量，凑不到时会自动减少颜色数。下限填得比上限大时会自动对调。', 'local-crush' ),
+                        'desc'    => __( '追求的最高质量：数越大画质越好、文件越大；数越小文件越小、画质越差。凑不到这个质量时会自动减少颜色数。默认 60-80 是常用推荐区间；下限填得比上限大时会自动对调。', 'local-crush' ),
                     ),
                     'png_lossy_speed'      => array(
                         'type'    => 'int',
@@ -474,14 +474,14 @@ class Local_Crush_Settings {
                         'min'     => 1,
                         'max'     => 11,
                         'default' => 4,
-                        'desc'    => __( '数值越大越快越省 CPU，画质越粗糙；1 最慢最细，4 是 pngquant 默认值。', 'local-crush' ),
+                        'desc'    => __( '数越大压缩越快、越省 CPU，但画质越粗糙；数越小越慢越细。默认 4 是 pngquant 自己的默认值。', 'local-crush' ),
                     ),
                     'png_lossy_dither'     => array(
                         'type'    => 'bool',
                         'label'   => __( '抖动', 'local-crush' ),
                         'flag'    => __( 'pngquant（取消勾选时加 --nofs）', 'local-crush' ),
                         'default' => true,
-                        'desc'    => __( '勾选：减少颜色后用抖动过渡，照片类渐变更自然；取消：色块更干净、体积更小，适合扁平图标。', 'local-crush' ),
+                        'desc'    => __( '勾选：减少颜色后用抖动把过渡补自然，照片类渐变更耐看；取消：色块更干净、文件更小，适合扁平图标和纯色图。pngquant 默认就是开启抖动的。', 'local-crush' ),
                     ),
                 ),
             ),
@@ -512,8 +512,8 @@ class Local_Crush_Settings {
                         'flag'    => 'gifsicle --lossy',
                         'min'     => 0,
                         'max'     => 1000,
-                        'default' => 80,
-                        'desc'    => __( '填多少就传给 --lossy 多少，数值越大文件越小、噪点越多，常用 20-200；填 0 表示不加有损。只有有损模式有效。', 'local-crush' ),
+                        'default' => 20,
+                        'desc'    => __( '数越大文件越小、噪点和色块越多；数越小越保真、文件越大。0 等于不加有损。默认 20 是 gifsicle 自己的默认值；录屏和照片类动图常用 30-200，纯色线稿建议保持小值或改选“无损压缩”。只有选“有损压缩”时才看这个数。', 'local-crush' ),
                     ),
                     'gif_colors'     => array(
                         'type'    => 'int',
@@ -522,7 +522,7 @@ class Local_Crush_Settings {
                         'min'     => 2,
                         'max'     => 256,
                         'default' => 256,
-                        'desc'    => __( 'GIF 最多 256 色。256 等于不缩色；调低后体积更小但会掉色，图标类 64-128 往往够用。', 'local-crush' ),
+                        'desc'    => __( '数越大保留的颜色越多、画质越好、文件越大；数越小文件越小、掉色越明显。GIF 最多 256 色，256 就是不缩颜色。图标类动图用 64-128 往往够用。', 'local-crush' ),
                     ),
                     'gif_level' => array(
                         'type'    => 'int',
@@ -531,7 +531,7 @@ class Local_Crush_Settings {
                         'min'     => 1,
                         'max'     => 3,
                         'default' => 2,
-                        'desc'    => __( '3 会多存一张透明度索引表，能再小一点；2 是官方推荐的平衡档。', 'local-crush' ),
+                        'desc'    => __( '1 只存帧间变化的部分；2 额外利用透明区域，体积与速度兼顾，日常推荐；3 会多试几种方法挑最小的，更慢但通常再小一点。注意 gifsicle 不加 -O 时完全不做优化，插件默认传 2。', 'local-crush' ),
                     ),
                 ),
             ),
@@ -548,7 +548,7 @@ class Local_Crush_Settings {
                             'safe'    => __( '保守（safe，几乎不改视觉）', 'local-crush' ),
                         ),
                         'default' => 'default',
-                        'desc'    => __( '常规会合并路径、精简属性；保守只做绝对安全的重写。', 'local-crush' ),
+                        'desc'    => __( '常规：合并路径、精简属性，瘦身最明显；保守：只做绝对安全的重写，几乎不影响视觉，适合结构复杂或带脚本的 SVG。两种预设都会删掉制作软件留下的说明和元数据。', 'local-crush' ),
                     ),
                 ),
             ),
@@ -672,7 +672,8 @@ class Local_Crush_Settings {
                 return ( is_string( $value ) && array_key_exists( $value, $param['choices'] ) ) ? $value : $param['default'];
 
             case 'bool':
-                return isset( $value ) ? ! empty( $value ) : (bool) $param['default'];
+                // 数组、对象等非标量输入一律回落到默认值，与函数注释的约定保持一致
+                return is_scalar( $value ) ? ! empty( $value ) : (bool) $param['default'];
 
             case 'mode':
                 return ( 'lossless' === $value ) ? 'lossless' : 'lossy';
@@ -1438,7 +1439,7 @@ class Local_Crush_Settings {
 
         <h2><?php esc_html_e( '压缩参数', 'local-crush' ); ?></h2>
         <p class="description" style="max-width: 900px;">
-            <?php esc_html_e( '参数按压缩路径分组：只有整条工具链完全一致的路径才共用一节，其余各自独立，改了不会连带改到别的路径。输入框后面标的就是它实际传给哪个工具的哪个参数，取值也就是工具本身的取值范围，插件不做换算、不折算档位，你填多少就传多少；只有超出范围时保存时会收到该参数的边界值，免得把非法数字塞给工具。没列出来的参数一律不传，由工具用自己内部的默认值。改动只影响之后的压缩，已经压好的图片不会自动重压。', 'local-crush' ); ?>
+            <?php esc_html_e( '参数按压缩路径分组：只有整条工具链完全一致的路径才共用一节，其余各自独立，改了不会连带改到别的路径。输入框后面标的就是它实际传给哪个工具的哪个参数，取值也就是工具本身的取值范围，插件不做换算、不折算档位，你填多少就传多少；只有超出范围时保存时会收到该参数的边界值，免得把非法数字塞给工具。没列出来的参数一律不传，由工具用自己内部的默认值。每个参数的默认值都优先取压缩工具自己的默认值，工具没有默认值的（比如各编码器的质量）才用插件推荐的平衡值，每项说明里都写明了来头；拿不准全部保持默认就行。改动只影响之后的压缩，已经压好的图片不会自动重压。', 'local-crush' ); ?>
         </p>
         <form method="post" action="options.php">
             <?php settings_fields( 'local_crush_tools_group' ); ?>
@@ -1496,10 +1497,7 @@ class Local_Crush_Settings {
                     </select>
                 <?php elseif ( 'bool' === $param['type'] ) : ?>
                     <input type="hidden" name="local_crush_tools[<?php echo esc_attr( $key ); ?>]" value="0">
-                    <label>
-                        <input type="checkbox" id="<?php echo esc_attr( $id ); ?>" name="local_crush_tools[<?php echo esc_attr( $key ); ?>]" value="1" <?php checked( (bool) $value ); ?>>
-                        <?php echo esc_html( $param['desc'] ); ?>
-                    </label>
+                    <input type="checkbox" id="<?php echo esc_attr( $id ); ?>" name="local_crush_tools[<?php echo esc_attr( $key ); ?>]" value="1" <?php checked( (bool) $value ); ?>>
                 <?php else : ?>
                     <input type="number" id="<?php echo esc_attr( $id ); ?>" name="local_crush_tools[<?php echo esc_attr( $key ); ?>]" value="<?php echo esc_attr( $value ); ?>" min="<?php echo esc_attr( $param['min'] ); ?>" max="<?php echo esc_attr( $param['max'] ); ?>" step="1" class="small-text">
                 <?php endif; ?>
@@ -1508,24 +1506,29 @@ class Local_Crush_Settings {
                     <code style="margin-left: 6px; font-size: 11px;"><?php echo esc_html( $param['flag'] ); ?></code>
                 <?php endif; ?>
 
-                <?php if ( 'bool' !== $param['type'] ) : ?>
-                    <p class="description">
-                        <?php
-                        if ( 'int' === $param['type'] ) {
-                            printf(
-                                /* translators: 1: 最小取值，2: 最大取值，3: 默认值 */
-                                esc_html__( '范围 %1$d-%2$d，默认 %3$d。', 'local-crush' ),
-                                (int) $param['min'],
-                                (int) $param['max'],
-                                (int) $param['default']
-                            );
-                            echo ' ';
-                        }
+                <p class="description">
+                    <?php
+                    if ( 'int' === $param['type'] ) {
+                        printf(
+                            /* translators: 1: 最小取值，2: 最大取值，3: 默认值 */
+                            esc_html__( '范围 %1$d-%2$d，默认 %3$d。', 'local-crush' ),
+                            (int) $param['min'],
+                            (int) $param['max'],
+                            (int) $param['default']
+                        );
+                        echo ' ';
+                    } elseif ( 'choice' === $param['type'] ) {
+                        printf(
+                            /* translators: %s: 默认选项的显示文字 */
+                            esc_html__( '默认：%s。', 'local-crush' ),
+                            esc_html( $param['choices'][ $param['default'] ] ?? '' )
+                        );
+                        echo ' ';
+                    }
 
-                        echo esc_html( $param['desc'] );
-                        ?>
-                    </p>
-                <?php endif; ?>
+                    echo esc_html( $param['desc'] );
+                    ?>
+                </p>
             </td>
         </tr>
         <?php

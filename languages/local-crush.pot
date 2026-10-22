@@ -5,7 +5,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Local Crush 1.0.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-22 17:30+0800\n"
+"POT-Creation-Date: 2026-10-22 22:12+0800\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -53,8 +53,8 @@ msgstr ""
 
 #: compression/class-pngquant.php:90
 #: compression/class-pngquant.php:104
-#: compression/class-tool-base.php:612
-#: includes/class-animation.php:807
+#: compression/class-tool-base.php:615
+#: includes/class-animation.php:809
 #: includes/class-compressor.php:632
 #: includes/class-converter.php:499
 #: includes/class-converter.php:539
@@ -65,101 +65,110 @@ msgstr ""
 msgid "从官网下载预编译的二进制文件"
 msgstr ""
 
-#: compression/class-tool-base.php:314
+#: compression/class-tool-base.php:316
 msgid "命令为空"
 msgstr ""
 
-#: compression/class-tool-base.php:321
+#: compression/class-tool-base.php:323
 msgid "本地命令执行功能不可用"
 msgstr ""
 
-#: compression/class-tool-base.php:337
+#: compression/class-tool-base.php:339
 msgid "无法创建命令输出缓冲区"
 msgstr ""
 
-#: compression/class-tool-base.php:354
+#: compression/class-tool-base.php:357
 msgid "无法启动本地命令"
 msgstr ""
 
-#: compression/class-tool-base.php:402
+#: compression/class-tool-base.php:405
 msgid "本地命令执行超时"
 msgstr ""
 
-#: compression/class-tool-base.php:495
+#: compression/class-tool-base.php:499
 msgid "%s 不可用"
 msgstr ""
 
-#: compression/class-tool-base.php:507
-#: includes/class-compressor.php:413
+#: compression/class-tool-base.php:511
+#: includes/class-compressor.php:414
 #: includes/class-converter.php:195
 #: includes/class-processor.php:361
 #: includes/class-processor.php:387
 msgid "文件不存在"
 msgstr ""
 
-#: compression/class-tool-base.php:518
+#: compression/class-tool-base.php:522
 msgid "不支持的文件格式"
 msgstr ""
 
-#: compression/class-tool-base.php:537
+#: compression/class-tool-base.php:541
 msgid "压缩结果文件写入失败，已保留原文件"
 msgstr ""
 
-#: compression/class-tool-base.php:582
+#: compression/class-tool-base.php:554
+msgid "无法清理上次中断留下的临时文件"
+msgstr ""
+
+#: compression/class-tool-base.php:585
 msgid "压缩结果收尾处理失败，已保留原文件"
 msgstr ""
 
-#: compression/class-tool-base.php:591
-#: includes/class-animation.php:800
+#: compression/class-tool-base.php:594
+#: includes/class-animation.php:802
 msgid "压缩结果替换失败，已保留原文件"
 msgstr ""
 
-#: compression/class-tool-base.php:604
+#: compression/class-tool-base.php:607
 msgid "压缩结果为空文件，已保留原文件"
 msgstr ""
 
-#: includes/class-animation.php:833
+#: includes/class-animation.php:835
 msgid "无法安全处理这张动图，已保留原文件"
 msgstr ""
 
-#: includes/class-animation.php:840
+#: includes/class-animation.php:842
 msgid "当前工具无法完整处理这张动画，已保留原文件"
 msgstr ""
 
-#: includes/class-animation.php:851
-#: includes/class-animation.php:857
+#: includes/class-animation.php:853
+#: includes/class-animation.php:859
 msgid "动图处理命令执行失败"
 msgstr ""
 
-#: includes/class-animation.php:1367
+#: includes/class-animation.php:1369
 msgid "APNG 已跳过：PNG 走的是有损模式，且没有勾选“APNG 自动无损压缩”，可在“压缩工具”页勾选，或在基本设置里勾选“APNG”让它转格式"
 msgstr ""
 
-#: includes/class-animation.php:1372
-#: includes/class-animation.php:1396
+#: includes/class-animation.php:1374
+#: includes/class-animation.php:1398
 msgid "动图处理需要 %s 工具，当前环境未配齐，已跳过"
 msgstr ""
 
-#: includes/class-compressor.php:421
+#: includes/class-animation.php:1399
+#: includes/class-settings.php:1635
+msgid "或"
+msgstr ""
+
+#: includes/class-compressor.php:422
 #: includes/class-converter.php:200
 msgid "文件路径不安全"
 msgstr ""
 
-#: includes/class-compressor.php:430
+#: includes/class-compressor.php:431
 #: includes/class-converter.php:211
 msgid "文件后缀与内容不符（内容是 APNG 动画），已跳过以保护动画内容"
 msgstr ""
 
-#: includes/class-compressor.php:445
+#: includes/class-compressor.php:446
 msgid "无法读取动图信息，已停止压缩以保护内容"
 msgstr ""
 
-#: includes/class-compressor.php:452
+#: includes/class-compressor.php:453
 #: includes/class-converter.php:227
 msgid "无法读取 APNG 动画信息，已跳过以保护动画内容"
 msgstr ""
 
-#: includes/class-compressor.php:484
+#: includes/class-compressor.php:485
 #: includes/class-converter.php:358
 msgid "没有可用的压缩工具"
 msgstr ""
@@ -288,8 +297,8 @@ msgid "格式"
 msgstr ""
 
 #: includes/class-local-crush.php:249
-#: includes/class-settings.php:1370
-#: includes/class-settings.php:1413
+#: includes/class-settings.php:1372
+#: includes/class-settings.php:1415
 msgid "状态"
 msgstr ""
 
@@ -411,14 +420,14 @@ msgstr ""
 msgid "设置"
 msgstr ""
 
-#: includes/class-media-library.php:234
-#: includes/class-processor.php:402
-msgid "未压缩"
-msgstr ""
-
 #: includes/class-media-library.php:51
 #: includes/class-media-library.php:237
 msgid "压缩"
+msgstr ""
+
+#: includes/class-media-library.php:234
+#: includes/class-processor.php:402
+msgid "未压缩"
 msgstr ""
 
 #: includes/class-media-library.php:257
@@ -569,6 +578,10 @@ msgstr ""
 msgid "图片已经压缩"
 msgstr ""
 
+#: includes/class-processor.php:518
+msgid "没有可处理的图片文件"
+msgstr ""
+
 #: includes/class-processor.php:538
 msgid "无法创建原图备份，已停止压缩"
 msgstr ""
@@ -597,15 +610,15 @@ msgstr ""
 msgid "没有可用的压缩结果"
 msgstr ""
 
-#: includes/class-processor.php:2407
+#: includes/class-processor.php:2409
 msgid "插件正在执行维护操作，请稍后重试"
 msgstr ""
 
-#: includes/class-processor.php:2408
+#: includes/class-processor.php:2410
 msgid "该图片正在处理中，请稍后重试"
 msgstr ""
 
-#: includes/class-processor.php:2411
+#: includes/class-processor.php:2413
 msgid "无法创建锁文件，请检查上传目录的写入权限"
 msgstr ""
 
@@ -614,11 +627,20 @@ msgid "压缩模式"
 msgstr ""
 
 #: includes/class-settings.php:45
-msgid "有损会丢掉部分画面细节来换更小体积；无损只重排压缩数据，画面一个像素都不变。"
+msgid "有损：丢掉一部分画面细节，换更小的文件，压完能明显看出文件变小；无损：只重新整理压缩数据，画面一个像素都不变，但文件也小得有限。拿不准就选有损。"
+msgstr ""
+
+#: includes/class-settings.php:67
+#: includes/class-settings.php:137
+#: includes/class-settings.php:262
+#: includes/class-settings.php:292
+#: includes/class-settings.php:330
+#: includes/class-settings.php:420
+msgid "有损质量"
 msgstr ""
 
 #: includes/class-settings.php:72
-msgid "填多少就传给 -q 多少，0 最省体积、100 最好。只有有损模式有效。"
+msgid "数越大画质越好、文件越大；数越小画质越差、文件越小。0 是最糊的档，100 是最好的档。默认 75 是 cwebp 自己的默认值，日常够用；想更清楚可以调到 80 左右（cwebp 帮助里也把 80 称为典型值），再高基本只是文件变大。只有选“有损压缩”时才看这个数。"
 msgstr ""
 
 #: includes/class-settings.php:76
@@ -626,7 +648,7 @@ msgid "有损压缩方法"
 msgstr ""
 
 #: includes/class-settings.php:81
-msgid "0 最快、6 最慢但最小。方法只影响耗时和体积，不影响画质。"
+msgid "数越大压缩越慢、文件越小；数越小压缩越快、文件越大。这个数只影响速度和体积，不影响画质。默认 4 是 cwebp 自己的默认值。只有选“有损压缩”时才看这个数。"
 msgstr ""
 
 #: includes/class-settings.php:85
@@ -634,11 +656,16 @@ msgid "无损级别"
 msgstr ""
 
 #: includes/class-settings.php:90
-msgid "只有无损模式有效，0 最快、9 最小。"
+msgid "数越大压缩越慢、文件越小；数越小压缩越快、文件越大。只影响速度和体积，不影响画质。默认 6 是 cwebp 自己的默认值。只有选“无损压缩”时才看这个数。"
+msgstr ""
+
+#: includes/class-settings.php:94
+#: includes/class-settings.php:146
+msgid "透明通道质量"
 msgstr ""
 
 #: includes/class-settings.php:99
-msgid "透明通道单独编码，100 表示透明通道无损。"
+msgid "只管图片里半透明部分的清晰程度：数越大透明边缘越保真、文件越大；数越小透明边缘越毛、文件越小。默认 100 表示透明部分完全无损，也是 cwebp 自己的默认值；没有半透明边缘的图调它没有意义。"
 msgstr ""
 
 #: includes/class-settings.php:103
@@ -670,7 +697,7 @@ msgid "文字截图"
 msgstr ""
 
 #: includes/class-settings.php:114
-msgid "按内容类型预调参数。预设会重置质量和压缩方法，所以它排在命令行最前面，后面的显式值仍然生效。"
+msgid "按图片内容替你预调好一套内部参数，省得自己一个个试：“照片”适合风景人像，“室内人像”适合室内合影，“绘图 / 线稿”适合卡通和截图，“图标 / 小彩图”适合 logo 和小图，“文字截图”适合界面截图。预设会重置质量和压缩方法，所以排在命令行最前面，你下面显式填的值仍然生效。拿不准就选默认。"
 msgstr ""
 
 #: includes/class-settings.php:118
@@ -678,29 +705,15 @@ msgid "保留透明区域颜色"
 msgstr ""
 
 #: includes/class-settings.php:121
-msgid "默认会把全透明像素的 RGB 抹平；勾选则原样保留，代价是体积约多 16%。"
-msgstr ""
-
-#: includes/class-settings.php:67
-#: includes/class-settings.php:137
-#: includes/class-settings.php:262
-#: includes/class-settings.php:292
-#: includes/class-settings.php:330
-#: includes/class-settings.php:420
-msgid "有损质量"
+msgid "默认会把全透明像素的底色抹掉，文件更小；勾选后原样保留这些像素的底色，文件大约大 16%。只有还要保留透明区域颜色信息（比如图还要再拿去加工）才需要勾。"
 msgstr ""
 
 #: includes/class-settings.php:142
-msgid "填多少就传给 -q 多少，100 为无损、0 最省体积。只有有损模式有效。"
-msgstr ""
-
-#: includes/class-settings.php:94
-#: includes/class-settings.php:146
-msgid "透明通道质量"
+msgid "数越大画质越好、文件越大；数越小画质越差、文件越小。0 是最糊的档，100 是无损。默认 60 是 avifenc 自己的默认值（官方称典型区间是 60-80），AVIF 本身压缩效率高，60 已经很清楚；嫌画质不够可以往 80 调。只有选“有损压缩”时才看这个数。"
 msgstr ""
 
 #: includes/class-settings.php:151
-msgid "100 为透明通道无损；半透明边缘多的图建议调高。"
+msgid "只管图片里半透明部分的清晰程度：数越大透明边缘越保真、文件越大；数越小透明边缘越毛、文件越小。默认 60 与上面的颜色质量保持一致，这也是 avifenc 不单独指定时的行为；半透明边缘特别多的图建议调高。"
 msgstr ""
 
 #: includes/class-settings.php:155
@@ -709,7 +722,7 @@ msgid "编码速度"
 msgstr ""
 
 #: includes/class-settings.php:160
-msgid "0 最慢最小、10 最快最大，avifenc 自己的范围就是 0-10。"
+msgid "数越大编码越快、文件越大；数越小编码越慢、文件越小。默认 6 是 avifenc 自己的默认值。有损和无损都看这个数。"
 msgstr ""
 
 #: includes/class-settings.php:164
@@ -734,7 +747,7 @@ msgid "4:2:0 + sharpyuv（最小，边缘略糊）"
 msgstr ""
 
 #: includes/class-settings.php:173
-msgid "只有有损模式有效。选 4:2:0 会额外带上 avifenc 的 --sharpyuv，选自动时不传这个参数。"
+msgid "决定颜色信息记得有多细：4:4:4 色彩最准、文件最大；4:2:2 横向减半；4:2:0 最小，但彩色边缘会略糊。自动表示按原图情况让 avifenc 自己决定，日常推荐。只有选“有损压缩”时才看这个选项。"
 msgstr ""
 
 #: includes/class-settings.php:177
@@ -754,7 +767,7 @@ msgid "12 位（几乎用不到）"
 msgstr ""
 
 #: includes/class-settings.php:185
-msgid "位深越高渐变越平滑，但 10/12 位文件更大、老设备可能不支持。8 位时不传这个参数。"
+msgid "位深越高，渐变过渡越平滑，但文件更大、部分老设备可能不支持。8 位是所有浏览器都能显示的标准档；只有对渐变质量极其敏感时才值得选 10 / 12 位。"
 msgstr ""
 
 #: includes/class-settings.php:189
@@ -762,7 +775,7 @@ msgid "并行线程数"
 msgstr ""
 
 #: includes/class-settings.php:194
-msgid "同时开几个编码线程，填多少传多少。开太多会和网站抢 CPU。"
+msgid "同时用几个 CPU 核心来编码：数越大编码越快，但会和网站前台抢资源，服务器上别贪多。avifenc 自己默认用满所有核心，插件默认 4 是稳妥值。"
 msgstr ""
 
 #: includes/class-settings.php:210
@@ -770,11 +783,11 @@ msgid "CRF（质量）"
 msgstr ""
 
 #: includes/class-settings.php:215
-msgid "直接对应 libaom 的 -crf：数值越小画质越好、体积越大，0 接近无损，63 最差。只有有损模式有效。"
+msgid "注意这个数和别处相反：数越小画质越好、文件越大，数越大画质越差、文件越小。0 接近无损，63 最糊。默认 20 是插件推荐的高画质档；觉得文件太大可以往 25-30 调。只有选“有损压缩”时才看这个数。"
 msgstr ""
 
 #: includes/class-settings.php:224
-msgid "直接对应 libaom 的 -cpu-used：0 最慢最小、8 最快最大。"
+msgid "数越大编码越快、文件越大；数越小编码越慢、文件越小。FFmpeg 自己的默认值是 1，服务器上跑太慢；插件默认 6，与 avifenc 的默认速度一致，是速度与画质的折中。"
 msgstr ""
 
 #: includes/class-settings.php:228
@@ -782,7 +795,7 @@ msgid "编码线程数"
 msgstr ""
 
 #: includes/class-settings.php:233
-msgid "直接对应 FFmpeg 的 -threads，填多少传多少。开太多会和网站抢 CPU。"
+msgid "同时用几个 CPU 核心来编码：数越大编码越快，但会和网站前台抢资源。FFmpeg 自己默认用满所有核心，插件默认 4 是稳妥值。"
 msgstr ""
 
 #: includes/class-settings.php:240
@@ -802,11 +815,11 @@ msgid "4:2:0（yuv420p，最小，边缘略糊）"
 msgstr ""
 
 #: includes/class-settings.php:246
-msgid "只有有损模式有效，直接对应 FFmpeg 的 -pix_fmt。选自动时不传这个参数，由编码器按输入决定。"
+msgid "决定颜色信息记得有多细：4:4:4 色彩最准、文件最大；4:2:2 横向减半；4:2:0 最小，但彩色边缘会略糊。自动表示交给 FFmpeg 按原图决定，日常推荐。只有选“有损压缩”时才看这个选项。"
 msgstr ""
 
 #: includes/class-settings.php:267
-msgid "填多少就传给 -quality 多少。FFmpeg 自己的默认值是 75。只有有损模式有效。"
+msgid "数越大画质越好、文件越大；数越小画质越差、文件越小。0 是最糊的档，100 是最好的档。默认 75 是 FFmpeg 自己的默认值；想更清楚可以调到 80 左右。只有选“有损压缩”时才看这个数。"
 msgstr ""
 
 #: includes/class-settings.php:271
@@ -815,11 +828,11 @@ msgid "压缩方法"
 msgstr ""
 
 #: includes/class-settings.php:276
-msgid "0 最快、6 最慢但最小，就是 libwebp 的 method 范围，有损与无损都生效。"
+msgid "数越大压缩越慢、文件越小；数越小压缩越快、文件越大。只影响速度和体积，不影响画质。默认 4 与 libwebp 的默认方法一致，有损和无损都生效。"
 msgstr ""
 
 #: includes/class-settings.php:297
-msgid "填多少就传给 -q 多少，100 等于数学无损、90 已经是视觉无损。只有有损模式有效。"
+msgid "数越大画质越好、文件越大；数越小画质越差、文件越小。100 是数学上的无损，90 起肉眼基本看不出差别。默认 80 是插件推荐值，落在官方建议的 68-96 区间内。只有选“有损压缩”时才看这个数。"
 msgstr ""
 
 #: includes/class-settings.php:301
@@ -827,7 +840,7 @@ msgid "压缩级别"
 msgstr ""
 
 #: includes/class-settings.php:306
-msgid "级别越高越慢、同样画质体积越小，7 是 cjxl 默认值。"
+msgid "数越大压缩越慢、同样画质下文件越小；数越小压缩越快、文件越大。只影响速度和体积，不影响画质。默认 7 是 cjxl 自己的默认值。"
 msgstr ""
 
 #: includes/class-settings.php:323
@@ -835,15 +848,15 @@ msgid "启用有损"
 msgstr ""
 
 #: includes/class-settings.php:326
-msgid "勾选时带上 -lossy 并按下面的质量重新量化；取消则只重排数据，画面不变、体积也降得少。"
+msgid "勾选：按下面的有损质量重新量化，文件明显更小；取消：只重排数据，画面一个像素都不变，但体积也降得有限。"
 msgstr ""
 
 #: includes/class-settings.php:335
-msgid "只有勾上“启用有损”才传，填多少传多少，0 最省体积、100 最好。"
+msgid "数越大画质越好、文件越大；数越小画质越差、文件越小。默认 80 是插件推荐值。只有勾上“启用有损”时才看这个数。"
 msgstr ""
 
 #: includes/class-settings.php:344
-msgid "0 最快、6 最慢但最小。"
+msgid "数越大压缩越慢、文件越小；数越小压缩越快、文件越大。只影响速度和体积，不影响画质。默认 4 是 gif2webp 自己的默认值。"
 msgstr ""
 
 #: includes/class-settings.php:359
@@ -851,7 +864,7 @@ msgid "oxipng 无损级别"
 msgstr ""
 
 #: includes/class-settings.php:364
-msgid "数值越大压得越小、越慢（6 非常慢）。2 是 oxipng 默认值，日常够用。"
+msgid "数越大压得越狠、文件越小，但耗时越长（6 非常慢）；数越小越快、文件越大。只影响速度和体积，不影响画质。默认 2 是 oxipng 自己的默认值，日常够用。"
 msgstr ""
 
 #: includes/class-settings.php:368
@@ -859,7 +872,7 @@ msgid "优化透明通道"
 msgstr ""
 
 #: includes/class-settings.php:371
-msgid "把完全透明的像素颜色改写成可压缩的值，带透明的大图能再小一截。画面看起来不变。"
+msgid "把完全透明的像素改写成更容易压缩的值，带透明区域的大图能再小一截，看起来没有任何变化。纯不透明的图勾了也没有效果。"
 msgstr ""
 
 #: includes/class-settings.php:375
@@ -867,7 +880,7 @@ msgid "Zopfli 极限压缩"
 msgstr ""
 
 #: includes/class-settings.php:378
-msgid "更慢更狠的压缩算法，通常还能再省几个百分点，大图或帧多的动图容易跑到超时。"
+msgid "换一种更狠的无损压缩算法，通常还能再小几个百分点，但耗时明显更长；大图或帧特别多的动图容易跑到超时，所以默认关闭。"
 msgstr ""
 
 #: includes/class-settings.php:414
@@ -879,7 +892,7 @@ msgid "所有 JPEG 都走这里。有损模式传 --max 设定质量上限，无
 msgstr ""
 
 #: includes/class-settings.php:425
-msgid "填多少就传给 --max 多少，0 最省体积、100 最好。只有有损模式有效。"
+msgid "数越大画质越好、文件越大；数越小画质越差、文件越小。jpegoptim 不设上限时只做无损整理，这个数是插件推荐的质量上限，80 是照片类图片的常用平衡点。只有选“有损压缩”时才看这个数。"
 msgstr ""
 
 #: includes/class-settings.php:429
@@ -899,7 +912,7 @@ msgid "渐进式（--all-progressive，先糊后清）"
 msgstr ""
 
 #: includes/class-settings.php:437
-msgid "渐进式通常体积更小、加载观感更好；个别老软件不认渐进式就选顺序式。"
+msgid "渐进式：图片由糊到清逐段加载，观感更好、文件通常也更小，推荐；顺序式：整张图一次性显示，只有很老的软件不认渐进式时才需要选；自动：让 jpegoptim 自己挑更小的那种。"
 msgstr ""
 
 #: includes/class-settings.php:442
@@ -915,23 +928,31 @@ msgid "PNG 走哪条路径"
 msgstr ""
 
 #: includes/class-settings.php:450
-msgid "有损：走本节 pngquant 的参数；无损：走下一节 oxipng 的参数。两条路径只能二选一，不会同时执行。"
+msgid "有损：走本节 pngquant 的参数，文件小得多但颜色会精简；无损：走下一节 oxipng 的参数，画面一个像素都不变。两条路径只能二选一，不会同时执行。"
 msgstr ""
 
 #: includes/class-settings.php:454
 msgid "有损质量下限"
 msgstr ""
 
+#: includes/class-settings.php:455
+msgid "pngquant --quality 下限"
+msgstr ""
+
 #: includes/class-settings.php:459
-msgid "低于这个质量就不保存、直接保留原图，用来防止压得太糊。0 表示不设下限。"
+msgid "压完的质量低于这个数就不保存、直接保留原图，防止压得太糊。数越小，越多图会被压小（哪怕画质变差）；数越大越保守。0 表示不设下限。"
 msgstr ""
 
 #: includes/class-settings.php:463
 msgid "有损质量上限"
 msgstr ""
 
+#: includes/class-settings.php:464
+msgid "pngquant --quality 上限"
+msgstr ""
+
 #: includes/class-settings.php:468
-msgid "追求的最高质量，凑不到时会自动减少颜色数。下限填得比上限大时会自动对调。"
+msgid "追求的最高质量：数越大画质越好、文件越大；数越小文件越小、画质越差。凑不到这个质量时会自动减少颜色数。默认 60-80 是常用推荐区间；下限填得比上限大时会自动对调。"
 msgstr ""
 
 #: includes/class-settings.php:472
@@ -939,15 +960,19 @@ msgid "pngquant 速度"
 msgstr ""
 
 #: includes/class-settings.php:477
-msgid "数值越大越快越省 CPU，画质越粗糙；1 最慢最细，4 是 pngquant 默认值。"
+msgid "数越大压缩越快、越省 CPU，但画质越粗糙；数越小越慢越细。默认 4 是 pngquant 自己的默认值。"
 msgstr ""
 
 #: includes/class-settings.php:481
 msgid "抖动"
 msgstr ""
 
+#: includes/class-settings.php:482
+msgid "pngquant（取消勾选时加 --nofs）"
+msgstr ""
+
 #: includes/class-settings.php:484
-msgid "勾选：减少颜色后用抖动过渡，照片类渐变更自然；取消：色块更干净、体积更小，适合扁平图标。"
+msgid "勾选：减少颜色后用抖动把过渡补自然，照片类渐变更耐看；取消：色块更干净、文件更小，适合扁平图标和纯色图。pngquant 默认就是开启抖动的。"
 msgstr ""
 
 #: includes/class-settings.php:489
@@ -960,6 +985,10 @@ msgstr ""
 
 #: includes/class-settings.php:495
 msgid "APNG 自动无损压缩"
+msgstr ""
+
+#: includes/class-settings.php:496
+msgid "APNG 走 oxipng"
 msgstr ""
 
 #: includes/class-settings.php:498
@@ -979,7 +1008,7 @@ msgid "有损强度"
 msgstr ""
 
 #: includes/class-settings.php:516
-msgid "填多少就传给 --lossy 多少，数值越大文件越小、噪点越多，常用 20-200；填 0 表示不加有损。只有有损模式有效。"
+msgid "数越大文件越小、噪点和色块越多；数越小越保真、文件越大。0 等于不加有损。默认 20 是 gifsicle 自己的默认值；录屏和照片类动图常用 30-200，纯色线稿建议保持小值或改选“无损压缩”。只有选“有损压缩”时才看这个数。"
 msgstr ""
 
 #: includes/class-settings.php:520
@@ -987,7 +1016,7 @@ msgid "调色板颜色数"
 msgstr ""
 
 #: includes/class-settings.php:525
-msgid "GIF 最多 256 色。256 等于不缩色；调低后体积更小但会掉色，图标类 64-128 往往够用。"
+msgid "数越大保留的颜色越多、画质越好、文件越大；数越小文件越小、掉色越明显。GIF 最多 256 色，256 就是不缩颜色。图标类动图用 64-128 往往够用。"
 msgstr ""
 
 #: includes/class-settings.php:529
@@ -995,7 +1024,7 @@ msgid "优化级别"
 msgstr ""
 
 #: includes/class-settings.php:534
-msgid "3 会多存一张透明度索引表，能再小一点；2 是官方推荐的平衡档。"
+msgid "1 只存帧间变化的部分；2 额外利用透明区域，体积与速度兼顾，日常推荐；3 会多试几种方法挑最小的，更慢但通常再小一点。注意 gifsicle 不加 -O 时完全不做优化，插件默认传 2。"
 msgstr ""
 
 #: includes/class-settings.php:539
@@ -1019,7 +1048,7 @@ msgid "保守（safe，几乎不改视觉）"
 msgstr ""
 
 #: includes/class-settings.php:551
-msgid "常规会合并路径、精简属性；保守只做绝对安全的重写。"
+msgid "常规：合并路径、精简属性，瘦身最明显；保守：只做绝对安全的重写，几乎不影响视觉，适合结构复杂或带脚本的 SVG。两种预设都会删掉制作软件留下的说明和元数据。"
 msgstr ""
 
 #: includes/class-settings.php:556
@@ -1102,410 +1131,409 @@ msgstr ""
 msgid "整只动画交给 FFmpeg 的 libaom-av1，一条命令读写全部帧，不需要 ffprobe 或 avifdec，所以单独一组。-crf / -cpu-used / -pix_fmt 都是 FFmpeg 的原始参数。"
 msgstr ""
 
-#: includes/class-settings.php:893
 #: includes/class-settings.php:894
-#: includes/class-settings.php:985
+#: includes/class-settings.php:895
+#: includes/class-settings.php:987
 msgid "Local Crush"
 msgstr ""
 
-#: includes/class-settings.php:989
+#: includes/class-settings.php:991
 msgid "基本设置"
 msgstr ""
 
-#: includes/class-settings.php:992
+#: includes/class-settings.php:994
 msgid "压缩工具"
 msgstr ""
 
-#: includes/class-settings.php:1034
+#: includes/class-settings.php:1036
 msgid "自动压缩"
 msgstr ""
 
-#: includes/class-settings.php:1038
+#: includes/class-settings.php:1040
 msgid "上传图片时自动压缩"
 msgstr ""
 
-#: includes/class-settings.php:1043
+#: includes/class-settings.php:1045
 msgid "备份原图"
 msgstr ""
 
-#: includes/class-settings.php:1047
+#: includes/class-settings.php:1049
 msgid "压缩前备份原图"
 msgstr ""
 
-#: includes/class-settings.php:1052
+#: includes/class-settings.php:1054
 msgid "原图备份保留时长"
 msgstr ""
 
-#: includes/class-settings.php:1055
+#: includes/class-settings.php:1057
 msgid "天"
 msgstr ""
 
-#: includes/class-settings.php:1056
+#: includes/class-settings.php:1058
 msgid "填 -1 表示永久保留；填天数则备份到期后自动删除，届时这张图将无法再恢复原图。0 无效，步进时会自动跳过 0。"
 msgstr ""
 
-#: includes/class-settings.php:1060
+#: includes/class-settings.php:1062
 msgid "图片元数据"
 msgstr ""
 
-#: includes/class-settings.php:1064
+#: includes/class-settings.php:1066
 msgid "压缩时删除图片元数据"
 msgstr ""
 
-#: includes/class-settings.php:1066
+#: includes/class-settings.php:1068
 msgid "删除 EXIF、GPS 拍摄位置、设备型号、作者与软件信息等隐私数据，对同格式压缩与格式转换的所有路径都生效。为了不让手机竖拍照片变横，会单独保留照片方向；ICC 色彩配置会尽量保留以免偏色；取消勾选则尽量保留元数据；经过解码再编码的路径（如 AVIF、动画 WebP）仍可能留不住全部元数据。"
 msgstr ""
 
-#: includes/class-settings.php:1070
+#: includes/class-settings.php:1072
 msgid "缩放画质"
 msgstr ""
 
-#: includes/class-settings.php:1074
+#: includes/class-settings.php:1076
 msgid "调整图片尺寸时把保存质量拉满"
 msgstr ""
 
-#: includes/class-settings.php:1076
+#: includes/class-settings.php:1078
 msgid "WordPress 生成缩略图和 -scaled 缩放图时，会用 GD / Imagick 把图片重新编码一遍，默认质量会把画质先损耗一次，压缩工具再怎么调也补不回来。勾选后，JPG、WebP、AVIF、JPEG XL 保存时一律用质量 100，先保住画质再交给各格式的专精工具压缩；PNG、GIF 这类本来就是无损编码，质量参数在它们身上会被换算成压缩级别，改它只会让文件变大，所以不碰。注意：JPG 是有损格式，质量 100 只是肉眼看不出差别，不是数学意义上的无损；代价是这一步的中间文件更大、生成缩略图稍慢。"
 msgstr ""
 
-#: includes/class-settings.php:1080
+#: includes/class-settings.php:1082
 msgid "SVG 上传"
 msgstr ""
 
-#: includes/class-settings.php:1084
+#: includes/class-settings.php:1086
 msgid "允许上传 SVG 文件"
 msgstr ""
 
-#: includes/class-settings.php:1086
+#: includes/class-settings.php:1088
 msgid "上传时自动清理脚本等危险内容；SVG 可能被用于 XSS 攻击，仅在信任上传者时开启。"
 msgstr ""
 
-#: includes/class-settings.php:1090
+#: includes/class-settings.php:1092
 msgid "格式转换"
 msgstr ""
 
-#: includes/class-settings.php:1094
+#: includes/class-settings.php:1096
 msgid "PNG"
 msgstr ""
 
-#: includes/class-settings.php:1099
+#: includes/class-settings.php:1101
 msgid "JPG"
 msgstr ""
 
-#: includes/class-settings.php:1104
+#: includes/class-settings.php:1106
 msgid "GIF"
 msgstr ""
 
-#: includes/class-settings.php:1109
+#: includes/class-settings.php:1111
 msgid "APNG"
 msgstr ""
 
-#: includes/class-settings.php:1111
+#: includes/class-settings.php:1113
 msgid "勾选的源格式执行压缩时输出为目标格式；未勾选的格式只执行同格式压缩。所有成功结果都记为已压缩。只有 PNG、JPG、GIF、APNG 能转换格式：APNG 由自己的勾选单独控制，与 PNG 无关，不勾就只做无损压缩。WebP、AVIF、JPEG XL 无论静图动图都只做同格式压缩，不会再来一遍转换。动图整张交给支持动画和透明背景的工具处理，插件不拆帧、不修改透明像素。"
 msgstr ""
 
-#: includes/class-settings.php:1115
+#: includes/class-settings.php:1117
 msgid "兼容格式回退"
 msgstr ""
 
-#: includes/class-settings.php:1119
+#: includes/class-settings.php:1121
 msgid "为转换后的图片提供旧格式回退"
 msgstr ""
 
-#: includes/class-settings.php:1121
+#: includes/class-settings.php:1123
 msgid "开启后，格式转换会把旧格式文件原地留下并同样压缩，新的 WebP/AVIF 以“原文件名.webp”“原文件名.avif”的双扩展名形式生成，前台用 <picture> 输出：支持新格式的浏览器加载新格式，不支持的浏览器加载同样压缩过的旧格式。关闭后转换不再保留旧格式文件，新格式直接替换源文件，前台也只输出新格式。此前已转换的图片仍留着旧格式文件，可用下方的“删除所有兼容格式回退”清理。"
 msgstr ""
 
-#: includes/class-settings.php:1125
+#: includes/class-settings.php:1127
 msgid "目标格式"
 msgstr ""
 
-#: includes/class-settings.php:1129
+#: includes/class-settings.php:1131
 msgid "WebP"
 msgstr ""
 
-#: includes/class-settings.php:1131
+#: includes/class-settings.php:1133
 msgid "AVIF"
 msgstr ""
 
-#: includes/class-settings.php:1133
+#: includes/class-settings.php:1135
 msgid "JPEG XL"
 msgstr ""
 
-#: includes/class-settings.php:1136
+#: includes/class-settings.php:1138
 msgid "选择目标格式：AVIF 压缩率更高但压缩更慢，WebP 兼容性最好，JPEG XL 同画质体积最小但浏览器支持仍不完整（动画 JXL 更是只有少数浏览器能播），选 JPEG XL 时建议同时开启上面的“兼容格式回退”。"
 msgstr ""
 
-#: includes/class-settings.php:1140
+#: includes/class-settings.php:1142
 msgid "缩略图尺寸"
 msgstr ""
 
-#: includes/class-settings.php:1144
+#: includes/class-settings.php:1146
 msgid "自动缩放超尺寸的主图，阈值"
 msgstr ""
 
-#: includes/class-settings.php:1146
+#: includes/class-settings.php:1148
 msgid "像素"
 msgstr ""
 
-#: includes/class-settings.php:1148
+#: includes/class-settings.php:1150
 msgid "勾选后，上传或补生成缩略图时，宽或高超过此阈值的主图会另存为 -scaled 缩放图并接管主文件，未缩放的源文件仍留在磁盘上；不勾选则关闭自动缩放，原图直接投入使用。压缩已有图片时不会改动缩放，改动缩放请用下方的“删除未勾选尺寸的缩略图”和“补生成缺失尺寸的缩略图”两个按钮。默认 2560，与 WordPress 默认一致。"
 msgstr ""
 
-#: includes/class-settings.php:1151
+#: includes/class-settings.php:1153
 msgid "当前没有注册额外的缩略图尺寸。"
 msgstr ""
 
-#: includes/class-settings.php:1160
-#: includes/class-settings.php:1161
+#: includes/class-settings.php:1162
+#: includes/class-settings.php:1163
 msgid "自动"
 msgstr ""
 
-#: includes/class-settings.php:1163
+#: includes/class-settings.php:1165
 msgid "等比"
 msgstr ""
 
-#: includes/class-settings.php:1163
+#: includes/class-settings.php:1165
 msgid "裁剪"
 msgstr ""
 
-#: includes/class-settings.php:1171
+#: includes/class-settings.php:1173
 msgid "%1$s（%2$s，%3$s）"
 msgstr ""
 
-#: includes/class-settings.php:1179
+#: includes/class-settings.php:1181
 msgid "取消勾选的尺寸在上传图片时不再生成；已经存在的文件用下方“删除未勾选尺寸的缩略图”清理。以后新注册的尺寸默认勾选。"
 msgstr ""
 
-#: includes/class-settings.php:1195
+#: includes/class-settings.php:1197
 #: includes/class-task.php:104
 msgid "批量压缩未压缩的图片"
 msgstr ""
 
-#: includes/class-settings.php:1199
+#: includes/class-settings.php:1201
 msgid "按当前设置压缩媒体库中所有未压缩的图片"
 msgstr ""
 
-#: includes/class-settings.php:1205
+#: includes/class-settings.php:1207
 #: includes/class-task.php:108
 msgid "恢复所有原图备份"
 msgstr ""
 
-#: includes/class-settings.php:1209
+#: includes/class-settings.php:1211
 msgid "将所有已压缩的图片恢复为原图"
 msgstr ""
 
-#: includes/class-settings.php:1215
+#: includes/class-settings.php:1217
 #: includes/class-task.php:112
 msgid "删除所有原图备份"
 msgstr ""
 
-#: includes/class-settings.php:1219
+#: includes/class-settings.php:1221
 msgid "删除所有备份文件，释放磁盘空间"
 msgstr ""
 
-#: includes/class-settings.php:1225
+#: includes/class-settings.php:1227
 #: includes/class-task.php:116
 msgid "删除所有兼容格式回退"
 msgstr ""
 
-#: includes/class-settings.php:1229
+#: includes/class-settings.php:1231
 msgid "删除媒体库中转换后保留的旧格式回退文件，并把文章里指向它们的图片链接改到新格式；删除后不支持新格式的浏览器将直接加载新格式图片"
 msgstr ""
 
-#: includes/class-settings.php:1235
+#: includes/class-settings.php:1237
 #: includes/class-task.php:120
 msgid "删除未勾选尺寸的缩略图"
 msgstr ""
 
-#: includes/class-settings.php:1239
+#: includes/class-settings.php:1241
 msgid "删除未勾选尺寸已存在的缩略图，文章里指向它们的图片链接会改到面积最接近的现有尺寸；若关闭了自动缩放，或现有 -scaled 缩放图与阈值不符，也会删除缩放图让主图退回原图"
 msgstr ""
 
-#: includes/class-settings.php:1245
+#: includes/class-settings.php:1247
 #: includes/class-task.php:124
 msgid "补生成缺失尺寸的缩略图"
 msgstr ""
 
-#: includes/class-settings.php:1249
+#: includes/class-settings.php:1251
 msgid "为已勾选但缺失的尺寸补生成缩略图；若开启了自动缩放且主图超过阈值，还会生成或修正 -scaled 缩放图。不会重建已存在的缩略图，纯缩略图缺失也不改动文章链接"
 msgstr ""
 
-#: includes/class-settings.php:1289
+#: includes/class-settings.php:1291
 msgid "停止任务"
 msgstr ""
 
-#: includes/class-settings.php:1290
+#: includes/class-settings.php:1292
 msgid "继续执行"
 msgstr ""
 
-#: includes/class-settings.php:1291
+#: includes/class-settings.php:1293
 msgid "重试失败的项目"
 msgstr ""
 
-#: includes/class-settings.php:1292
+#: includes/class-settings.php:1294
 msgid "完成"
 msgstr ""
 
-#: includes/class-settings.php:1333
+#: includes/class-settings.php:1335
 msgid "系统状态"
 msgstr ""
 
-#: includes/class-settings.php:1345
+#: includes/class-settings.php:1347
 msgid "可用"
 msgstr ""
 
-#: includes/class-settings.php:1347
+#: includes/class-settings.php:1349
 msgid "不可用"
 msgstr ""
 
-#: includes/class-settings.php:1352
+#: includes/class-settings.php:1354
 msgid "插件的所有压缩都靠 proc_open() 直接启动命令行工具，请联系主机商启用"
 msgstr ""
 
-#: includes/class-settings.php:1359
+#: includes/class-settings.php:1361
 msgid "工具状态"
 msgstr ""
 
-#: includes/class-settings.php:1369
+#: includes/class-settings.php:1371
 msgid "工具"
 msgstr ""
 
-#: includes/class-settings.php:1371
+#: includes/class-settings.php:1373
 msgid "安装路径"
 msgstr ""
 
-#: includes/class-settings.php:1372
+#: includes/class-settings.php:1374
 msgid "链接"
 msgstr ""
 
-#: includes/class-settings.php:1381
+#: includes/class-settings.php:1383
 msgid "已安装"
 msgstr ""
 
-#: includes/class-settings.php:1383
+#: includes/class-settings.php:1385
 msgid "未安装"
 msgstr ""
 
-#: includes/class-settings.php:1395
+#: includes/class-settings.php:1397
 msgid "跳转"
 msgstr ""
 
-#: includes/class-settings.php:1404
+#: includes/class-settings.php:1406
 msgid "安装方式：① 把可执行文件直接放进 /wp-content/local-crush-bin 目录；② 把工具所在文件夹加入系统 Path 环境变量；③ 使用包管理器安装。"
 msgstr ""
 
-#: includes/class-settings.php:1407
+#: includes/class-settings.php:1409
 msgid "路径支持状态"
 msgstr ""
 
-#: includes/class-settings.php:1411
+#: includes/class-settings.php:1413
 msgid "路径"
 msgstr ""
 
-#: includes/class-settings.php:1412
+#: includes/class-settings.php:1414
 msgid "依赖"
 msgstr ""
 
-#: includes/class-settings.php:1423
+#: includes/class-settings.php:1425
 msgid "支持"
 msgstr ""
 
-#: includes/class-settings.php:1425
+#: includes/class-settings.php:1427
 msgid "不支持"
 msgstr ""
 
-#: includes/class-settings.php:1427
+#: includes/class-settings.php:1429
 msgid "缺少：%s"
 msgstr ""
 
-#: includes/class-settings.php:1438
+#: includes/class-settings.php:1440
 msgid "压缩参数"
 msgstr ""
 
-#: includes/class-settings.php:1440
-msgid "参数按压缩路径分组：只有整条工具链完全一致的路径才共用一节，其余各自独立，改了不会连带改到别的路径。输入框后面标的就是它实际传给哪个工具的哪个参数，取值也就是工具本身的取值范围，插件不做换算、不折算档位，你填多少就传多少；只有超出范围时保存时会收到该参数的边界值，免得把非法数字塞给工具。没列出来的参数一律不传，由工具用自己内部的默认值。改动只影响之后的压缩，已经压好的图片不会自动重压。"
+#: includes/class-settings.php:1442
+msgid "参数按压缩路径分组：只有整条工具链完全一致的路径才共用一节，其余各自独立，改了不会连带改到别的路径。输入框后面标的就是它实际传给哪个工具的哪个参数，取值也就是工具本身的取值范围，插件不做换算、不折算档位，你填多少就传多少；只有超出范围时保存时会收到该参数的边界值，免得把非法数字塞给工具。没列出来的参数一律不传，由工具用自己内部的默认值。每个参数的默认值都优先取压缩工具自己的默认值，工具没有默认值的（比如各编码器的质量）才用插件推荐的平衡值，每项说明里都写明了来头；拿不准全部保持默认就行。改动只影响之后的压缩，已经压好的图片不会自动重压。"
 msgstr ""
 
-#: includes/class-settings.php:1483
+#: includes/class-settings.php:1485
 msgid "有损压缩"
 msgstr ""
 
-#: includes/class-settings.php:1488
+#: includes/class-settings.php:1490
 msgid "无损压缩"
 msgstr ""
 
-#: includes/class-settings.php:1516
+#: includes/class-settings.php:1514
 msgid "范围 %1$d-%2$d，默认 %3$d。"
 msgstr ""
 
-#: includes/class-settings.php:1579
+#: includes/class-settings.php:1523
+msgid "默认：%s。"
+msgstr ""
+
+#: includes/class-settings.php:1583
 msgid "GD 扩展"
 msgstr ""
 
-#: includes/class-settings.php:1584
+#: includes/class-settings.php:1588
 msgid "JPEG 压缩"
 msgstr ""
 
-#: includes/class-settings.php:1585
+#: includes/class-settings.php:1589
 msgid "PNG 有损压缩"
 msgstr ""
 
-#: includes/class-settings.php:1586
+#: includes/class-settings.php:1590
 msgid "PNG / APNG 无损压缩"
 msgstr ""
 
-#: includes/class-settings.php:1587
+#: includes/class-settings.php:1591
 msgid "GIF 压缩"
 msgstr ""
 
-#: includes/class-settings.php:1588
+#: includes/class-settings.php:1592
 msgid "SVG 压缩"
 msgstr ""
 
-#: includes/class-settings.php:1589
+#: includes/class-settings.php:1593
 msgid "WebP 压缩 / PNG·JPG 转 WebP"
 msgstr ""
 
-#: includes/class-settings.php:1590
+#: includes/class-settings.php:1594
 msgid "动画 WebP 压缩 / APNG 转 WebP"
 msgstr ""
 
-#: includes/class-settings.php:1591
+#: includes/class-settings.php:1595
 msgid "AVIF 同格式压缩"
 msgstr ""
 
-#: includes/class-settings.php:1592
+#: includes/class-settings.php:1596
 msgid "动画 AVIF 同格式压缩"
 msgstr ""
 
-#: includes/class-settings.php:1593
+#: includes/class-settings.php:1597
 msgid "JPEG XL 压缩 / 全部转 JPEG XL"
 msgstr ""
 
-#: includes/class-settings.php:1594
+#: includes/class-settings.php:1598
 msgid "静态 GIF 转 WebP"
 msgstr ""
 
-#: includes/class-settings.php:1595
+#: includes/class-settings.php:1599
 msgid "动画 GIF 转 WebP"
 msgstr ""
 
-#: includes/class-settings.php:1596
+#: includes/class-settings.php:1600
 msgid "PNG / JPG 转 AVIF"
 msgstr ""
 
-#: includes/class-settings.php:1597
+#: includes/class-settings.php:1601
 msgid "静态 GIF 转 AVIF"
 msgstr ""
 
-#: includes/class-settings.php:1598
+#: includes/class-settings.php:1602
 msgid "动画 GIF / APNG 转 AVIF"
-msgstr ""
-
-#: includes/class-animation.php:1397
-#: includes/class-settings.php:1631
-msgid "或"
 msgstr ""
 
 #: includes/class-task.php:276
@@ -1525,87 +1553,63 @@ msgstr ""
 msgid "已有批量任务正在执行，请等它跑完，或先点“停止任务”"
 msgstr ""
 
-#: includes/class-task.php:1080
+#: includes/class-task.php:1081
 msgid "没有需要处理的项目"
 msgstr ""
 
-#: includes/class-task.php:1091
+#: includes/class-task.php:1092
 msgid "%1$s - 成功: %2$d, 跳过: %3$d, 失败: %4$d"
 msgstr ""
 
-#: includes/class-task.php:1102
+#: includes/class-task.php:1103
 msgid "%1$s - 成功: %2$d, 失败: %3$d"
 msgstr ""
 
-#: includes/class-task.php:1112
+#: includes/class-task.php:1113
 msgid "已删除 %1$d 个附件上的 %2$d 个备份文件，失败 %3$d 个"
 msgstr ""
 
-#: includes/class-task.php:1122
+#: includes/class-task.php:1123
 msgid "已删除 %1$d 个附件上的 %2$d 个兼容格式回退文件，替换了 %3$d 个图片链接"
 msgstr ""
 
-#: includes/class-task.php:1129
-#: includes/class-task.php:1143
+#: includes/class-task.php:1130
+#: includes/class-task.php:1144
 msgid "部分正文链接未更新成功，可再次执行本操作继续处理。"
 msgstr ""
 
-#: includes/class-task.php:1136
+#: includes/class-task.php:1137
 msgid "已删除 %1$d 个未勾选尺寸的缩略图（涉及 %2$d 个附件），替换了 %3$d 个图片链接"
 msgstr ""
 
-#: includes/class-task.php:1150
+#: includes/class-task.php:1151
 msgid "已为 %1$d 个附件补生成 %2$d 个缩略图（%3$d 个无需处理或已跳过，%4$d 个失败）"
 msgstr ""
 
-#: includes/class-task.php:1168
+#: includes/class-task.php:1169
 msgid "失败附件 ID：%s"
 msgstr ""
 
-#: includes/class-task.php:1175
+#: includes/class-task.php:1176
 msgid "（共 %d 个，仅显示前 10 个）"
 msgstr ""
 
-#: includes/class-task.php:1184
+#: includes/class-task.php:1185
 msgid "任务已停止：本次共处理 %d 个附件，可以随时再执行一次继续处理剩余部分。"
 msgstr ""
 
-#: local-crush.php:236
+#: local-crush.php:299
 msgid "服务器缺少 DOM 扩展，无法安全处理 SVG"
 msgstr ""
 
-#: local-crush.php:244
+#: local-crush.php:307
 msgid "无法读取上传的 SVG 文件"
 msgstr ""
 
-#: local-crush.php:251
+#: local-crush.php:314
 msgid "SVG 内容不合法或包含危险代码"
 msgstr ""
 
-#: local-crush.php:259
+#: local-crush.php:322
 msgid "无法安全写入清理后的 SVG 文件"
-msgstr ""
-
-#: compression/class-tool-base.php:551
-msgid "无法清理上次中断留下的临时文件"
-msgstr ""
-
-#: includes/class-processor.php:518
-msgid "没有可处理的图片文件"
-msgstr ""
-
-#: includes/class-settings.php:455
-msgid "pngquant --quality 下限"
-msgstr ""
-
-#: includes/class-settings.php:464
-msgid "pngquant --quality 上限"
-msgstr ""
-
-#: includes/class-settings.php:482
-msgid "pngquant（取消勾选时加 --nofs）"
-msgstr ""
-
-#: includes/class-settings.php:496
-msgid "APNG 走 oxipng"
 msgstr ""
