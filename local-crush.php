@@ -94,17 +94,73 @@ function local_crush_allow_svg_upload( $mimes ) {
 add_filter( 'upload_mimes', 'local_crush_allow_svg_upload' );
 
 /**
+ * 检查 SVG 里的 DOCTYPE 声明是否安全
+ *
+ * 只放行“引用外部 DTD”的普通 DOCTYPE（`<!DOCTYPE svg PUBLIC "..." "...">`）。
+ * 带内部子集（方括号包起来的那段）的声明可以定义实体和属性默认值，是 XXE 的入口，一律拒绝。
+ * 解析时没有开启 LIBXML_DTDLOAD / LIBXML_NOENT，外部 DTD 不会被加载、实体不会被展开。
+ *
+ * @param string $content SVG 文件内容
+ * @return bool 没有 DOCTYPE 或声明安全时返回 true
+ */
+function local_crush_svg_doctype_is_safe( string $content ): bool {
+    $length = strlen( $content );
+    $offset = 0;
+
+    while ( false !== ( $start = stripos( $content, '<!DOCTYPE', $offset ) ) ) {
+        $quote = '';
+        $end   = null;
+
+        for ( $i = $start + 9; $i < $length; $i++ ) {
+            $char = $content[ $i ];
+
+            // 引号里的内容（DTD 地址、标识符）不参与结构判断
+            if ( '' !== $quote ) {
+                if ( $char === $quote ) {
+                    $quote = '';
+                }
+
+                continue;
+            }
+
+            if ( '"' === $char || "'" === $char ) {
+                $quote = $char;
+                continue;
+            }
+
+            // 内部子集从这里开始
+            if ( '[' === $char ) {
+                return false;
+            }
+
+            if ( '>' === $char ) {
+                $end = $i;
+                break;
+            }
+        }
+
+        // 声明没有闭合，说明内容已经不合法
+        if ( null === $end ) {
+            return false;
+        }
+
+        $offset = $end + 1;
+    }
+
+    return true;
+}
+
+/**
  * 清理 SVG 内容中的危险代码
  *
  * 移除 script 与 foreignObject 元素、on* 事件属性、javascript/vbscript
- * 协议与 data:text/html 伪协议；包含 DOCTYPE/ENTITY 的文件直接拒绝（防 XXE）
+ * 协议与 data:text/html 伪协议；自定义实体与 DOCTYPE 内部子集直接拒绝（防 XXE）
  *
  * @param string $content SVG 文件内容
  * @return string|false 清理后的内容，不合法时返回 false
  */
 function local_crush_sanitize_svg_content( string $content ) {
-    // SVG 图片不需要 DOCTYPE/ENTITY，存在即拒绝，杜绝 XXE 向量
-    if ( false !== stripos( $content, '<!DOCTYPE' ) || false !== stripos( $content, '<!ENTITY' ) ) {
+    if ( false !== stripos( $content, '<!ENTITY' ) || ! local_crush_svg_doctype_is_safe( $content ) ) {
         return false;
     }
 
@@ -201,6 +257,12 @@ function local_crush_sanitize_svg_content( string $content ) {
                 }
             }
         }
+    }
+
+    // 走到这里说明文档没有依赖 DTD 定义的自定义实体（否则上面的 loadXML 会失败），
+    // 所以外部 DTD 声明已经没有保留价值。删掉它，避免下游工具或浏览器再去拉那个地址。
+    if ( null !== $doc->doctype && null !== $doc->doctype->parentNode ) {
+        $doc->removeChild( $doc->doctype );
     }
 
     return $doc->saveXML();
