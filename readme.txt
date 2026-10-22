@@ -5,8 +5,8 @@ Requires at least: 6.4
 Tested up to: 7.1
 Requires PHP: 7.4
 Stable tag: 1.0.0
-License: GPLv2 or later
-License URI: https://www.gnu.org/licenses/gpl-2.0.html
+License: GPLv3 or later
+License URI: https://www.gnu.org/licenses/gpl-3.0.html
 
 纯本地 WordPress 图片压缩：调用服务器上的命令行工具，不上传图片、不需要 API Key。
 
@@ -24,14 +24,14 @@ Local Crush 是一个完全在服务器本地运行的图片压缩插件。图�
 
 * 支持 JPEG、PNG、GIF、WebP、AVIF、JPEG XL 和 SVG。
 * 支持 PNG、JPG、GIF 转换为 WebP、AVIF 或 JPEG XL。
-* 支持 GIF、APNG、动画 WebP、动画 AVIF、动画 JXL，整张动画交给工具处理，不拆帧。
-* 上传时自动压缩、媒体库单张压缩、后台批量压缩共用同一套流程。
+* 支持 GIF、APNG、动画 WebP、动画 AVIF、动画 JXL。
+* 上传时自动压缩、媒体库单张压缩、后台批量压缩。
 * 批量任务由服务器自己执行，关掉浏览器页面也会继续。
 * 压缩前可备份原图，支持单张或批量恢复，并可按天数自动清理旧备份。
 * 可选兼容格式回退：格式转换后保留同样压缩过的旧格式文件，前台用 `<picture>` 自动选择。
 * 可逐尺寸控制缩略图生成，支持补生成缺失尺寸和删除未勾选尺寸。
-* 默认删除 EXIF、GPS 等隐私信息，但会单独保留照片方向，避免手机竖拍照片变横。
-* 每个压缩路径的参数独立设置，界面填什么就传给工具什么，不做参数换算。
+* 默认删除 EXIF、GPS 等隐私信息。
+* 压缩参数自定义设置。
 
 == Installation ==
 
@@ -66,17 +66,9 @@ JPEG、PNG、GIF、WebP、AVIF、JPEG XL 和 SVG，包含 GIF、APNG、动画 We
 
 如果压缩或转换后的文件没有变小，插件会保留原图，并按 0% 记为“已压缩”，不会反复重试。
 
-= 删除图片元数据后，照片方向会变吗？ =
-
-不会。插件会单独保留照片方向，避免竖拍照片被当成横图；GPS、设备型号等其他隐私信息仍然会被删除。
-
-= 需要安装 Node.js、Python 或 ImageMagick 吗？ =
-
-不需要。压缩工具是独立的命令行可执行文件。只有静态 GIF 转 AVIF 需要 PHP 的 GD 扩展。
-
 = 没有安装压缩工具会怎样？ =
 
-缺少对应工具时，该格式会安全跳过并保留原图；在“压缩工具”页装好工具后，重新执行批量压缩即可重试。
+缺少对应工具时，该格式会安全跳过并保留原图；在“压缩工具”页装好工具后，重新执行压缩即可重试。
 
 == Changelog ==
 
@@ -86,10 +78,9 @@ JPEG、PNG、GIF、WebP、AVIF、JPEG XL 和 SVG，包含 GIF、APNG、动画 We
 * 支持常用图片格式、动图与格式转换。
 * 支持上传自动压缩、媒体库压缩和后台批量任务。
 * 支持原图备份与恢复、兼容格式回退和缩略图管理。
-* 修复 SVG 上传校验、照片方向保留、APNG 转换开关、批量重试跳过文件，以及孤儿数据和临时文件清理。
 
 == Upgrade Notice ==
 
 = 1.0.0 =
 
-建议更新：修复 SVG 上传安全、照片方向、APNG 设置和批量跳过文件重试等问题。
+完全免费纯本地的 WordPress 图像压缩插件
