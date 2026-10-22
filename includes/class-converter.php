@@ -47,7 +47,7 @@ class Local_Crush_Output {
      *
      * @var int
      */
-    const MAX_NAME_ATTEMPTS = 200;
+    const MAX_NAME_ATTEMPTS = 100;
 
     /**
      * 目标格式对应的编码工具注册名
