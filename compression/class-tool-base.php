@@ -357,15 +357,23 @@ abstract class Local_Crush_Tool_Base {
         }
 
         fclose( $pipes[0] );
-        $started  = microtime( true );
-        $exitcode = -1;
-        $timedout = false;
+        $started        = microtime( true );
+        $last_heartbeat = $started;
+        $exitcode       = -1;
+        $timedout       = false;
 
         while ( true ) {
             $status = proc_get_status( $process );
             if ( ! $status['running'] ) {
                 $exitcode = (int) $status['exitcode'];
                 break;
+            }
+
+            // 批量任务靠这个心跳续期执行权；单条命令可能跑几十秒，
+            // 只在命令结束后才刷新心跳会被别的请求误判成“执行者已死”。
+            if ( microtime( true ) - $last_heartbeat >= 5 ) {
+                do_action( 'local_crush_command_heartbeat' );
+                $last_heartbeat = microtime( true );
             }
 
             if ( microtime( true ) - $started > max( 1, $timeout ) ) {

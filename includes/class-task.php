@@ -490,9 +490,16 @@ class Local_Crush_Task {
         // 子命令也必须收短：给 PHP 留出回滚、写记录和清理临时文件的时间。
         Local_Crush_Tool_Base::set_command_timeout_cap( self::COMMAND_TIMEOUT );
 
+        // 单条命令执行期间也要续期，否则超过 35 秒的长命令会被误判为停滞。
+        $heartbeat = function () use ( $runner ) {
+            $this->heartbeat( $runner );
+        };
+        add_action( 'local_crush_command_heartbeat', $heartbeat );
+
         try {
             $this->run( $runner, $budget );
         } finally {
+            remove_action( 'local_crush_command_heartbeat', $heartbeat );
             Local_Crush_Tool_Base::reset_command_timeout_cap();
         }
 
@@ -929,6 +936,24 @@ class Local_Crush_Task {
             // 任务都干完了，兜底事件没必要再留着；万一是别人刚开的新任务，这里不会动它
             wp_unschedule_hook( self::WATCHDOG_HOOK );
         }
+    }
+
+    /**
+     * 命令执行期间刷新执行者心跳
+     *
+     * @param string $runner 执行者令牌
+     */
+    private function heartbeat( string $runner ): void {
+        $this->mutate(
+            function ( array &$task ) use ( $runner ) {
+                if ( ! $this->runner_owns( $task, $runner ) ) {
+                    return;
+                }
+
+                $task['runner_until'] = microtime( true ) + self::RUNNER_GRACE + 10;
+                $task['updated_at']   = time();
+            }
+        );
     }
 
     /**
