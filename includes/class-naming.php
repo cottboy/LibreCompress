@@ -1,6 +1,6 @@
 <?php
 /**
- * 上传文件名消歧
+ * 文件命名消歧
  *
  * @package LocalCrush
  */
@@ -11,39 +11,40 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 /**
- * 上传文件名消歧
+ * 文件命名消歧
  *
- * 插件的格式转换产物按“源文件名.目标格式”的双扩展名规则生成：photo.jpg 转成
+ * 插件的格式转换产物按“源文件名.目标格式”的双扩展名生成：photo.jpg 转成
  * photo.jpg.webp，旧格式的 photo.jpg 原地留下当回退。前台据此推导回退地址：
  * 去掉最后一段扩展名就是旧格式文件名，再去磁盘上确认它确实存在。
  *
  * 用户自己上传的文件名不受这套规则约束。同目录下正好存在同名旧格式文件时，
  * 用户上传的新格式文件会被前台当成转换产物，于是配出一张不相干的图当回退。
  *
- * 这里在文件落盘前消一次歧：会跟旧格式文件（或同名新格式文件）撞上的名字，
- * 按 WordPress 的习惯追加 -1、-2 序号改名，改完就不再和任何旧格式文件撞名。
+ * 这里统一管两处改名，规则完全一致（主体追加 -1、-2 序号）：
+ * - 上传落盘前消歧：会跟旧格式文件（或同名新格式文件）撞上的名字，改名避让；
+ * - 转换时避让：目标名已被占用时，先给源文件改名再转换，产物跟着换名。
  */
-class Local_Crush_Upload_Naming {
+class Local_Crush_Naming {
 
     /**
-     * 插件的目标格式扩展名
+     * 插件支持的目标格式扩展名
      *
      * @var string[]
      */
     const TARGET_FORMATS = array( 'webp', 'avif', 'jxl' );
 
     /**
-     * 改名尝试次数上限
+     * 文件名分配的最大尝试次数
      *
      * @var int
      */
-    const MAX_ATTEMPTS = 100;
+    const MAX_NAME_ATTEMPTS = 100;
 
     /**
      * 构造函数
      */
     public function __construct() {
-        add_filter( 'wp_unique_filename', array( $this, 'filter_unique_filename' ), 20, 3 );
+        add_filter( 'wp_unique_filename', array( $this, 'disambiguate_upload_name' ), 20, 3 );
     }
 
     /**
@@ -57,12 +58,12 @@ class Local_Crush_Upload_Naming {
      * @param string $dir      目标目录
      * @return string
      */
-    public function filter_unique_filename( $filename, $ext = '', $dir = '' ) {
+    public function disambiguate_upload_name( $filename, $ext = '', $dir = '' ) {
         if ( ! is_string( $filename ) || '' === $filename ) {
             return $filename;
         }
 
-        if ( ! is_string( $dir ) || '' === $dir || ! $this->is_in_uploads( $dir ) ) {
+        if ( ! is_string( $dir ) || '' === $dir || ! $this->is_upload_dir( $dir ) ) {
             return $filename;
         }
 
@@ -82,11 +83,11 @@ class Local_Crush_Upload_Naming {
                 return $filename;
             }
 
-            if ( ! $this->file_exists( $dir, $stem ) ) {
+            if ( ! $this->upload_file_exists( $dir, $stem ) ) {
                 return $filename;
             }
 
-            $renamed = $this->allocate_name( $dir, $name, $extension, true );
+            $renamed = $this->allocate_upload_name( $dir, $name, $extension, true );
 
             return '' === $renamed ? $filename : $renamed;
         }
@@ -94,8 +95,8 @@ class Local_Crush_Upload_Naming {
         // 旧格式文件：同目录下已有同名的新格式文件时改名，避免两者撞成一组，
         // 让那个新格式文件失去（或错配）自己的回退。
         foreach ( self::TARGET_FORMATS as $target ) {
-            if ( $this->file_exists( $dir, $name . '.' . $target ) ) {
-                $renamed = $this->allocate_name( $dir, $name, $extension, false );
+            if ( $this->upload_file_exists( $dir, $name . '.' . $target ) ) {
+                $renamed = $this->allocate_upload_name( $dir, $name, $extension, false );
 
                 return '' === $renamed ? $filename : $renamed;
             }
@@ -105,28 +106,59 @@ class Local_Crush_Upload_Naming {
     }
 
     /**
-     * 分配一个不与任何相关文件撞名的名字
+     * 给转换用的源文件分配一个不撞名的路径
+     *
+     * 转换产物按“源文件名.目标格式”生成，目标名已被占用时（上次转换中断的残留，
+     * 或同目录里恰好有同名文件）先给源文件改个名，产物跟着换名，不会互相覆盖。
+     *
+     * @param string $file_path 源文件绝对路径
+     * @return string 分配不到时返回空字符串
+     */
+    public function allocate_unique_source_path( string $file_path ): string {
+        $directory = dirname( $file_path );
+        $name      = pathinfo( $file_path, PATHINFO_FILENAME );
+        $extension = pathinfo( $file_path, PATHINFO_EXTENSION );
+
+        if ( '' === $name || '' === $extension || ! $this->is_upload_dir( $directory ) ) {
+            return '';
+        }
+
+        for ( $attempt = 1; $attempt <= self::MAX_NAME_ATTEMPTS; $attempt++ ) {
+            $candidate = $directory . '/' . $name . '-' . $attempt . '.' . $extension;
+
+            if ( file_exists( $candidate ) || is_link( $candidate ) ) {
+                continue;
+            }
+
+            return $candidate;
+        }
+
+        return '';
+    }
+
+    /**
+     * 分配一个不与任何相关文件撞名的上传文件名
      *
      * 序号追加在主体名之后：photo.jpg → photo-1.jpg，photo.jpg.webp → photo.jpg-1.webp，
-     * 与 WordPress 上传去重和插件转换时的改名规则一致。
+     * 与 WordPress 上传去重和转换时的改名规则一致。
      *
-     * @param string $dir             目标目录
-     * @param string $name            原文件名
-     * @param string $extension       原扩展名（小写）
+     * @param string $dir              目标目录
+     * @param string $name             原文件名
+     * @param string $extension        原扩展名（小写）
      * @param bool   $is_target_format 原文件是不是插件的目标格式
      * @return string 分配不到时返回空字符串
      */
-    private function allocate_name( string $dir, string $name, string $extension, bool $is_target_format ): string {
+    private function allocate_upload_name( string $dir, string $name, string $extension, bool $is_target_format ): string {
         $body = pathinfo( $name, PATHINFO_FILENAME );
 
         if ( '' === $body ) {
             return '';
         }
 
-        for ( $attempt = 1; $attempt <= self::MAX_ATTEMPTS; $attempt++ ) {
+        for ( $attempt = 1; $attempt <= self::MAX_NAME_ATTEMPTS; $attempt++ ) {
             $candidate = $body . '-' . $attempt . '.' . $extension;
 
-            if ( $this->file_exists( $dir, $candidate ) ) {
+            if ( $this->upload_file_exists( $dir, $candidate ) ) {
                 continue;
             }
 
@@ -134,7 +166,7 @@ class Local_Crush_Upload_Naming {
                 // 新格式文件：去掉最后一段得到的旧格式名也不能已经被占用。
                 $stem = substr( $candidate, 0, strlen( $candidate ) - strlen( $extension ) - 1 );
 
-                if ( '' !== pathinfo( $stem, PATHINFO_EXTENSION ) && $this->file_exists( $dir, $stem ) ) {
+                if ( '' !== pathinfo( $stem, PATHINFO_EXTENSION ) && $this->upload_file_exists( $dir, $stem ) ) {
                     continue;
                 }
 
@@ -145,7 +177,7 @@ class Local_Crush_Upload_Naming {
             $clash = false;
 
             foreach ( self::TARGET_FORMATS as $target ) {
-                if ( $this->file_exists( $dir, $candidate . '.' . $target ) ) {
+                if ( $this->upload_file_exists( $dir, $candidate . '.' . $target ) ) {
                     $clash = true;
                     break;
                 }
@@ -167,7 +199,7 @@ class Local_Crush_Upload_Naming {
      * @param string $dir 目录绝对路径
      * @return bool
      */
-    private function is_in_uploads( string $dir ): bool {
+    private function is_upload_dir( string $dir ): bool {
         $uploads = wp_upload_dir();
 
         if ( empty( $uploads['basedir'] ) ) {
@@ -192,7 +224,7 @@ class Local_Crush_Upload_Naming {
     }
 
     /**
-     * 判断目标目录下的文件是否存在
+     * 判断上传目录下的文件是否存在
      *
      * 文件名来自上传流程，仍按不可信数据校验：目录穿越和非法字符一律当作不存在。
      *
@@ -200,7 +232,7 @@ class Local_Crush_Upload_Naming {
      * @param string $name 文件名
      * @return bool
      */
-    private function file_exists( string $dir, string $name ): bool {
+    private function upload_file_exists( string $dir, string $name ): bool {
         if ( '' === $name || false !== strpos( $name, '..' ) || false !== strpbrk( $name, "/\\:\0" ) ) {
             return false;
         }

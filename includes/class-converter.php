@@ -43,13 +43,6 @@ class Local_Crush_Output {
     const REFERENCE_BATCH_SIZE = 100;
 
     /**
-     * 文件名分配的最大尝试次数
-     *
-     * @var int
-     */
-    const MAX_NAME_ATTEMPTS = 100;
-
-    /**
      * 目标格式对应的编码工具注册名
      *
      * @var array
@@ -1435,7 +1428,7 @@ class Local_Crush_Output {
      * @return string|null 改名后的绝对路径，失败返回 null
      */
     private function rename_source_for_target( int $attachment_id, string $file_path ): ?string {
-        $new_path = $this->allocate_unique_source_path( $file_path );
+        $new_path = local_crush()->naming->allocate_unique_source_path( $file_path );
 
         if ( '' === $new_path ) {
             return null;
@@ -1504,30 +1497,6 @@ class Local_Crush_Output {
         }
 
         return $new_path;
-    }
-
-    /**
-     * 分配未被占用的源文件名
-     *
-     * 与 WordPress 上传时的避让规则一致：依次追加 -1、-2 等数字后缀。
-     *
-     * @param string $file_path 源文件绝对路径
-     * @return string 无法分配时返回空字符串
-     */
-    private function allocate_unique_source_path( string $file_path ): string {
-        $directory = dirname( $file_path );
-        $name      = pathinfo( $file_path, PATHINFO_FILENAME );
-        $extension = pathinfo( $file_path, PATHINFO_EXTENSION );
-
-        for ( $attempt = 1; $attempt <= self::MAX_NAME_ATTEMPTS; $attempt++ ) {
-            $candidate = $directory . '/' . $name . '-' . $attempt . '.' . $extension;
-
-            if ( ! file_exists( $candidate ) ) {
-                return $this->is_safe_destination_path( $candidate ) ? $candidate : '';
-            }
-        }
-
-        return '';
     }
 
     /**

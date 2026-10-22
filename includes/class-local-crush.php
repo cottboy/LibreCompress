@@ -81,6 +81,13 @@ class Local_Crush {
     public $thumbnail_manager;
 
     /**
+     * 文件命名消歧模块实例
+     *
+     * @var Local_Crush_Naming
+     */
+    public $naming;
+
+    /**
      * 设置页面模块实例
      *
      * @var Local_Crush_Settings
@@ -142,8 +149,8 @@ class Local_Crush {
         // 前台图片按浏览器能力选择新格式或旧格式回退文件。
         new Local_Crush_Compatible_Fallback();
 
-        // 上传文件名消歧，避免用户上传的文件被当成格式转换产物。
-        new Local_Crush_Upload_Naming();
+        // 初始化文件命名消歧模块（上传消歧与转换改名共用一套规则）
+        $this->naming = new Local_Crush_Naming();
 
         // 初始化统一图片压缩处理器
         $this->processor = new Local_Crush_Processor();
