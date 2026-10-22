@@ -273,6 +273,7 @@ function local_crush_load_dependencies() {
     require_once LOCAL_CRUSH_PATH . 'includes/class-database.php';
     require_once LOCAL_CRUSH_PATH . 'includes/class-backup.php';
     require_once LOCAL_CRUSH_PATH . 'includes/class-compatible-fallback.php';
+    require_once LOCAL_CRUSH_PATH . 'includes/class-upload-naming.php';
     require_once LOCAL_CRUSH_PATH . 'includes/class-animation.php';
     require_once LOCAL_CRUSH_PATH . 'includes/class-compressor.php';
     require_once LOCAL_CRUSH_PATH . 'includes/class-converter.php';

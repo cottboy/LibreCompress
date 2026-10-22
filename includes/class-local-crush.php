@@ -142,6 +142,9 @@ class Local_Crush {
         // 前台图片按浏览器能力选择新格式或旧格式回退文件。
         new Local_Crush_Compatible_Fallback();
 
+        // 上传文件名消歧，避免用户上传的文件被当成格式转换产物。
+        new Local_Crush_Upload_Naming();
+
         // 初始化统一图片压缩处理器
         $this->processor = new Local_Crush_Processor();
 
