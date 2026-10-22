@@ -422,10 +422,20 @@ class Local_Crush_Thumbnail_Manager {
             // 的未缩放旧格式原图。不能使用备份文件，也不能拿 -scaled 图当原图。
             $legacy_source = $this->find_legacy_original_source( $attachment_id, wp_get_attachment_metadata( $attachment_id ) );
 
-            // SVG 和 JXL 没有 WordPress 能解码的栅格源（JXL 只有转换后保留的旧格式源
-            // 才可能生成），这不是失败，只是这张图没有可补的尺寸。
-            if ( null === $legacy_source && in_array( get_post_mime_type( $attachment_id ), array( 'image/svg+xml', 'image/jxl' ), true ) ) {
-                return 'unsupported_format';
+            // 没有 WordPress 能解码的旧格式栅格源时，这两种格式都补不了缩略图，
+            // 但结果不一样：
+            // - SVG 本来就没有栅格源，跳过不算失败；
+            // - JXL 是占位格式，暂时解不出来就按失败报，不能悄悄算作“无需处理”。
+            if ( null === $legacy_source ) {
+                $mime_type = (string) get_post_mime_type( $attachment_id );
+
+                if ( 'image/svg+xml' === $mime_type ) {
+                    return 'unsupported_format';
+                }
+
+                if ( 'image/jxl' === $mime_type ) {
+                    return null;
+                }
             }
 
             // 先按当前缩放设置补建/修正 -scaled 缩放图（与缩略图缺失无关）
@@ -772,14 +782,13 @@ class Local_Crush_Thumbnail_Manager {
             return false;
         }
 
-        if ( ! empty( $config['crop'] ) ) {
-            return true;
-        }
-
         if ( $width <= 0 || $height <= 0 ) {
             return false;
         }
 
+        // 口径必须和 WordPress 核心一致：目标宽高都不小于原图时，核心直接跳过这个尺寸，
+        // 裁剪尺寸（crop）也一样不例外。所以这里不能因为 crop 就认定“一定适用”，
+        // 否则小图会被当成“有尺寸可补”，生成结果为空又被判成失败。
         return ( $target_width > 0 && $width > $target_width ) || ( $target_height > 0 && $height > $target_height );
     }
 
