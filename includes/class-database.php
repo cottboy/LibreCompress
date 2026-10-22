@@ -10,6 +10,8 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
+// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- 本文件拼接进 SQL 的只有 $wpdb->prefix 生成的固定表名和内置 MIME 白名单（逐项 esc_sql），都不含用户输入。
+
 /**
  * 数据库操作类
  *
@@ -183,7 +185,6 @@ class Local_Crush_Database {
         $attachment_id = absint( $attachment_id );
         $size_type     = sanitize_text_field( $size_type );
 
-        // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
         return $wpdb->get_row(
             $wpdb->prepare(
                 "SELECT * FROM {$this->records_table} WHERE attachment_id = %d AND size_type = %s",
@@ -209,7 +210,6 @@ class Local_Crush_Database {
             return array();
         }
 
-        // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
         $rows = $wpdb->get_results(
             $wpdb->prepare(
                 "SELECT * FROM {$this->records_table} WHERE attachment_id = %d ORDER BY id ASC",
@@ -481,7 +481,6 @@ class Local_Crush_Database {
 
         // 按建立顺序返回：恢复流程取第一条当原图，旧版本可能为同一附件留下多条，
         // 最早那条才是未压缩原图，不能交给不确定的返回顺序决定。
-        // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
         return $wpdb->get_results(
             $wpdb->prepare(
                 "SELECT * FROM {$this->backups_table} WHERE attachment_id = %d ORDER BY id ASC",
@@ -511,7 +510,6 @@ class Local_Crush_Database {
             return null;
         }
 
-        // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
         return $wpdb->get_row(
             $wpdb->prepare(
                 "SELECT * FROM {$this->backups_table} WHERE attachment_id = %d AND original_path = %s",
@@ -595,7 +593,6 @@ class Local_Crush_Database {
             return array();
         }
 
-        // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
         $ids = $wpdb->get_col(
             $wpdb->prepare(
                 "SELECT attachment_id FROM {$this->backups_table}
@@ -629,7 +626,6 @@ class Local_Crush_Database {
         $after_id = absint( $after_id );
         $limit    = max( 1, min( 100, absint( $limit ) ) );
 
-        // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
         $ids = $wpdb->get_col(
             $wpdb->prepare(
                 "SELECT m.post_id FROM {$wpdb->postmeta} m
@@ -657,7 +653,6 @@ class Local_Crush_Database {
     public function count_fallback_attachments(): int {
         global $wpdb;
 
-        // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
         return (int) $wpdb->get_var(
             $wpdb->prepare(
                 "SELECT COUNT(*) FROM {$wpdb->postmeta} m
@@ -683,7 +678,6 @@ class Local_Crush_Database {
         $after_id = absint( $after_id );
         $limit    = max( 1, min( 100, absint( $limit ) ) );
 
-        // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
         $ids = $wpdb->get_col(
             $wpdb->prepare(
                 "SELECT b.attachment_id FROM {$this->backups_table} b
@@ -710,7 +704,6 @@ class Local_Crush_Database {
     public function count_backup_attachments(): int {
         global $wpdb;
 
-        // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
         return (int) $wpdb->get_var(
             "SELECT COUNT( DISTINCT b.attachment_id ) FROM {$this->backups_table} b
             INNER JOIN {$wpdb->posts} p ON p.ID = b.attachment_id
@@ -734,7 +727,6 @@ class Local_Crush_Database {
         $after_id = absint( $after_id );
         $limit    = max( 1, min( 100, absint( $limit ) ) );
 
-        // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
         $ids = $wpdb->get_col(
             $wpdb->prepare(
                 "SELECT attachment_id FROM (
@@ -773,7 +765,6 @@ class Local_Crush_Database {
     public function count_restore_attachments(): int {
         global $wpdb;
 
-        // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
         return (int) $wpdb->get_var(
             $wpdb->prepare(
                 "SELECT COUNT(*) FROM (
@@ -814,7 +805,6 @@ class Local_Crush_Database {
         $limit    = max( 1, min( 100, absint( $limit ) ) );
 
         // 回收站里的附件不算残留：移回回收站后还要能恢复原图。
-        // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
         $ids = $wpdb->get_col(
             $wpdb->prepare(
                 "SELECT attachment_id FROM (

@@ -1764,7 +1764,7 @@ class Local_Crush_Output {
         $success  = true;
 
         do {
-            // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+            // phpcs:disable WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, PluginCheck.Security.DirectDB.UnescapedDBParameter -- 每个 LIKE 片段都是固定的 %s 占位符，模式经 esc_like 处理后由 prepare 逐一绑定，参数数量与占位符一致；这里分页改写正文，没有可缓存对象。
             $posts = $wpdb->get_results(
                 $wpdb->prepare(
                     "SELECT ID, post_content FROM {$wpdb->posts}
@@ -1777,6 +1777,7 @@ class Local_Crush_Output {
                     array_merge( array( $after_id ), $like_args, array( self::REFERENCE_BATCH_SIZE ) )
                 )
             );
+            // phpcs:enable
 
             $posts     = is_array( $posts ) ? $posts : array();
             $page_size = count( $posts );

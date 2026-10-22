@@ -9,6 +9,8 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
+// phpcs:disable WordPress.WP.AlternativeFunctions -- 判断动图需要直接按二进制块结构读取文件，WP_Filesystem 没有 fseek/分段读取接口。
+
 /**
  * 压缩调度器类
  *
@@ -249,7 +251,6 @@ class Local_Crush_Compressor {
             return true;
         }
 
-        // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_get_contents
         $data = file_get_contents( $file_path );
 
         if ( false === $data || strlen( $data ) < 14 || 'GIF' !== substr( $data, 0, 3 ) ) {
@@ -494,7 +495,6 @@ class Local_Crush_Compressor {
         // 使用唯一回滚副本，避免异常中断或并发遗留文件互相覆盖。
         $rollback_path = $file_path . '.lc-rollback-' . wp_generate_password( 12, false, false );
 
-        // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_copy
         if ( ! copy( $file_path, $rollback_path ) ) {
             $message = __( '无法创建回滚副本，已跳过压缩', 'local-crush' );
             $this->record_skipped_file( $attachment_id, $file_path, $size_type, $message );
@@ -747,7 +747,6 @@ class Local_Crush_Compressor {
             return false;
         }
 
-        // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_copy
         if ( ! copy( $rollback_path, $file_path ) ) {
             return false;
         }
@@ -763,7 +762,6 @@ class Local_Crush_Compressor {
      */
     private function cleanup_rollback( string $rollback_path ): void {
         if ( file_exists( $rollback_path ) ) {
-            // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
             unlink( $rollback_path );
         }
     }

@@ -974,6 +974,7 @@ class Local_Crush_Settings {
     }
 
     public function render_settings_page() {
+        // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- 只读取用于切换设置页标签，已做白名单校验，不修改任何数据。
         $this->current_tab = isset( $_GET['tab'] ) ? sanitize_text_field( wp_unslash( $_GET['tab'] ) ) : 'general';
 
         $valid_tabs = array( 'general', 'tools' );

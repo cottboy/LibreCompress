@@ -18,9 +18,9 @@ global $wpdb;
 $records_table = $wpdb->prefix . 'local_crush_records';
 $backups_table = $wpdb->prefix . 'local_crush_backups';
 
-// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- 表名由 $wpdb->prefix 与固定后缀拼成，不含用户输入。
 $wpdb->query( "DROP TABLE IF EXISTS {$records_table}" );
-// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- 表名由 $wpdb->prefix 与固定后缀拼成，不含用户输入。
 $wpdb->query( "DROP TABLE IF EXISTS {$backups_table}" );
 
 // 删除设置项
@@ -40,6 +40,8 @@ wp_clear_scheduled_hook( 'local_crush_cleanup_event' );
 wp_unschedule_hook( 'local_crush_task_watchdog_event' );
 delete_transient( 'local_crush_pending_sweep' );
 
+// phpcs:disable WordPress.WP.AlternativeFunctions -- 卸载时按固定目录递归清理插件自己的文件，路径全部来自 wp_upload_dir()/WP_CONTENT_DIR；不用 WP_Filesystem 是因为卸载阶段没有后台表单可依赖，直接用 PHP 文件函数最可靠。
+
 // 删除备份文件目录和附件锁目录（目录名需与 Local_Crush_Processor 常量保持一致）
 $upload_dir = wp_upload_dir();
 
@@ -57,10 +59,13 @@ foreach ( array( 'local-crush-backups', '.local-crush-locks' ) as $dir_name ) {
     );
 
     foreach ( $files as $file ) {
-        if ( $file->isDir() ) {
-            rmdir( $file->getRealPath() );
+        $path = $file->getPathname();
+
+        // 只删链接本身，不能顺着符号链接删到目录之外的目标文件。
+        if ( $file->isLink() || ! $file->isDir() ) {
+            unlink( $path );
         } else {
-            unlink( $file->getRealPath() );
+            rmdir( $path );
         }
     }
 
@@ -78,12 +83,17 @@ if ( is_dir( $bin_dir ) ) {
     );
 
     foreach ( $files as $file ) {
-        if ( $file->isDir() ) {
-            rmdir( $file->getRealPath() );
+        $path = $file->getPathname();
+
+        // 只删链接本身，不能顺着符号链接删到目录之外的目标文件。
+        if ( $file->isLink() || ! $file->isDir() ) {
+            unlink( $path );
         } else {
-            unlink( $file->getRealPath() );
+            rmdir( $path );
         }
     }
 
     rmdir( $bin_dir );
 }
+
+// phpcs:enable

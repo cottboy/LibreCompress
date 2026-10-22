@@ -359,6 +359,7 @@ class Local_Crush_Backup {
             return false;
         }
 
+        // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink -- 目标路径由备份目录和已校验的相对路径拼成，删除失败会保留临时副本。
         if ( file_exists( $original_path ) && ! unlink( $original_path ) ) {
             // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
             unlink( $restore_temp );
@@ -366,6 +367,7 @@ class Local_Crush_Backup {
         }
 
         // 先清空目标再改名落位，兼容 Windows 上 rename 不覆盖已有文件的行为。
+        // phpcs:ignore WordPress.WP.AlternativeFunctions.rename_rename -- 临时文件与原文件在同一目录，改名不会跨目录移动。
         if ( ! rename( $restore_temp, $original_path ) ) {
             if ( file_exists( $restore_temp ) ) {
                 // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
@@ -425,6 +427,7 @@ class Local_Crush_Backup {
                 continue;
             }
 
+            // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink -- 前面已确认路径位于备份目录内，不会删到备份之外的文件。
             if ( file_exists( $backup_path ) && ! unlink( $backup_path ) ) {
                 $success = false;
                 continue;

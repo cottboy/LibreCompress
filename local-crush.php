@@ -61,6 +61,7 @@ define( 'LOCAL_CRUSH_DB_VERSION', '1.0.0' );
  * 加载插件文本域
  */
 function local_crush_load_textdomain() {
+    // phpcs:ignore PluginCheck.CodeAnalysis.DiscouragedFunctions.load_plugin_textdomainFound -- 插件不通过 WordPress.org 分发，翻译文件随插件自带，需要显式加载 languages 目录。
     load_plugin_textdomain(
         'local-crush',
         false,

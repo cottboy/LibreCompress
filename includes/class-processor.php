@@ -2124,6 +2124,7 @@ class Local_Crush_Processor {
      * @return resource|false
      */
     public function acquire_attachment_lock( int $attachment_id ) {
+        // phpcs:disable WordPress.WP.AlternativeFunctions -- 文件锁必须用 fopen/flock/fclose，WP_Filesystem 不支持加锁。
         $upload_dir = wp_upload_dir();
         $lock_dir   = $upload_dir['basedir'] . '/' . self::LOCK_DIR_NAME;
 
@@ -2195,6 +2196,7 @@ class Local_Crush_Processor {
         flock( $lock, LOCK_UN );
         fclose( $lock );
     }
+    // phpcs:enable
 
     /**
      * 判断压缩记录是否与当前文件完全匹配

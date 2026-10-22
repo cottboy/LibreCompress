@@ -441,6 +441,7 @@ class Local_Crush_Task {
      * 所以重复的请求不会把同一张图压两遍。
      */
     public function handle_async_tick(): void {
+        // phpcs:ignore WordPress.Security.NonceVerification.Missing -- 这个后台接力入口不使用 nonce，只认任务里的一次性令牌，并用 hash_equals() 做常量时间比对。
         $token = isset( $_POST['token'] ) ? sanitize_text_field( wp_unslash( $_POST['token'] ) ) : '';
         $task  = $this->get_task();
         $ran   = false;
@@ -481,7 +482,7 @@ class Local_Crush_Task {
 
         // 后台请求不能因为 PHP 执行时间上限干到一半被杀
         if ( function_exists( 'set_time_limit' ) ) {
-            // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
+            // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged, Squiz.PHP.DiscouragedFunctions.Discouraged -- 后台压缩一棒需要按任务预算延长执行时间，WordPress 没有替代接口；超限失败由调用方兜底。
             @set_time_limit( (int) $budget + self::PHP_LIMIT_GRACE );
         }
 
@@ -1302,6 +1303,7 @@ class Local_Crush_Task {
      * @return resource|false
      */
     private function acquire_lock() {
+        // phpcs:disable WordPress.WP.AlternativeFunctions -- 任务锁必须用 fopen/flock/fclose，WP_Filesystem 不支持加锁。
         $lock_dir = $this->lock_dir();
 
         if ( ! is_dir( $lock_dir ) && ! wp_mkdir_p( $lock_dir ) ) {
@@ -1336,6 +1338,7 @@ class Local_Crush_Task {
         flock( $lock, LOCK_UN );
         fclose( $lock );
     }
+    // phpcs:enable
 
     /**
      * 锁目录，与压缩处理共用同一个目录

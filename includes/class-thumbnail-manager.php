@@ -629,10 +629,12 @@ class Local_Crush_Thumbnail_Manager {
                                     $size_data['file'] = $desired_name;
                                 }
                             } else {
+                                // phpcs:disable WordPress.WP.AlternativeFunctions.rename_rename -- 目标路径已确认在 uploads 内，改名为同目录重命名，不会移出上传目录。
                                 if ( ! $this->is_safe_upload_path( $desired_path )
                                     || ! rename( $new_path, $desired_path ) ) {
                                     return null;
                                 }
+                                // phpcs:enable
 
                                 $size_data['file'] = $desired_name;
                             }

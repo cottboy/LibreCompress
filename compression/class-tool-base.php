@@ -10,6 +10,8 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
+// phpcs:disable WordPress.WP.AlternativeFunctions -- 本类负责调用本机压缩工具，需要对临时文件做原子替换、清理并关闭进程管道，WP_Filesystem 没有这些底层接口。
+
 /**
  * 压缩工具基类
  *
@@ -345,6 +347,7 @@ abstract class Local_Crush_Tool_Base {
             2 => array( 'file', $stderr_path, 'w' ),
         );
         $pipes       = array();
+        // phpcs:ignore Generic.PHP.ForbiddenFunctions.Found -- 插件必须调用本机压缩工具；命令以参数数组传入，直接创建进程、不经过 shell，参数不会被当成命令解析。
         $process     = proc_open( $command, $descriptors, $pipes, $cwd );
         if ( ! is_resource( $process ) ) {
             unlink( $stdout_path );
@@ -454,6 +457,7 @@ abstract class Local_Crush_Tool_Base {
     private static function terminate_process( $process, int $pid ): void {
         if ( 'WIN' === strtoupper( substr( PHP_OS, 0, 3 ) ) && $pid > 0 ) {
             // Windows 的 proc_terminate 不保证结束子进程，用 taskkill /T 连子进程一起端掉
+            // phpcs:ignore Generic.PHP.ForbiddenFunctions.Found -- 参数数组直接创建进程、不经过 shell，这里只用于结束超时的子进程。
             $kill = proc_open( array( 'taskkill', '/F', '/T', '/PID', (string) $pid ), array( array( 'pipe', 'r' ), array( 'file', 'NUL', 'w' ), array( 'file', 'NUL', 'w' ) ), $kill_pipes );
             if ( is_resource( $kill ) ) {
                 foreach ( $kill_pipes as $pipe ) { fclose( $pipe ); }
@@ -544,7 +548,6 @@ abstract class Local_Crush_Tool_Base {
         // 上次中断留下的确定性输出文件必须先清掉：部分工具（如 avifdec）拒绝覆盖
         // 已存在的输出，留着会让这张图每次重试都失败，直到定时清理把它删掉。
         if ( '' !== $temp_output && is_file( $temp_output ) && ! is_link( $temp_output ) ) {
-            // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
             if ( ! unlink( $temp_output ) ) {
                 return array(
                     'success'         => false,
@@ -618,7 +621,6 @@ abstract class Local_Crush_Tool_Base {
             // 编码中间产物留在公开的 uploads 里等于泄漏未压缩内容。
             foreach ( $temp_paths as $temp_path ) {
                 if ( '' !== $temp_path && file_exists( $temp_path ) ) {
-                    // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
                     unlink( $temp_path );
                 }
             }

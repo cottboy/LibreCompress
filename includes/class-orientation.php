@@ -12,6 +12,8 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
+// phpcs:disable WordPress.WP.AlternativeFunctions -- 方向读取需要按 JPEG/WebP/PNG 块结构分段读取文件，方向写回要用临时文件，WP_Filesystem 没有这些接口。
+
 class Local_Crush_Orientation {
 
     /**
@@ -366,7 +368,6 @@ class Local_Crush_Orientation {
             return '';
         }
 
-        // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents
         if ( false === file_put_contents( $path, self::payload( $orientation, $with_exif_header ) ) ) {
             unlink( $path );
             return '';
@@ -424,7 +425,6 @@ class Local_Crush_Orientation {
         $ok = ! empty( $run['success'] ) && is_file( $muxed ) && filesize( $muxed ) > 0;
 
         if ( $ok ) {
-            // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_copy
             $ok = copy( $muxed, $file_path ) && self::from_webp( $file_path ) > 1;
         }
 
@@ -452,7 +452,6 @@ class Local_Crush_Orientation {
             return true;
         }
 
-        // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_get_contents
         $data = file_get_contents( $file_path );
 
         if ( false === $data || "\xFF\xD8" !== substr( $data, 0, 2 ) ) {
@@ -462,7 +461,6 @@ class Local_Crush_Orientation {
         $payload = self::payload( $orientation, true );
         $app1    = "\xFF\xE1" . pack( 'n', strlen( $payload ) + 2 ) . $payload;
 
-        // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents
         return false !== file_put_contents( $file_path, "\xFF\xD8" . $app1 . substr( $data, 2 ) );
     }
 }

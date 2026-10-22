@@ -16,6 +16,8 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
+// phpcs:disable WordPress.WP.AlternativeFunctions -- 动画处理需要按二进制块结构分段读取图像，并在同目录内替换输出，WP_Filesystem 没有 fseek/分段读取和原子改名接口。
+
 class Local_Crush_Animation {
 
     /**
@@ -1402,7 +1404,7 @@ class Local_Crush_Animation {
     private static function cleanup( array $paths ): void {
         foreach ( $paths as $path ) {
             if ( is_file( $path ) ) {
-                unlink( $path ); // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
+                unlink( $path );
             }
         }
     }
