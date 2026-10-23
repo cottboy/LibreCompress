@@ -494,8 +494,19 @@ class Local_Crush_Processor {
         }
 
         try {
-            $metadata = wp_get_attachment_metadata( $attachment_id );
-            $files    = $this->get_processing_files( $attachment_id, is_array( $metadata ) ? $metadata : null );
+            $metadata      = wp_get_attachment_metadata( $attachment_id );
+            $metadata      = is_array( $metadata ) ? $metadata : array();
+            $drop_unscaled = $this->should_drop_unscaled_original( $metadata );
+            $files         = $this->get_processing_files( $attachment_id, empty( $metadata ) ? null : $metadata );
+
+            if ( $drop_unscaled ) {
+                // 这份文件压缩完就要删掉，压它纯属白费功夫；它的旧格式回退文件同样排除。
+                // 但如果除了它一个文件都不剩（例如 -scaled 主图已经不在了），就别排除，
+                // 否则这张图会彻底没法处理。
+                $remaining = $this->without_unscaled_original( $files );
+                $files     = empty( $remaining ) ? $files : $remaining;
+            }
+
             if ( empty( $files ) ) {
                 return $this->empty_result( __( '未找到可压缩的图片文件', 'local-crush' ), 'failed' );
             }
@@ -512,6 +523,11 @@ class Local_Crush_Processor {
                         $has_safe_file = true;
                         break;
                     }
+                }
+
+                // 文件都已压缩，但以前留下的未缩放原图还占着磁盘：这次压缩同样按开关清掉。
+                if ( $drop_unscaled && $this->delete_unscaled_original( $attachment_id ) ) {
+                    return $this->empty_result( __( '图片已经压缩，已删除未缩放的原始大图', 'local-crush' ), 'skipped' );
                 }
 
                 return $this->empty_result(
@@ -620,6 +636,12 @@ class Local_Crush_Processor {
             }
 
             $this->refresh_metadata_file_sizes( $attachment_id );
+
+            // 主图（-scaled 缩放图）确实压好了才清理原始大图：主图一张都没压成时先留着，
+            // 等用户把工具配好重来，别在什么都没做成的时候先动刀。
+            if ( $drop_unscaled && $this->is_main_file_compressed( $attachment_id ) ) {
+                $this->delete_unscaled_original( $attachment_id );
+            }
 
             if ( empty( $result['message'] ) ) {
                 if ( $result['success'] === $result['total'] ) {
@@ -732,6 +754,14 @@ class Local_Crush_Processor {
             }
         }
 
+        // 主文件本身就是 -scaled 缩放图，却已经没有 original_image 记录：未缩放原图不是
+        // 被清理掉了就是丢了，这时把缩放图当原图存进备份目录，只会让“恢复原图”恢复出
+        // 一张本来就是压缩、缩放过的图，白占一份磁盘。
+        if ( '' !== $main_rel && empty( $metadata['original_image'] )
+            && preg_match( '/-scaled\.[^\/]+$/i', wp_basename( $main_rel ) ) ) {
+            return '';
+        }
+
         if ( '' !== $main_rel ) {
             $main_path = $base_dir . '/' . $main_rel;
 
@@ -748,6 +778,179 @@ class Local_Crush_Processor {
         $attached_path = wp_normalize_path( $attached );
 
         return is_file( $attached_path ) && $this->is_inside_upload_dir( $attached_path ) ? $attached_path : '';
+    }
+
+    /**
+     * 本次压缩后是否要删掉未缩放的原始大图
+     *
+     * 三个条件缺一不可：设置里开着“压缩后删除未缩放的原始大图”、开着自动缩放、
+     * 元数据里确实有 original_image 记录（说明原图超阈值生成了 -scaled 缩放图）。
+     * 关闭自动缩放时根本不会生成 -scaled 图，这个开关也就没有意义。
+     *
+     * @param array $metadata 附件元数据
+     * @return bool
+     */
+    private function should_drop_unscaled_original( array $metadata ): bool {
+        if ( ! Local_Crush_Settings::delete_unscaled_original() || ! Local_Crush_Settings::image_scale_enabled() ) {
+            return false;
+        }
+
+        return ! empty( $metadata['file'] ) && ! empty( $metadata['original_image'] );
+    }
+
+    /**
+     * 主图（-scaled 缩放图）是否已经压缩完毕
+     *
+     * 只看附件当前主文件的压缩记录：转换过格式时记录落在新格式文件上，
+     * 元数据同步后主文件也指向它，两者必须能对上。
+     *
+     * @param int $attachment_id 附件 ID
+     * @return bool
+     */
+    private function is_main_file_compressed( int $attachment_id ): bool {
+        $main_path = get_attached_file( $attachment_id );
+
+        if ( ! is_string( $main_path ) || '' === $main_path ) {
+            return false;
+        }
+
+        return $this->is_complete_record(
+            wp_normalize_path( $main_path ),
+            local_crush()->database->get_record( $attachment_id, 'full' )
+        );
+    }
+
+    /**
+     * 从待处理文件里去掉未缩放原图
+     *
+     * 未缩放原图压缩完就要删掉，压缩它没有意义；它的旧格式回退文件同属这份原图，
+     * 一并排除，免得为一份马上消失的文件生成转换结果和映射。
+     *
+     * @param array $files 文件列表
+     * @return array
+     */
+    private function without_unscaled_original( array $files ): array {
+        $kept = array();
+
+        foreach ( $files as $file ) {
+            if ( 'original_image' === (string) $file['size_type'] ) {
+                continue;
+            }
+
+            $kept[] = $file;
+        }
+
+        return $kept;
+    }
+
+    /**
+     * 删除未缩放的原始大图，只留 -scaled 缩放图当主图
+     *
+     * 只在同时满足这些条件时才动手：
+     * 1. 设置里开启“压缩后删除未缩放的原始大图”，且开启自动缩放；
+     * 2. 元数据里有 original_image，说明确实生成过 -scaled 缩放图；
+     * 3. -scaled 主图真实存在、非空、不是符号链接且在 uploads 内 —— 原图删掉后就只剩它了；
+     * 4. 未缩放原图与主图不是同一个文件，且是 uploads 内的普通文件。
+     *
+     * 删除成功后清掉元数据里的 original_image，并顺手清掉指向这份原图的转换映射、
+     * 旧格式回退文件与压缩记录，不留任何指向已删文件的痕迹。原图早就不在磁盘上时
+     * 只清理这些残留指向，不动主图。
+     *
+     * @param int $attachment_id 附件 ID
+     * @return bool 是否真的删掉了未缩放原图（原图本来就不在时返回 false）
+     */
+    private function delete_unscaled_original( int $attachment_id ): bool {
+        $metadata = wp_get_attachment_metadata( $attachment_id );
+
+        if ( ! is_array( $metadata ) || ! $this->should_drop_unscaled_original( $metadata ) ) {
+            return false;
+        }
+
+        $base_dir = untrailingslashit( wp_normalize_path( wp_upload_dir()['basedir'] ) );
+        $main_rel = ltrim( wp_normalize_path( (string) $metadata['file'] ), '/' );
+        $file_dir = dirname( $main_rel );
+        $orig_rel = ( '.' === $file_dir ? '' : $file_dir . '/' ) . wp_basename( (string) $metadata['original_image'] );
+        $main_abs = $base_dir . '/' . $main_rel;
+        $orig_abs = $base_dir . '/' . ltrim( wp_normalize_path( $orig_rel ), '/' );
+
+        // 元数据属于不可信数据，拼出来的路径先按字面排掉回溯写法与多余层级。
+        if ( '' === $main_rel || '' === wp_basename( $orig_rel )
+            || false !== strpos( $orig_rel, '..' ) || false !== strpos( $orig_rel, ':' ) ) {
+            return false;
+        }
+
+        // 主图必须真实可用：原图删掉后媒体库只剩它撑门面，它有问题就一个都不能动。
+        if ( $this->normalized_path( $main_abs ) === $this->normalized_path( $orig_abs )
+            || ! $this->is_safe_processing_path( $main_abs ) ) {
+            return false;
+        }
+
+        clearstatcache( true, $main_abs );
+
+        if ( (int) filesize( $main_abs ) <= 0 ) {
+            return false;
+        }
+
+        // 未缩放原图必须是 uploads 内的普通文件，符号链接一律不碰。
+        if ( is_link( $orig_abs ) ) {
+            return false;
+        }
+
+        $had_original = is_file( $orig_abs );
+
+        if ( $had_original ) {
+            if ( ! $this->is_inside_upload_dir( $orig_abs ) ) {
+                return false;
+            }
+
+            // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink -- 已确认是 uploads 内的普通文件，不会删到目录外或符号链接目标。
+            if ( ! unlink( $orig_abs ) || file_exists( $orig_abs ) ) {
+                // 删不掉就保持现状，下次压缩还能再试，不能留下“文件还在、记录没了”的状态。
+                return false;
+            }
+        }
+
+        $this->forget_unscaled_original_traces( $attachment_id, $orig_abs );
+
+        unset( $metadata['original_image'] );
+        wp_update_attachment_metadata( $attachment_id, $metadata );
+
+        return $had_original;
+    }
+
+    /**
+     * 清掉指向未缩放原图的转换映射、旧格式回退文件与压缩记录
+     *
+     * 转换过的附件里，未缩放原图有新旧两份文件：新格式那份就是元数据里的 original_image，
+     * 旧格式那份是它的兼容格式回退。前者已由调用方删除，后者同样没人引用，跟着删掉，
+     * 再把映射、回退记录和对应压缩记录一并清空。
+     *
+     * @param int    $attachment_id 附件 ID
+     * @param string $original_path 已删除的未缩放原图绝对路径
+     */
+    private function forget_unscaled_original_traces( int $attachment_id, string $original_path ): void {
+        foreach ( local_crush()->output_processor->get_output_entries( $attachment_id ) as $entry ) {
+            if ( 'original_image' !== (string) $entry['size_type'] ) {
+                continue;
+            }
+
+            $fallback_file = wp_normalize_path( (string) $entry['from'] );
+
+            if ( $this->normalized_path( $fallback_file ) !== $this->normalized_path( $original_path )
+                && is_file( $fallback_file ) && ! is_link( $fallback_file ) && $this->is_inside_upload_dir( $fallback_file ) ) {
+                // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink -- 已确认是 uploads 内的普通文件，不会删到目录外或符号链接目标。
+                unlink( $fallback_file );
+            }
+
+            local_crush()->output_processor->remove_output_entry( $attachment_id, 'original_image' );
+            local_crush()->output_processor->forget_fallback_records( $attachment_id, array( 'original_image' ) );
+        }
+
+        $record = local_crush()->database->get_record( $attachment_id, 'original_image' );
+
+        if ( is_array( $record ) && ! empty( $record['id'] ) ) {
+            local_crush()->database->delete_record( (int) $record['id'] );
+        }
     }
 
     /**

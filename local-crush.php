@@ -386,16 +386,17 @@ function local_crush_activate() {
 
     // 设置默认选项
     $default_general = array(
-        'auto_compress'         => false,
-        'backup_enabled'        => true,
-        'backup_retention_days' => -1,
-        'strip_metadata'        => true,
-        'resize_lossless'       => false,
-        'fallback_enabled'      => false,
-        'image_scale_enabled'   => true,
-        'image_size_threshold'  => 2560,
-        'output_format'         => 'avif',
-        'output_apng'           => false,
+        'auto_compress'            => false,
+        'backup_enabled'           => true,
+        'backup_retention_days'    => -1,
+        'strip_metadata'           => true,
+        'resize_lossless'          => false,
+        'fallback_enabled'         => false,
+        'image_scale_enabled'      => true,
+        'image_size_threshold'     => 2560,
+        'delete_unscaled_original' => true,
+        'output_format'            => 'avif',
+        'output_apng'              => false,
     );
 
     // 压缩参数的默认值只从参数总表取，不再在激活代码里抄第二份。

@@ -1027,20 +1027,22 @@ class Local_Crush_Output {
     }
 
     /**
-     * 按尺寸类型删除恢复映射条目
+     * 按尺寸类型删除转换映射条目
      *
      * @param int    $attachment_id 附件 ID
      * @param string $size_type     尺寸类型
+     * @return bool 没有条目或删除成功时为 true
      */
-    private function remove_output_entry( int $attachment_id, string $size_type ): void {
+    public function remove_output_entry( int $attachment_id, string $size_type ): bool {
         $entries = $this->read_output_entries( $attachment_id );
 
         if ( ! isset( $entries[ $size_type ] ) ) {
-            return;
+            return true;
         }
 
         unset( $entries[ $size_type ] );
-        $this->store_output_entries( $attachment_id, $entries );
+
+        return $this->store_output_entries( $attachment_id, $entries );
     }
 
     /**

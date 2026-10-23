@@ -842,6 +842,24 @@ class Local_Crush_Settings {
     }
 
     /**
+     * 压缩后是否删除未缩放的原始大图
+     *
+     * 原图超过阈值时 WordPress 会另存一张 -scaled 缩放图并让它在媒体库里充当全尺寸主图，
+     * 未缩放的那份原始大图只留在上传目录里，没有任何界面入口能用到它。勾选后，压缩
+     * （手动或自动）结束时会把它删掉，只保留 -scaled 图，省下一份原始大图的磁盘占用。
+     *
+     * 关闭自动缩放时这个开关没有意义（不会生成 -scaled 图），调用方需自行判断。
+     * 选项缺失时按开启处理：默认帮用户省磁盘。
+     *
+     * @return bool
+     */
+    public static function delete_unscaled_original(): bool {
+        $general = get_option( 'local_crush_general', array() );
+
+        return ! isset( $general['delete_unscaled_original'] ) || ! empty( $general['delete_unscaled_original'] );
+    }
+
+    /**
      * 大图缩放阈值
      *
      * @return int 像素值，仅在开启自动缩放时生效
@@ -923,6 +941,7 @@ class Local_Crush_Settings {
         $sanitized['backup_retention_days'] = self::normalize_retention_days( isset( $input['backup_retention_days'] ) ? $input['backup_retention_days'] : null );
         $sanitized['image_scale_enabled']      = ! empty( $input['image_scale_enabled'] );
         $sanitized['image_size_threshold']   = self::normalize_image_size_threshold( isset( $input['image_size_threshold'] ) ? $input['image_size_threshold'] : null );
+        $sanitized['delete_unscaled_original'] = ! empty( $input['delete_unscaled_original'] );
         $sanitized['strip_metadata']        = ! empty( $input['strip_metadata'] );
 
         // 缩放画质开关
@@ -1148,6 +1167,11 @@ class Local_Crush_Settings {
                             <?php esc_html_e( '像素', 'local-crush' ); ?>
                         </label>
                         <p class="description" style="margin-top:0;"><?php esc_html_e( '勾选后，上传或补生成缩略图时，宽或高超过此阈值的主图会另存为 -scaled 缩放图并接管主文件，未缩放的源文件仍留在磁盘上；不勾选则关闭自动缩放，原图直接投入使用。压缩已有图片时不会改动缩放，改动缩放请用下方的“删除未勾选尺寸的缩略图”和“补生成缺失尺寸的缩略图”两个按钮。默认 2560，与 WordPress 默认一致。', 'local-crush' ); ?></p>
+                        <label style="display:block; margin-bottom:10px;">
+                            <input type="checkbox" name="local_crush_general[delete_unscaled_original]" value="1" <?php checked( Local_Crush_Settings::delete_unscaled_original() ); ?>>
+                            <?php esc_html_e( '压缩后删除未缩放的原始大图', 'local-crush' ); ?>
+                        </label>
+                        <p class="description" style="margin-top:0;"><?php esc_html_e( '原图超过阈值时 WordPress 会另存一张 -scaled 缩放图当媒体库的全尺寸主图，未缩放的那份原始大图只躺在上传目录里，没有任何按钮能调用到。勾选后，手动或自动压缩结束时会把它删掉，只保留 -scaled 图，省下一份原始大图的磁盘占用；上传生图时不会删，删除只发生在压缩的时候。媒体库和文章里的图片都走 -scaled 图，不受影响，只有自己手动填过未缩放原图地址的地方会失效。开了“备份原图”的随时能恢复，没开备份的删掉就找不回来了；恢复原图时会按当前缩放设置重新生成 -scaled 图，并保留恢复出来的原图。已经压缩过的老图不会自己去清，重新点一次压缩就会删掉。取消上面的“自动缩放超尺寸的主图”后本选项不起作用。', 'local-crush' ); ?></p>
                         <div style="margin-top:14px;">
                             <?php if ( empty( $registered_sizes ) ) : ?>
                                 <p class="description"><?php esc_html_e( '当前没有注册额外的缩略图尺寸。', 'local-crush' ); ?></p>
