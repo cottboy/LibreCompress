@@ -111,6 +111,7 @@ class Local_Crush_Thumbnail_Manager {
      * 删除单个附件中未勾选尺寸的缩略图
      *
      * 先更新正文链接，成功后再改元数据和删文件；正文更新失败时不做任何清理。
+     * 文件仍被保留尺寸共用时只摘元数据条目，文件与它的旧格式回退都保留。
      *
      * @param int $attachment_id 附件 ID
      * @return array|null 计划结果；锁被占用或元数据写入失败时返回 null
@@ -200,10 +201,23 @@ class Local_Crush_Thumbnail_Manager {
             // 两者捆在一个判断里会让“一个尺寸都没勾选”时没有任何相近尺寸可选，
             // 结果一个文件都删不掉。
             // $kept 里带着原图，所以挑不到替代只可能是连原图都不在，此时链接不动、文件照删。
+            // 宽高相同的两个尺寸（如 large 与 medium_large）可能共用同一份文件：文件仍被
+            // 保留尺寸使用时只摘掉被删尺寸的元数据条目，不删文件，正文链接也不改写——
+            // 文件还在原地，链接依然有效。
+            $kept_paths = array();
+
+            foreach ( $kept as $size_data ) {
+                $kept_paths[ $this->normalized_path( $size_data['file'] ) ] = true;
+            }
+
             $deletions = array();
             $targets   = array();
 
             foreach ( $victims as $size_name => $size_data ) {
+                if ( isset( $kept_paths[ $this->normalized_path( $size_data['file'] ) ] ) ) {
+                    continue;
+                }
+
                 $deletions[ $size_name ] = $size_data['file'];
 
                 $replacement = $this->nearest_replacement( $size_data, $kept );
@@ -215,11 +229,12 @@ class Local_Crush_Thumbnail_Manager {
 
             // 兼容格式不写进附件元数据，必须按转换映射找到同尺寸的旧文件。
             // 这里不看“兼容格式回退”开关：开关关闭后，磁盘上仍可能留有旧文件。
+            // 只看真正要删文件的尺寸：共用文件没删，它的旧格式回退同样不能动。
             $fallback_by_size = array();
             foreach ( local_crush()->output_processor->get_fallback_entries( $attachment_id ) as $entry ) {
                 $size_type = isset( $entry['size_type'] ) ? (string) $entry['size_type'] : '';
 
-                if ( '' !== $size_type && isset( $victims[ $size_type ] ) ) {
+                if ( '' !== $size_type && isset( $deletions[ $size_type ] ) ) {
                     $fallback_by_size[ $size_type ] = $entry;
                 }
             }
@@ -249,7 +264,8 @@ class Local_Crush_Thumbnail_Manager {
                 );
             }
 
-            foreach ( array_keys( $deletions ) as $size_name ) {
+            // 元数据条目对全部被删尺寸一律摘除；共用文件的尺寸文件仍在，只是名册里去掉这一条。
+            foreach ( array_keys( $victims ) as $size_name ) {
                 unset( $metadata['sizes'][ $size_name ] );
             }
 
@@ -257,7 +273,9 @@ class Local_Crush_Thumbnail_Manager {
                 return null;
             }
 
-            $deleted = 0;
+            $deleted                = 0;
+            $deleted_paths          = array();
+            $deleted_fallback_paths = array();
 
             foreach ( $deletions as $size_name => $path ) {
                 if ( ! $this->is_safe_upload_path( $path ) ) {
@@ -273,7 +291,15 @@ class Local_Crush_Thumbnail_Manager {
                     continue;
                 }
 
-                $deleted++;
+                // 两个被删尺寸共用同一个文件时文件只删一次，计数也只记一次；
+                // 每个尺寸自己的压缩记录仍要逐个清理。
+                $normalized = $this->normalized_path( $path );
+
+                if ( ! isset( $deleted_paths[ $normalized ] ) ) {
+                    $deleted_paths[ $normalized ] = true;
+                    $deleted++;
+                }
+
                 $database = local_crush()->database;
                 $record   = $database->get_record( $attachment_id, $size_name );
 
@@ -291,9 +317,32 @@ class Local_Crush_Thumbnail_Manager {
                     }
 
                     if ( ! file_exists( $fallback_path ) ) {
-                        $deleted++;
+                        $fallback_normalized = $this->normalized_path( $fallback_path );
+
+                        if ( ! isset( $deleted_fallback_paths[ $fallback_normalized ] ) ) {
+                            $deleted_fallback_paths[ $fallback_normalized ] = true;
+                            $deleted++;
+                        }
                     }
                 }
+            }
+
+            // 共用文件被保留尺寸继续使用：文件与其映射对不动，但被删尺寸自己的
+            // 映射条目和压缩记录要清掉，否则明细里会留下没有当前文件对应的孤儿条目。
+            foreach ( $victims as $size_name => $size_data ) {
+                if ( isset( $deletions[ $size_name ] ) ) {
+                    continue;
+                }
+
+                local_crush()->output_processor->remove_output_entry( $attachment_id, $size_name );
+
+                $shared_record = local_crush()->database->get_record( $attachment_id, $size_name );
+
+                if ( $shared_record ) {
+                    local_crush()->database->delete_record( $shared_record['id'] );
+                }
+
+                local_crush()->output_processor->forget_fallback_records( $attachment_id, array( $size_name ) );
             }
 
             if ( ! empty( $fallback_by_size ) ) {

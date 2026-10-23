@@ -264,10 +264,19 @@ class Local_Crush_Output {
             $entry = null;
         }
 
-        // 目标名已被占用时，先给源文件改一个独一无二的名字。新规则下唯一可能的冲突就是
-        // 目标文件本身已存在（上次转换中断的残留，或同名文件）：photo.jpg 与 photo.jpg.webp
-        // 不可能互相撞名，不必再扫目录比主名。
+        // 目标名已被占用时，先看占用者是不是本附件按同一源文件转出的结果：WordPress 会让
+        // 宽高相同的两个尺寸（如 large 与 medium_large）共用同一张缩略图，先转的尺寸已经
+        // 把这份文件转成了新格式。是就共用那份结果，不重复编码，也不会把前者留下的回退
+        // 文件改名挪走；其余情况（上次转换中断的残留，或同名文件）才给源文件改一个
+        // 独一无二的名字。新规则下唯一可能的冲突就是目标文件本身已存在：photo.jpg 与
+        // photo.jpg.webp 不可能互相撞名，不必再扫目录比主名。
         if ( null === $entry && file_exists( $natural_target ) ) {
+            $shared = $this->share_existing_output( $attachment_id, $file_path, $size_type, $natural_target, $original_size, $tool_name );
+
+            if ( null !== $shared ) {
+                return $shared;
+            }
+
             $renamed = $this->rename_source_for_target( $attachment_id, $file_path );
 
             if ( null === $renamed ) {
@@ -540,6 +549,138 @@ class Local_Crush_Output {
             'original_size'   => $original_size,
             'compressed_size' => $compressed_size,
             'tool_name'       => $tool_name,
+        );
+    }
+
+    /**
+     * 目标名被同附件同源文件的转换结果占着时，直接共用那份结果
+     *
+     * WordPress 会让宽高完全相同的两个尺寸（如 large 与 medium_large）共用同一张
+     * 缩略图文件。先转的尺寸已经把这份文件转成新格式并留下旧格式回退，后转的尺寸
+     * 若按改名流程另起炉灶，会把前者留下的回退文件改名挪走，回退列表从此缺一个
+     * 尺寸，还多存一份一模一样的转换结果。共用则两个尺寸各自记一条映射（指向同一
+     * 对文件），元数据由提交阶段统一改到新格式，回退文件也只有那一份。
+     *
+     * 占用者不是本附件按同一源文件转出的结果时返回 null，交回调用方走改名流程。
+     *
+     * @param int    $attachment_id  附件 ID
+     * @param string $file_path      源文件绝对路径
+     * @param string $size_type      尺寸类型
+     * @param string $natural_target 被占用的目标路径
+     * @param int    $original_size  源文件大小
+     * @param string $tool_name      目标格式工具名
+     * @return array|null 共用成功时返回转换结果
+     */
+    private function share_existing_output( int $attachment_id, string $file_path, string $size_type, string $natural_target, int $original_size, string $tool_name ): ?array {
+        $owner_type = '';
+
+        foreach ( $this->get_output_entries( $attachment_id ) as $candidate ) {
+            if ( $this->normalized_path( (string) $candidate['to'] ) !== $this->normalized_path( $natural_target ) ) {
+                continue;
+            }
+
+            // 占用者必须由同一个源文件转出，否则是无关文件占了名字，交给改名流程处理。
+            if ( $this->normalized_path( (string) $candidate['from'] ) !== $this->normalized_path( $file_path ) ) {
+                return null;
+            }
+
+            $owner_type = (string) $candidate['size_type'];
+            break;
+        }
+
+        if ( '' === $owner_type || $owner_type === $size_type || ! is_file( $natural_target ) ) {
+            return null;
+        }
+
+        clearstatcache( true, $natural_target );
+        $compressed_size = (int) filesize( $natural_target );
+
+        if ( $compressed_size <= 0 ) {
+            return null;
+        }
+
+        // 记录沿用占用者的压缩前后大小，明细里两个尺寸的数字才能对得上。
+        $owner_record      = local_crush()->database->get_record( $attachment_id, $owner_type );
+        $record_original   = is_array( $owner_record ) ? max( 0, (int) $owner_record['original_size'] ) : $original_size;
+        $record_compressed = is_array( $owner_record ) ? max( 0, (int) $owner_record['compressed_size'] ) : $compressed_size;
+
+        if ( ! $this->save_record( $attachment_id, $natural_target, $size_type, $record_original, $record_compressed, $tool_name, 'success', '' ) ) {
+            return array(
+                'file_path'       => $file_path,
+                'from'            => $file_path,
+                'to'              => '',
+                'status'          => 'failed',
+                'message'         => __( '压缩记录保存失败，请重新压缩', 'local-crush' ),
+                'original_size'   => $original_size,
+                'compressed_size' => 0,
+            );
+        }
+
+        if ( ! $this->add_output_entry( $attachment_id, $size_type, $file_path, $natural_target ) ) {
+            $this->save_record( $attachment_id, $file_path, $size_type, $original_size, $original_size, $tool_name, 'failed', __( '恢复映射保存失败，已保留原文件', 'local-crush' ) );
+
+            return array(
+                'file_path'       => $file_path,
+                'from'            => $file_path,
+                'to'              => '',
+                'status'          => 'failed',
+                'message'         => __( '恢复映射保存失败，已保留原文件', 'local-crush' ),
+                'original_size'   => $original_size,
+                'compressed_size' => 0,
+            );
+        }
+
+        // 回退文件就是占用者留下的那一份，把回退压缩记录也复制到本尺寸名下，
+        // 否则这个尺寸的回退每轮批量都会被当成待处理，对已经压缩过的旧格式文件再压一遍。
+        $this->clone_fallback_record( $attachment_id, $owner_type, $size_type, $file_path );
+
+        return array(
+            'file_path'       => $natural_target,
+            'from'            => $file_path,
+            'to'              => $natural_target,
+            'size_type'       => $size_type,
+            'status'          => 'success',
+            'message'         => __( '该尺寸与另一尺寸共用同一份转换结果，未重复生成文件', 'local-crush' ),
+            // 没有新文件产生，本次运行不重复计入节省字节数。
+            'original_size'   => $compressed_size,
+            'compressed_size' => $compressed_size,
+            'tool_name'       => $tool_name,
+        );
+    }
+
+    /**
+     * 共用转换结果时，把占用者的回退压缩记录复制到共用尺寸名下
+     *
+     * 回退文件只有一份，但压缩记录按“附件 + 尺寸”唯一：不复制的话，共用尺寸的回退
+     * 每轮批量都会被当成待处理，对已经压缩过的旧格式文件再压一遍，白损一次质量。
+     * 占用者自己还没有回退记录（上次中断在压缩回退之前）时不复制，等它补上后下轮对齐。
+     *
+     * @param int    $attachment_id 附件 ID
+     * @param string $owner_type    占用者的尺寸类型
+     * @param string $size_type     共用尺寸的类型
+     * @param string $fallback_path 共用的回退文件绝对路径
+     */
+    private function clone_fallback_record( int $attachment_id, string $owner_type, string $size_type, string $fallback_path ): void {
+        $record = local_crush()->database->get_record( $attachment_id, $this->fallback_size_type( $owner_type ) );
+
+        // 记录里存的是 uploads 内相对路径，必须与回退文件的相对路径比对。
+        $fallback_relative = $this->get_relative_upload_path( $fallback_path );
+
+        if ( ! is_array( $record )
+            || 'success' !== ( isset( $record['status'] ) ? (string) $record['status'] : '' )
+            || $this->normalized_path( (string) $record['file_path'] ) !== $this->normalized_path( $fallback_relative ) ) {
+            return;
+        }
+
+        $this->save_record(
+            $attachment_id,
+            $fallback_path,
+            $this->fallback_size_type( $size_type ),
+            max( 0, (int) $record['original_size'] ),
+            max( 0, (int) $record['compressed_size'] ),
+            (string) ( isset( $record['tool_name'] ) ? $record['tool_name'] : '' ),
+            'success',
+            ''
         );
     }
 

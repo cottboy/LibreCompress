@@ -2089,6 +2089,11 @@ class Local_Crush_Processor {
             $deleted = array();
 
             foreach ( $entries as $entry ) {
+                // 两个尺寸共用同一份回退文件时，前面的条目已经把它删掉了：跳过即可，不算失败。
+                if ( ! is_file( $entry['from'] ) ) {
+                    continue;
+                }
+
                 // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
                 if ( ! unlink( $entry['from'] ) || file_exists( $entry['from'] ) ) {
                     $result['failed'] = true;
