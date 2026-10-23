@@ -44,10 +44,16 @@ class Local_Crush_Media_Library {
     /**
      * 添加压缩状态列
      *
+     * 状态和按钮只有管理员能用，非管理员直接不显示这一列。
+     *
      * @param array $columns 现有列
      * @return array 修改后的列
      */
     public function add_compression_column( $columns ) {
+        if ( ! current_user_can( 'manage_options' ) ) {
+            return $columns;
+        }
+
         $columns['local_crush'] = __( '压缩', 'local-crush' );
         return $columns;
     }
