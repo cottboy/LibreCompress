@@ -378,6 +378,66 @@ class Local_Crush_Database {
     }
 
     /**
+     * 按附件 ID 游标获取“带未缩放原图”的图片附件
+     *
+     * 未缩放原图记在附件的 _wp_attachment_metadata 里（original_image 键），
+     * 没有独立字段可查，只能按元数据内容筛。meta_key 上有索引，
+     * 扫描范围限定在附件元数据这一批，不会被文章正文拖累。
+     *
+     * @param int $after_id 上一批最后处理的附件 ID
+     * @param int $limit    本批数量
+     * @return int[]
+     */
+    public function get_original_image_attachment_ids_after( $after_id = 0, $limit = 100 ): array {
+        global $wpdb;
+
+        $after_id = absint( $after_id );
+        $limit    = max( 1, min( 200, absint( $limit ) ) );
+
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+        $ids = $wpdb->get_col(
+            $wpdb->prepare(
+                "SELECT p.post_id FROM {$wpdb->postmeta} p
+                INNER JOIN {$wpdb->posts} o ON o.ID = p.post_id
+                WHERE p.meta_key = '_wp_attachment_metadata'
+                AND p.meta_value LIKE %s
+                AND o.post_type = 'attachment'
+                AND o.post_status != 'trash'
+                AND p.post_id > %d
+                ORDER BY p.post_id ASC
+                LIMIT %d",
+                '%' . $wpdb->esc_like( 'original_image' ) . '%',
+                $after_id,
+                $limit
+            )
+        );
+
+        return array_map( 'absint', $ids );
+    }
+
+    /**
+     * 统计带未缩放原图的图片附件数量
+     *
+     * @return int
+     */
+    public function count_original_image_attachments(): int {
+        global $wpdb;
+
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+        return (int) $wpdb->get_var(
+            $wpdb->prepare(
+                "SELECT COUNT(*) FROM {$wpdb->postmeta} p
+                INNER JOIN {$wpdb->posts} o ON o.ID = p.post_id
+                WHERE p.meta_key = '_wp_attachment_metadata'
+                AND p.meta_value LIKE %s
+                AND o.post_type = 'attachment'
+                AND o.post_status != 'trash'",
+                '%' . $wpdb->esc_like( 'original_image' ) . '%'
+            )
+        );
+    }
+
+    /**
      * 统计图片附件总数
      *
      * 批量压缩与缩略图任务按“看过多少张图”推进进度，分母就是它。

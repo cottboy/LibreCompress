@@ -1257,6 +1257,16 @@ class Local_Crush_Settings {
             </tr>
             <tr>
                 <td style="padding: 10px 0;">
+                    <button type="button" class="button" id="local-crush-delete-all-originals">
+                        <?php esc_html_e( '删除所有未缩放的原始大图', 'local-crush' ); ?>
+                    </button>
+                </td>
+                <td style="padding: 10px 0;">
+                    <span class="description"><?php esc_html_e( '删除所有生成过 -scaled 缩放图的图片留在磁盘上的未缩放原始大图：格式转换后的那份和它的旧格式回退文件一并删除，媒体库主图仍是 -scaled 图；不涉及备份，没备份的删掉就找不回来了', 'local-crush' ); ?></span>
+                </td>
+            </tr>
+            <tr>
+                <td style="padding: 10px 0;">
                     <button type="button" class="button" id="local-crush-delete-thumbnails">
                         <?php esc_html_e( '删除未勾选尺寸的缩略图', 'local-crush' ); ?>
                     </button>

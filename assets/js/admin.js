@@ -31,6 +31,7 @@
             '#local-crush-restore-all': { type: 'restore', confirm: 'confirmRestoreAll' },
             '#local-crush-delete-all-backups': { type: 'delete_backups', confirm: 'confirmDeleteAllBackups' },
             '#local-crush-delete-all-fallbacks': { type: 'delete_fallbacks', confirm: 'confirmDeleteAllFallbacks' },
+            '#local-crush-delete-all-originals': { type: 'delete_originals', confirm: 'confirmDeleteAllOriginals' },
             '#local-crush-delete-thumbnails': { type: 'delete_thumbnails', confirm: 'confirmDeleteThumbnails' },
             '#local-crush-generate-thumbnails': { type: 'generate_thumbnails', confirm: 'confirmGenerateThumbnails' }
         },

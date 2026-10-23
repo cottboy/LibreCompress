@@ -116,6 +116,10 @@ class Local_Crush_Task {
                 'label'  => __( '删除所有兼容格式回退', 'local-crush' ),
                 'source' => 'fallbacks',
             ),
+            'delete_originals'    => array(
+                'label'  => __( '删除所有未缩放的原始大图', 'local-crush' ),
+                'source' => 'originals',
+            ),
             'delete_thumbnails'   => array(
                 'label'  => __( '删除未勾选尺寸的缩略图', 'local-crush' ),
                 'source' => 'images',
@@ -631,6 +635,9 @@ class Local_Crush_Task {
             case 'delete_fallbacks':
                 return $this->process_delete_fallback( $attachment_id, $outcome );
 
+            case 'delete_originals':
+                return $this->process_delete_original( $attachment_id, $outcome );
+
             case 'delete_thumbnails':
                 return $this->process_delete_thumbnails( $attachment_id, $outcome );
 
@@ -722,6 +729,30 @@ class Local_Crush_Task {
         );
 
         if ( $failed ) {
+            $outcome['failed'] = 1;
+        } elseif ( $deleted > 0 ) {
+            $outcome['success'] = 1;
+        } else {
+            $outcome['skipped'] = 1;
+        }
+
+        return $outcome;
+    }
+
+    /**
+     * 删除一个附件的未缩放原始大图
+     *
+     * @param int   $attachment_id 附件 ID
+     * @param array $outcome       结果骨架
+     * @return array
+     */
+    private function process_delete_original( int $attachment_id, array $outcome ): array {
+        $result  = local_crush()->processor->delete_original_image( $attachment_id );
+        $deleted = isset( $result['deleted_files'] ) ? (int) $result['deleted_files'] : 0;
+
+        $outcome['detail'] = array( 'files' => $deleted );
+
+        if ( ! empty( $result['failed'] ) ) {
             $outcome['failed'] = 1;
         } elseif ( $deleted > 0 ) {
             $outcome['success'] = 1;
@@ -1021,6 +1052,9 @@ class Local_Crush_Task {
             case 'fallbacks':
                 return $database->get_fallback_attachment_ids_after( $after_id, $limit );
 
+            case 'originals':
+                return $database->get_original_image_attachment_ids_after( $after_id, $limit );
+
             case 'images':
                 return $database->get_image_attachment_ids_after( $after_id, $limit );
         }
@@ -1046,6 +1080,9 @@ class Local_Crush_Task {
 
             case 'fallbacks':
                 return $database->count_fallback_attachments();
+
+            case 'originals':
+                return $database->count_original_image_attachments();
 
             case 'images':
                 return $database->count_image_attachments();
@@ -1143,6 +1180,16 @@ class Local_Crush_Task {
                 if ( ! empty( $detail['content_failed'] ) ) {
                     $summary .= ' ' . __( '部分正文链接未更新成功，可再次执行本操作继续处理。', 'local-crush' );
                 }
+                break;
+
+            case 'delete_originals':
+                $summary = sprintf(
+                    /* translators: 1: 涉及的文件数, 2: 通过的附件数, 3: 失败的附件数 */
+                    __( '已删除 %1$d 个未缩放的原始大图（涉及 %2$d 个附件），失败 %3$d 个', 'local-crush' ),
+                    $files,
+                    (int) $task['success'],
+                    (int) $task['failed']
+                );
                 break;
 
             case 'generate_thumbnails':

@@ -131,7 +131,7 @@ msgstr ""
 msgid "动图处理需要 %s 工具，当前环境未配齐，已跳过"
 msgstr ""
 
-#: includes/class-animation.php:1399 includes/class-settings.php:1659
+#: includes/class-animation.php:1399 includes/class-settings.php:1669
 msgid "或"
 msgstr ""
 
@@ -271,7 +271,7 @@ msgstr ""
 msgid "格式"
 msgstr ""
 
-#: includes/class-local-crush.php:249 includes/class-settings.php:1396 includes/class-settings.php:1439
+#: includes/class-local-crush.php:249 includes/class-settings.php:1406 includes/class-settings.php:1449
 msgid "状态"
 msgstr ""
 
@@ -323,71 +323,71 @@ msgstr ""
 msgid "确定要删除所有兼容格式回退吗？删除后不支持新格式的浏览器将直接加载新格式图片，此操作不可撤销。"
 msgstr ""
 
-#: includes/class-local-crush.php:262 includes/class-media-library.php:369
+#: includes/class-local-crush.php:263 includes/class-media-library.php:369
 msgid "删除备份"
 msgstr ""
 
-#: includes/class-local-crush.php:263 includes/class-media-library.php:375
+#: includes/class-local-crush.php:264 includes/class-media-library.php:375
 msgid "删除兼容格式回退"
 msgstr ""
 
-#: includes/class-local-crush.php:264
+#: includes/class-local-crush.php:265
 msgid "处理中..."
 msgstr ""
 
-#: includes/class-local-crush.php:265
+#: includes/class-local-crush.php:266
 msgid "执行中"
 msgstr ""
 
-#: includes/class-local-crush.php:266
+#: includes/class-local-crush.php:267
 msgid "已完成"
 msgstr ""
 
-#: includes/class-local-crush.php:267
+#: includes/class-local-crush.php:268
 msgid "已停止"
 msgstr ""
 
-#: includes/class-local-crush.php:268
+#: includes/class-local-crush.php:269
 msgid "任务已停滞，点“继续执行”接着跑"
 msgstr ""
 
-#: includes/class-local-crush.php:270
+#: includes/class-local-crush.php:271
 msgid "已处理 %1$d / %2$d"
 msgstr ""
 
-#: includes/class-local-crush.php:272
+#: includes/class-local-crush.php:273
 msgid "已检查 %1$d / %2$d 张图片"
 msgstr ""
 
-#: includes/class-local-crush.php:274
+#: includes/class-local-crush.php:275
 msgid "成功 %1$d，跳过 %2$d，失败 %3$d"
 msgstr ""
 
-#: includes/class-local-crush.php:276
+#: includes/class-local-crush.php:277
 msgid "正在处理：%s"
 msgstr ""
 
-#: includes/class-local-crush.php:278
+#: includes/class-local-crush.php:279
 msgid "已用时 %s"
 msgstr ""
 
-#: includes/class-local-crush.php:280
+#: includes/class-local-crush.php:281
 msgid "%d 秒"
 msgstr ""
 
-#: includes/class-local-crush.php:282
+#: includes/class-local-crush.php:283
 msgid "%1$d 分 %2$d 秒"
 msgstr ""
 
-#: includes/class-local-crush.php:284
+#: includes/class-local-crush.php:285
 msgid "重试失败的 %d 个项目"
 msgstr ""
 
-#: includes/class-local-crush.php:285
+#: includes/class-local-crush.php:286
 msgid "确定停止当前任务吗？已经处理完的部分会保留下来。"
 msgstr ""
 
-#: includes/class-local-crush.php:313
+#: includes/class-local-crush.php:314
 msgid "设置"
 msgstr ""
 
@@ -431,7 +431,7 @@ msgstr ""
 msgid "详情"
 msgstr ""
 
-#: includes/class-media-library.php:429 includes/class-media-library.php:447 includes/class-media-library.php:472 includes/class-media-library.php:508 includes/class-media-library.php:544 includes/class-task.php:214 includes/class-task.php:237 includes/class-task.php:256 includes/class-task.php:270 includes/class-task.php:301
+#: includes/class-media-library.php:429 includes/class-media-library.php:447 includes/class-media-library.php:472 includes/class-media-library.php:508 includes/class-media-library.php:544 includes/class-task.php:218 includes/class-task.php:241 includes/class-task.php:260 includes/class-task.php:274 includes/class-task.php:305
 msgid "权限不足"
 msgstr ""
 
@@ -563,15 +563,15 @@ msgstr ""
 msgid "没有可用的压缩结果"
 msgstr ""
 
-#: includes/class-processor.php:2612
+#: includes/class-processor.php:2695
 msgid "插件正在执行维护操作，请稍后重试"
 msgstr ""
 
-#: includes/class-processor.php:2613
+#: includes/class-processor.php:2696
 msgid "该图片正在处理中，请稍后重试"
 msgstr ""
 
-#: includes/class-processor.php:2616
+#: includes/class-processor.php:2699
 msgid "无法创建锁文件，请检查上传目录的写入权限"
 msgstr ""
 
@@ -1279,255 +1279,255 @@ msgstr ""
 msgid "删除媒体库中转换后保留的旧格式回退文件，并把文章里指向它们的图片链接改到新格式；删除后不支持新格式的浏览器将直接加载新格式图片"
 msgstr ""
 
-#: includes/class-settings.php:1261 includes/class-task.php:120
+#: includes/class-settings.php:1271 includes/class-task.php:124
 msgid "删除未勾选尺寸的缩略图"
 msgstr ""
 
-#: includes/class-settings.php:1265
+#: includes/class-settings.php:1275
 msgid "删除未勾选尺寸已存在的缩略图，文章里指向它们的图片链接会改到面积最接近的现有尺寸；若关闭了自动缩放，或现有 -scaled 缩放图与阈值不符，也会删除缩放图让主图退回原图"
 msgstr ""
 
-#: includes/class-settings.php:1271 includes/class-task.php:124
+#: includes/class-settings.php:1281 includes/class-task.php:128
 msgid "补生成缺失尺寸的缩略图"
 msgstr ""
 
-#: includes/class-settings.php:1275
+#: includes/class-settings.php:1285
 msgid "为已勾选但缺失的尺寸补生成缩略图；若开启了自动缩放且主图超过阈值，还会生成或修正 -scaled 缩放图。不会重建已存在的缩略图，纯缩略图缺失也不改动文章链接"
 msgstr ""
 
-#: includes/class-settings.php:1315
+#: includes/class-settings.php:1325
 msgid "停止任务"
 msgstr ""
 
-#: includes/class-settings.php:1316
+#: includes/class-settings.php:1326
 msgid "继续执行"
 msgstr ""
 
-#: includes/class-settings.php:1317
+#: includes/class-settings.php:1327
 msgid "重试失败的项目"
 msgstr ""
 
-#: includes/class-settings.php:1318
+#: includes/class-settings.php:1328
 msgid "完成"
 msgstr ""
 
-#: includes/class-settings.php:1359
+#: includes/class-settings.php:1369
 msgid "系统状态"
 msgstr ""
 
-#: includes/class-settings.php:1371
+#: includes/class-settings.php:1381
 msgid "可用"
 msgstr ""
 
-#: includes/class-settings.php:1373
+#: includes/class-settings.php:1383
 msgid "不可用"
 msgstr ""
 
-#: includes/class-settings.php:1378
+#: includes/class-settings.php:1388
 msgid "插件的所有压缩都靠 proc_open() 直接启动命令行工具，请联系主机商启用"
 msgstr ""
 
-#: includes/class-settings.php:1385
+#: includes/class-settings.php:1395
 msgid "工具状态"
 msgstr ""
 
-#: includes/class-settings.php:1395
+#: includes/class-settings.php:1405
 msgid "工具"
 msgstr ""
 
-#: includes/class-settings.php:1397
+#: includes/class-settings.php:1407
 msgid "安装路径"
 msgstr ""
 
-#: includes/class-settings.php:1398
+#: includes/class-settings.php:1408
 msgid "链接"
 msgstr ""
 
-#: includes/class-settings.php:1407
+#: includes/class-settings.php:1417
 msgid "已安装"
 msgstr ""
 
-#: includes/class-settings.php:1409
+#: includes/class-settings.php:1419
 msgid "未安装"
 msgstr ""
 
-#: includes/class-settings.php:1421
+#: includes/class-settings.php:1431
 msgid "跳转"
 msgstr ""
 
-#: includes/class-settings.php:1430
+#: includes/class-settings.php:1440
 msgid "安装方式：① 把可执行文件直接放进 /wp-content/local-crush-bin 目录；② 把工具所在文件夹加入系统 Path 环境变量；③ 使用包管理器安装。"
 msgstr ""
 
-#: includes/class-settings.php:1433
+#: includes/class-settings.php:1443
 msgid "路径支持状态"
 msgstr ""
 
-#: includes/class-settings.php:1437
+#: includes/class-settings.php:1447
 msgid "路径"
 msgstr ""
 
-#: includes/class-settings.php:1438
+#: includes/class-settings.php:1448
 msgid "依赖"
 msgstr ""
 
-#: includes/class-settings.php:1449
+#: includes/class-settings.php:1459
 msgid "支持"
 msgstr ""
 
-#: includes/class-settings.php:1451
+#: includes/class-settings.php:1461
 msgid "不支持"
 msgstr ""
 
-#: includes/class-settings.php:1453
+#: includes/class-settings.php:1463
 msgid "缺少：%s"
 msgstr ""
 
-#: includes/class-settings.php:1464
+#: includes/class-settings.php:1474
 msgid "压缩参数"
 msgstr ""
 
-#: includes/class-settings.php:1466
+#: includes/class-settings.php:1476
 msgid "参数按压缩路径分组：只有整条工具链完全一致的路径才共用一节，其余各自独立，改了不会连带改到别的路径。输入框后面标的就是它实际传给哪个工具的哪个参数，取值也就是工具本身的取值范围，插件不做换算、不折算档位，你填多少就传多少；只有超出范围时保存时会收到该参数的边界值，免得把非法数字塞给工具。没列出来的参数一律不传，由工具用自己内部的默认值。每个参数的默认值都优先取压缩工具自己的默认值，工具没有默认值的（比如各编码器的质量）才用插件推荐的平衡值，每项说明里都写明了来头；拿不准全部保持默认就行。改动只影响之后的压缩，已经压好的图片不会自动重压。"
 msgstr ""
 
-#: includes/class-settings.php:1509
+#: includes/class-settings.php:1519
 msgid "有损压缩"
 msgstr ""
 
-#: includes/class-settings.php:1514
+#: includes/class-settings.php:1524
 msgid "无损压缩"
 msgstr ""
 
-#: includes/class-settings.php:1538
+#: includes/class-settings.php:1548
 msgid "范围 %1$d-%2$d，默认 %3$d。"
 msgstr ""
 
-#: includes/class-settings.php:1547
+#: includes/class-settings.php:1557
 msgid "默认：%s。"
 msgstr ""
 
-#: includes/class-settings.php:1607
+#: includes/class-settings.php:1617
 msgid "GD 扩展"
 msgstr ""
 
-#: includes/class-settings.php:1612
+#: includes/class-settings.php:1622
 msgid "JPEG 压缩"
 msgstr ""
 
-#: includes/class-settings.php:1613
+#: includes/class-settings.php:1623
 msgid "PNG 有损压缩"
 msgstr ""
 
-#: includes/class-settings.php:1614
+#: includes/class-settings.php:1624
 msgid "PNG / APNG 无损压缩"
 msgstr ""
 
-#: includes/class-settings.php:1615
+#: includes/class-settings.php:1625
 msgid "GIF 压缩"
 msgstr ""
 
-#: includes/class-settings.php:1616
+#: includes/class-settings.php:1626
 msgid "SVG 压缩"
 msgstr ""
 
-#: includes/class-settings.php:1617
+#: includes/class-settings.php:1627
 msgid "WebP 压缩 / PNG·JPG 转 WebP"
 msgstr ""
 
-#: includes/class-settings.php:1618
+#: includes/class-settings.php:1628
 msgid "动画 WebP 压缩 / APNG 转 WebP"
 msgstr ""
 
-#: includes/class-settings.php:1619
+#: includes/class-settings.php:1629
 msgid "AVIF 同格式压缩"
 msgstr ""
 
-#: includes/class-settings.php:1620
+#: includes/class-settings.php:1630
 msgid "动画 AVIF 同格式压缩"
 msgstr ""
 
-#: includes/class-settings.php:1621
+#: includes/class-settings.php:1631
 msgid "JPEG XL 压缩 / 全部转 JPEG XL"
 msgstr ""
 
-#: includes/class-settings.php:1622
+#: includes/class-settings.php:1632
 msgid "静态 GIF 转 WebP"
 msgstr ""
 
-#: includes/class-settings.php:1623
+#: includes/class-settings.php:1633
 msgid "动画 GIF 转 WebP"
 msgstr ""
 
-#: includes/class-settings.php:1624
+#: includes/class-settings.php:1634
 msgid "PNG / JPG 转 AVIF"
 msgstr ""
 
-#: includes/class-settings.php:1625
+#: includes/class-settings.php:1635
 msgid "静态 GIF 转 AVIF"
 msgstr ""
 
-#: includes/class-settings.php:1626
+#: includes/class-settings.php:1636
 msgid "动画 GIF / APNG 转 AVIF"
 msgstr ""
 
-#: includes/class-task.php:276 includes/class-task.php:282
+#: includes/class-task.php:280 includes/class-task.php:286
 msgid "没有可重试的失败记录"
 msgstr ""
 
-#: includes/class-task.php:308
+#: includes/class-task.php:312
 msgid "任务还在执行，请先停止再关闭面板"
 msgstr ""
 
-#: includes/class-task.php:332
+#: includes/class-task.php:336
 msgid "无效的操作类型"
 msgstr ""
 
-#: includes/class-task.php:338
+#: includes/class-task.php:342
 msgid "已有批量任务正在执行，请等它跑完，或先点“停止任务”"
 msgstr ""
 
-#: includes/class-task.php:1081
+#: includes/class-task.php:1118
 msgid "没有需要处理的项目"
 msgstr ""
 
-#: includes/class-task.php:1092
+#: includes/class-task.php:1129
 msgid "%1$s - 成功: %2$d, 跳过: %3$d, 失败: %4$d"
 msgstr ""
 
-#: includes/class-task.php:1103
+#: includes/class-task.php:1140
 msgid "%1$s - 成功: %2$d, 失败: %3$d"
 msgstr ""
 
-#: includes/class-task.php:1113
+#: includes/class-task.php:1150
 msgid "已删除 %1$d 个附件上的 %2$d 个备份文件，失败 %3$d 个"
 msgstr ""
 
-#: includes/class-task.php:1123
+#: includes/class-task.php:1160
 msgid "已删除 %1$d 个附件上的 %2$d 个兼容格式回退文件，替换了 %3$d 个图片链接"
 msgstr ""
 
-#: includes/class-task.php:1130 includes/class-task.php:1144
+#: includes/class-task.php:1167 includes/class-task.php:1181
 msgid "部分正文链接未更新成功，可再次执行本操作继续处理。"
 msgstr ""
 
-#: includes/class-task.php:1137
+#: includes/class-task.php:1174
 msgid "已删除 %1$d 个未勾选尺寸的缩略图（涉及 %2$d 个附件），替换了 %3$d 个图片链接"
 msgstr ""
 
-#: includes/class-task.php:1151
+#: includes/class-task.php:1198
 msgid "已为 %1$d 个附件补生成 %2$d 个缩略图（%3$d 个无需处理或已跳过，%4$d 个失败）"
 msgstr ""
 
-#: includes/class-task.php:1169
+#: includes/class-task.php:1216
 msgid "失败附件 ID：%s"
 msgstr ""
 
-#: includes/class-task.php:1176
+#: includes/class-task.php:1223
 msgid "（共 %d 个，仅显示前 10 个）"
 msgstr ""
 
-#: includes/class-task.php:1185
+#: includes/class-task.php:1232
 msgid "任务已停止：本次共处理 %d 个附件，可以随时再执行一次继续处理剩余部分。"
 msgstr ""
 
@@ -1557,4 +1557,21 @@ msgstr ""
 
 #: includes/class-settings.php:1174
 msgid "原图超过阈值时 WordPress 会另存一张 -scaled 缩放图当媒体库的全尺寸主图，未缩放的那份原始大图只躺在上传目录里，没有任何按钮能调用到。勾选后，手动或自动压缩结束时会把它删掉，只保留 -scaled 图，省下一份原始大图的磁盘占用；上传生图时不会删，删除只发生在压缩的时候。媒体库和文章里的图片都走 -scaled 图，不受影响，只有自己手动填过未缩放原图地址的地方会失效。开了“备份原图”的随时能恢复，没开备份的删掉就找不回来了；恢复原图时会按当前缩放设置重新生成 -scaled 图，并保留恢复出来的原图。本选项只对之后压缩的图片生效，之前已经压缩完的图片不会被清理。取消上面的“自动缩放超尺寸的主图”后本选项不起作用。"
+msgstr ""
+
+#: includes/class-local-crush.php:262
+msgid "确定要删除所有未缩放的原始大图吗？只处理生成过 -scaled 缩放图的图片，格式转换后的那份和它的旧格式回退文件会一起删除，媒体库主图仍是 -scaled 图。此操作不涉及备份，没有备份的图片删除后无法恢复，且不可撤销。"
+msgstr ""
+
+#: includes/class-settings.php:1261 includes/class-task.php:120
+msgid "删除所有未缩放的原始大图"
+msgstr ""
+
+#: includes/class-settings.php:1265
+msgid "删除所有生成过 -scaled 缩放图的图片留在磁盘上的未缩放原始大图：格式转换后的那份和它的旧格式回退文件一并删除，媒体库主图仍是 -scaled 图；不涉及备份，没备份的删掉就找不回来了"
+msgstr ""
+
+#, php-format
+#: includes/class-task.php:1188
+msgid "已删除 %1$d 个未缩放的原始大图（涉及 %2$d 个附件），失败 %3$d 个"
 msgstr ""

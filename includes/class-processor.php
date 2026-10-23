@@ -781,6 +781,19 @@ class Local_Crush_Processor {
     }
 
     /**
+     * 元数据里是否记着未缩放的原始大图
+     *
+     * original_image 非空就说明这张图上传时超过阈值、另存过 -scaled 缩放图，
+     * 未缩放的那份仍留在上传目录里。
+     *
+     * @param array $metadata 附件元数据
+     * @return bool
+     */
+    private function has_unscaled_original( array $metadata ): bool {
+        return ! empty( $metadata['file'] ) && ! empty( $metadata['original_image'] );
+    }
+
+    /**
      * 本次压缩后是否要删掉未缩放的原始大图
      *
      * 三个条件缺一不可：设置里开着“压缩后删除未缩放的原始大图”、开着自动缩放、
@@ -795,7 +808,7 @@ class Local_Crush_Processor {
             return false;
         }
 
-        return ! empty( $metadata['file'] ) && ! empty( $metadata['original_image'] );
+        return $this->has_unscaled_original( $metadata );
     }
 
     /**
@@ -856,14 +869,23 @@ class Local_Crush_Processor {
      * 旧格式回退文件与压缩记录，不留任何指向已删文件的痕迹。原图早就不在磁盘上时
      * 只清理这些残留指向，不动主图。
      *
-     * @param int $attachment_id 附件 ID
-     * @return bool 是否真的删掉了未缩放原图（原图本来就不在时返回 false）
+     * @param int  $attachment_id   附件 ID
+     * @param bool $ignore_settings 为 true 时只看数据、不看两个设置开关（批量按钮用）
+     * @return int 实际删掉的文件数（原图 + 它的旧格式回退），没删任何文件时为 0
      */
-    private function delete_unscaled_original( int $attachment_id ): bool {
+    private function delete_unscaled_original( int $attachment_id, bool $ignore_settings = false ): int {
         $metadata = wp_get_attachment_metadata( $attachment_id );
 
-        if ( ! is_array( $metadata ) || ! $this->should_drop_unscaled_original( $metadata ) ) {
-            return false;
+        if ( ! is_array( $metadata ) ) {
+            return 0;
+        }
+
+        $allowed = $ignore_settings
+            ? $this->has_unscaled_original( $metadata )
+            : $this->should_drop_unscaled_original( $metadata );
+
+        if ( ! $allowed ) {
+            return 0;
         }
 
         $base_dir = untrailingslashit( wp_normalize_path( wp_upload_dir()['basedir'] ) );
@@ -876,46 +898,47 @@ class Local_Crush_Processor {
         // 元数据属于不可信数据，拼出来的路径先按字面排掉回溯写法与多余层级。
         if ( '' === $main_rel || '' === wp_basename( $orig_rel )
             || false !== strpos( $orig_rel, '..' ) || false !== strpos( $orig_rel, ':' ) ) {
-            return false;
+            return 0;
         }
 
         // 主图必须真实可用：原图删掉后媒体库只剩它撑门面，它有问题就一个都不能动。
         if ( $this->normalized_path( $main_abs ) === $this->normalized_path( $orig_abs )
             || ! $this->is_safe_processing_path( $main_abs ) ) {
-            return false;
+            return 0;
         }
 
         clearstatcache( true, $main_abs );
 
         if ( (int) filesize( $main_abs ) <= 0 ) {
-            return false;
+            return 0;
         }
 
         // 未缩放原图必须是 uploads 内的普通文件，符号链接一律不碰。
         if ( is_link( $orig_abs ) ) {
-            return false;
+            return 0;
         }
 
         $had_original = is_file( $orig_abs );
 
         if ( $had_original ) {
             if ( ! $this->is_inside_upload_dir( $orig_abs ) ) {
-                return false;
+                return 0;
             }
 
             // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink -- 已确认是 uploads 内的普通文件，不会删到目录外或符号链接目标。
             if ( ! unlink( $orig_abs ) || file_exists( $orig_abs ) ) {
                 // 删不掉就保持现状，下次压缩还能再试，不能留下“文件还在、记录没了”的状态。
-                return false;
+                return 0;
             }
         }
 
-        $this->forget_unscaled_original_traces( $attachment_id, $orig_abs );
+        $deleted = $had_original ? 1 : 0;
+        $deleted += $this->forget_unscaled_original_traces( $attachment_id, $orig_abs );
 
         unset( $metadata['original_image'] );
         wp_update_attachment_metadata( $attachment_id, $metadata );
 
-        return $had_original;
+        return $deleted;
     }
 
     /**
@@ -927,8 +950,11 @@ class Local_Crush_Processor {
      *
      * @param int    $attachment_id 附件 ID
      * @param string $original_path 已删除的未缩放原图绝对路径
+     * @return int 跟着删掉的旧格式回退文件数
      */
-    private function forget_unscaled_original_traces( int $attachment_id, string $original_path ): void {
+    private function forget_unscaled_original_traces( int $attachment_id, string $original_path ): int {
+        $deleted = 0;
+
         foreach ( local_crush()->output_processor->get_output_entries( $attachment_id ) as $entry ) {
             if ( 'original_image' !== (string) $entry['size_type'] ) {
                 continue;
@@ -939,7 +965,9 @@ class Local_Crush_Processor {
             if ( $this->normalized_path( $fallback_file ) !== $this->normalized_path( $original_path )
                 && is_file( $fallback_file ) && ! is_link( $fallback_file ) && $this->is_inside_upload_dir( $fallback_file ) ) {
                 // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink -- 已确认是 uploads 内的普通文件，不会删到目录外或符号链接目标。
-                unlink( $fallback_file );
+                if ( unlink( $fallback_file ) ) {
+                    $deleted++;
+                }
             }
 
             local_crush()->output_processor->remove_output_entry( $attachment_id, 'original_image' );
@@ -951,6 +979,8 @@ class Local_Crush_Processor {
         if ( is_array( $record ) && ! empty( $record['id'] ) ) {
             local_crush()->database->delete_record( (int) $record['id'] );
         }
+
+        return $deleted;
     }
 
     /**
@@ -1934,6 +1964,59 @@ class Local_Crush_Processor {
         delete_post_meta( $attachment_id, self::RESTORE_STATE_META_KEY );
 
         return ! $this->has_restore_state( $attachment_id );
+    }
+
+    /**
+     * 删除附件的未缩放原始大图（批量按钮入口）
+     *
+     * 与压缩流程里的自动清理共用同一套判断和清理逻辑，区别只有两点：不看
+     * “压缩后删除未缩放的原始大图”和“自动缩放”两个开关（按钮是明确指令），
+     * 以及批处理需要自己拿锁。
+     *
+     * @param int $attachment_id 附件 ID
+     * @return array deleted_files、failed
+     */
+    public function delete_original_image( int $attachment_id ): array {
+        $result = array(
+            'deleted_files' => 0,
+            'failed'        => false,
+        );
+
+        if ( ! $this->is_valid_attachment( $attachment_id ) ) {
+            $result['failed'] = true;
+            return $result;
+        }
+
+        $lock = $this->acquire_attachment_lock( $attachment_id );
+
+        if ( false === $lock ) {
+            $result['failed'] = true;
+            return $result;
+        }
+
+        $global_lock = $this->acquire_global_lock( false );
+
+        if ( false === $global_lock ) {
+            $this->release_attachment_lock( $lock );
+            $result['failed'] = true;
+            return $result;
+        }
+
+        try {
+            $result['deleted_files'] = $this->delete_unscaled_original( $attachment_id, true );
+
+            // 删完元数据还记着未缩放原图，说明主图有问题或文件删不动，如实报失败。
+            $after = wp_get_attachment_metadata( $attachment_id );
+
+            if ( 0 === $result['deleted_files'] && is_array( $after ) && $this->has_unscaled_original( $after ) ) {
+                $result['failed'] = true;
+            }
+
+            return $result;
+        } finally {
+            $this->release_attachment_lock( $global_lock );
+            $this->release_attachment_lock( $lock );
+        }
     }
 
     /**
