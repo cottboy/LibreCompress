@@ -390,7 +390,6 @@ function local_crush_activate() {
         'backup_enabled'           => true,
         'backup_retention_days'    => -1,
         'strip_metadata'           => true,
-        'resize_lossless'          => false,
         'fallback_enabled'         => false,
         'image_scale_enabled'      => true,
         'image_size_threshold'     => 2560,

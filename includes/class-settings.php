@@ -884,20 +884,6 @@ class Local_Crush_Settings {
         return ! isset( $general['strip_metadata'] ) || (bool) $general['strip_metadata'];
     }
 
-    /**
-     * 调整图片尺寸时是否把保存质量拉满
-     *
-     * 开启后 WordPress 用 GD / Imagick 缩放图片（缩略图与 -scaled 缩放图）保存时，
-     * JPG / WebP / AVIF 一律用质量 100，避免在插件压缩之前先被聚合引擎压一遍。
-     *
-     * @return bool
-     */
-    public static function resize_is_lossless(): bool {
-        $general = get_option( 'local_crush_general', array() );
-
-        return ! empty( $general['resize_lossless'] );
-    }
-
     public function __construct() {
         $this->init_hooks();
     }
@@ -944,8 +930,6 @@ class Local_Crush_Settings {
         $sanitized['delete_unscaled_original'] = ! empty( $input['delete_unscaled_original'] );
         $sanitized['strip_metadata']        = ! empty( $input['strip_metadata'] );
 
-        // 缩放画质开关
-        $sanitized['resize_lossless'] = ! empty( $input['resize_lossless'] );
         // 缩略图尺寸：每个尺寸都有隐藏域 0 和复选框 1 两个同名输入，后提交的复选框生效，
         // 所以未勾选时也会带上 0；表单里没有这组字段时保留原状态。
         if ( array_key_exists( 'thumbnail_state', $input ) ) {
@@ -1088,16 +1072,6 @@ class Local_Crush_Settings {
                     </td>
                 </tr>
                 <tr>
-                    <th scope="row"><?php esc_html_e( '缩放画质', 'local-crush' ); ?></th>
-                    <td>
-                        <label style="display:block;">
-                            <input type="checkbox" name="local_crush_general[resize_lossless]" value="1" <?php checked( Local_Crush_Settings::resize_is_lossless() ); ?>>
-                            <?php esc_html_e( '调整图片尺寸时把保存质量拉满', 'local-crush' ); ?>
-                        </label>
-                        <p class="description"><?php esc_html_e( 'WordPress 生成缩略图和 -scaled 缩放图时，会用 GD / Imagick 把图片重新编码一遍，默认质量会把画质先损耗一次，压缩工具再怎么调也补不回来。勾选后，JPG、WebP、AVIF、JPEG XL 保存时一律用质量 100，先保住画质再交给各格式的专精工具压缩；PNG、GIF 这类本来就是无损编码，质量参数在它们身上会被换算成压缩级别，改它只会让文件变大，所以不碰。注意：JPG 是有损格式，质量 100 只是肉眼看不出差别，不是数学意义上的无损；代价是这一步的中间文件更大、生成缩略图稍慢。', 'local-crush' ); ?></p>
-                    </td>
-                </tr>
-                <tr>
                     <th scope="row"><?php esc_html_e( 'SVG 上传', 'local-crush' ); ?></th>
                     <td>
                         <label>
@@ -1166,7 +1140,7 @@ class Local_Crush_Settings {
                             <input type="number" name="local_crush_general[image_size_threshold]" value="<?php echo esc_attr( Local_Crush_Settings::image_size_threshold() ); ?>" min="1" max="20000" step="1" class="small-text">
                             <?php esc_html_e( '像素', 'local-crush' ); ?>
                         </label>
-                        <p class="description" style="margin-top:0;"><?php esc_html_e( '勾选后，上传或补生成缩略图时，宽或高超过此阈值的主图会另存为 -scaled 缩放图并接管主文件，未缩放的源文件仍留在磁盘上；不勾选则关闭自动缩放，原图直接投入使用。压缩已有图片时不会改动缩放，改动缩放请用下方的“删除未勾选尺寸的缩略图”和“补生成缺失尺寸的缩略图”两个按钮。默认 2560，与 WordPress 默认一致。', 'local-crush' ); ?></p>
+                        <p class="description" style="margin-top:0; margin-bottom:12px;"><?php esc_html_e( '勾选后，上传或补生成缩略图时，宽或高超过此阈值的主图会另存为 -scaled 缩放图并接管主文件，未缩放的源文件仍留在磁盘上；不勾选则关闭自动缩放，原图直接投入使用。压缩已有图片时不会改动缩放，改动缩放请用下方的“删除未勾选尺寸的缩略图”和“补生成缺失尺寸的缩略图”两个按钮。默认 2560，与 WordPress 默认一致。', 'local-crush' ); ?></p>
                         <label style="display:block; margin-bottom:10px;">
                             <input type="checkbox" name="local_crush_general[delete_unscaled_original]" value="1" <?php checked( Local_Crush_Settings::delete_unscaled_original() ); ?>>
                             <?php esc_html_e( '压缩后删除未缩放的原始大图', 'local-crush' ); ?>

@@ -33,28 +33,6 @@ class Local_Crush_Thumbnail_Manager {
 
         // 按设置调整大图缩放阈值
         add_filter( 'big_image_size_threshold', array( $this, 'filter_big_image_size_threshold' ) );
-
-        // 按设置把缩放保存质量拉满，避免 GD / Imagick 先压一遍再交给专精工具
-        add_filter( 'wp_editor_set_quality', array( $this, 'filter_editor_quality' ), 10, 2 );
-    }
-
-    /**
-     * 调整图片尺寸时覆盖保存质量
-     *
-     * 只对这几个有损格式生效：JPG、WebP、AVIF、JXL。开启后一律用 100。
-     * 其它格式（PNG、GIF 等）原样放行——它们本来就是无损编码，
-     * 质量参数在那边会被换算成压缩级别，改它只会让文件变大。
-     *
-     * @param int    $quality   当前质量
-     * @param string $mime_type 输出 MIME
-     * @return int
-     */
-    public function filter_editor_quality( $quality, $mime_type = '' ) {
-        if ( ! Local_Crush_Settings::resize_is_lossless() ) {
-            return $quality;
-        }
-
-        return in_array( $mime_type, array( 'image/jpeg', 'image/webp', 'image/avif', 'image/jxl' ), true ) ? 100 : $quality;
     }
 
     /**
